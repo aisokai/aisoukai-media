@@ -5,10 +5,14 @@ import { Search, Menu, X } from "lucide-react"
 import { useState } from "react"
 
 const navItems = [
+  { name: "虫歯治療", href: "/category/cavity", color: "#3b82f6" },
+  { name: "根管治療", href: "/category/root-canal", color: "#ef4444" },
+  { name: "歯周病治療", href: "/category/periodontal", color: "#f97316" },
   { name: "予防歯科", href: "/category/preventive", color: "#22c55e" },
-  { name: "訪問歯科", href: "/category/home-visit", color: "#14b8a6" },
-  { name: "小児歯科", href: "/category/pediatric", color: "#f97316" },
-  { name: "医院からのお知らせ", href: "/category/news", color: "#8b5cf6" },
+  { name: "小児歯科", href: "/category/pediatric", color: "#14b8a6" },
+  { name: "親知らず", href: "/category/wisdom-tooth", color: "#ec4899" },
+  { name: "インプラント", href: "/category/implant", color: "#0ea5e9" },
+  { name: "その他", href: "/category/other", color: "#6b7280" },
 ]
 
 export function Header() {
@@ -69,13 +73,13 @@ export function Header() {
       {/* 下段（デスクトップのみ）: ナビゲーション pills */}
       <div className="hidden border-b border-gray-100 bg-gray-50/50 md:block">
         <div className="mx-auto max-w-[1100px] px-4">
-          <nav className="flex items-center justify-center gap-2 py-3">
+          <nav className="flex items-center justify-center gap-1.5 py-2">
             {navItems.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
                 // ホバー時に各カラー背景 + 白文字になるよう group を使用
-                className="group relative overflow-hidden rounded-full border border-gray-200 bg-white px-4 py-2 text-[13px] font-medium text-gray-600 shadow-sm transition-all duration-200 hover:border-transparent hover:text-white hover:shadow-md"
+                className="group relative overflow-hidden rounded-full border border-gray-200 bg-white px-3 py-1.5 text-[12px] font-medium text-gray-600 shadow-sm transition-all duration-200 hover:border-transparent hover:text-white hover:shadow-md"
               >
                 {/* ホバー時に表示するカラー背景レイヤー */}
                 <span
