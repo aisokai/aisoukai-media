@@ -1,36 +1,31 @@
-import type { Metadata } from 'next';
-import { getAllPosts } from '@/lib/posts';
-import { ArticleCard } from '@/components/ArticleCard';
-
-export const metadata: Metadata = {
-  title: '記事一覧',
-  description: '歯科医療・予防・訪問歯科・医院情報に関する最新記事の一覧です。',
-};
+import { getAllPosts } from '@/lib/posts'
+import { ArticleCard } from '@/components/ArticleCard'
+import { Sidebar } from '@/components/Sidebar'
+import { HeroSection } from '@/components/HeroSection'
 
 export default function BlogPage() {
-  const posts = getAllPosts();
+  const posts = getAllPosts()
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-14">
-      <header className="mb-12">
-        <p className="text-xs font-semibold tracking-[0.15em] text-blue-600 uppercase mb-2">
-          Articles
-        </p>
-        <h1 className="text-3xl font-bold text-gray-900">記事一覧</h1>
-        <p className="text-sm text-gray-400 mt-2">{posts.length}件の記事</p>
-      </header>
-
-      {posts.length > 0 ? (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {posts.map((post) => (
-            <ArticleCard key={post.slug} {...post} />
-          ))}
+    <>
+      <HeroSection
+        title="記事一覧"
+        description="歯科に関する専門的な情報をわかりやすくお届けします"
+      />
+      <div className="mx-auto max-w-[1100px] px-4 py-8">
+        <div className="flex flex-col gap-8 lg:flex-row">
+          <div className="min-w-0 flex-1">
+            <div className="grid gap-5 sm:grid-cols-2">
+              {posts.map((post) => (
+                <ArticleCard key={post.slug} {...post} />
+              ))}
+            </div>
+          </div>
+          <aside className="shrink-0 lg:w-[300px]">
+            <Sidebar />
+          </aside>
         </div>
-      ) : (
-        <div className="text-center py-24 text-gray-400">
-          <p>記事を準備中です。しばらくお待ちください。</p>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    </>
+  )
 }
