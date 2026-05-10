@@ -8,28 +8,48 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-800;
+    @apply bg-white text-gray-800;
   }
 }
 
 @layer utilities {
-  /* 記事本文 typography */
+  /* 記事本文 typography — 医療メディアの読みやすさを優先 */
+  .prose {
+    @apply text-gray-700 leading-loose;
+  }
+
   .prose h2 {
-    @apply text-xl font-bold text-slate-900 mt-10 mb-4 pb-2 border-b border-slate-200;
+    @apply text-xl font-bold text-gray-900 mt-12 mb-5 pl-4;
+    border-left: 4px solid #2563eb;
   }
+
   .prose h3 {
-    @apply text-lg font-semibold text-slate-800 mt-8 mb-3;
+    @apply text-lg font-semibold text-gray-800 mt-8 mb-3;
   }
+
   .prose p {
-    @apply text-slate-700 leading-relaxed mb-6;
+    @apply mb-6 leading-loose;
   }
+
   .prose ul {
-    @apply list-disc list-inside space-y-1 mb-6 text-slate-700;
+    @apply pl-6 mb-6 space-y-2;
+    list-style-type: disc;
   }
+
+  .prose ol {
+    @apply pl-6 mb-6 space-y-2;
+    list-style-type: decimal;
+  }
+
   .prose li {
-    @apply leading-relaxed;
+    @apply leading-relaxed text-gray-700;
   }
+
   .prose strong {
-    @apply font-semibold text-slate-900;
+    @apply font-bold text-gray-900;
+  }
+
+  .prose a {
+    @apply text-blue-600 underline underline-offset-2 hover:text-blue-800 transition-colors;
   }
 }
