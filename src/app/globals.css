@@ -1,55 +1,29 @@
 @import "tailwindcss";
 
 @layer base {
-  html {
-    font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Noto Sans JP',
-      'Meiryo', sans-serif;
-    -webkit-font-smoothing: antialiased;
-  }
-
   body {
-    @apply bg-white text-gray-800;
+    @apply bg-[#f7f7f7] text-gray-800;
   }
 }
 
 @layer utilities {
-  /* 記事本文 typography — 医療メディアの読みやすさを優先 */
-  .prose {
-    @apply text-gray-700 leading-loose;
-  }
-
   .prose h2 {
     @apply text-xl font-bold text-gray-900 mt-12 mb-5 pl-4;
-    border-left: 4px solid #2563eb;
+    border-left: 4px solid #1e3a5f;
   }
-
   .prose h3 {
-    @apply text-lg font-semibold text-gray-800 mt-8 mb-3;
+    @apply text-lg font-bold text-gray-800 mt-8 mb-3;
   }
-
   .prose p {
-    @apply mb-6 leading-loose;
-  }
-
-  .prose ul {
-    @apply pl-6 mb-6 space-y-2;
-    list-style-type: disc;
-  }
-
-  .prose ol {
-    @apply pl-6 mb-6 space-y-2;
-    list-style-type: decimal;
-  }
-
-  .prose li {
     @apply leading-relaxed text-gray-700;
   }
-
-  .prose strong {
-    @apply font-bold text-gray-900;
-  }
-
   .prose a {
-    @apply text-blue-600 underline underline-offset-2 hover:text-blue-800 transition-colors;
+    @apply text-[#1e3a5f] underline underline-offset-2;
+  }
+  .prose ul {
+    @apply list-disc pl-6 space-y-1;
+  }
+  .prose ol {
+    @apply list-decimal pl-6 space-y-1;
   }
 }
