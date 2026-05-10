@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { getAllPosts } from '@/lib/posts';
-import ArticleCard from '@/components/ArticleCard';
+import { ArticleCard } from '@/components/ArticleCard';
 
 const CATEGORIES = [
   { name: '予防歯科', desc: 'むし歯・歯周病の予防と定期ケア' },
@@ -69,7 +69,7 @@ export default function HomePage() {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {recentPosts.map((post) => (
-              <ArticleCard key={post.slug} post={post} />
+              <ArticleCard key={post.slug} {...post} />
             ))}
           </div>
         </section>

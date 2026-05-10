@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getAllPosts } from '@/lib/posts';
-import ArticleCard from '@/components/ArticleCard';
+import { ArticleCard } from '@/components/ArticleCard';
 
 export const metadata: Metadata = {
   title: '記事一覧',
@@ -23,7 +23,7 @@ export default function BlogPage() {
       {posts.length > 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {posts.map((post) => (
-            <ArticleCard key={post.slug} post={post} />
+            <ArticleCard key={post.slug} {...post} />
           ))}
         </div>
       ) : (
