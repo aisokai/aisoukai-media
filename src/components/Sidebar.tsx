@@ -73,7 +73,7 @@ export function Sidebar() {
             return (
               <Link
                 key={post.slug}
-                href={`/posts/${post.slug}`}
+                href={`/blog/${post.slug}`}
                 className={`group flex items-start gap-3 py-3 ${
                   index !== recentPosts.length - 1 ? 'border-b border-gray-100' : ''
                 }`}
