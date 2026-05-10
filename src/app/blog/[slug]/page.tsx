@@ -34,7 +34,7 @@ export async function generateMetadata({
   if (!post) return {}
   return {
     title: post.title,
-    description: post.description,
+    description: post.excerpt,
   }
 }
 
@@ -98,7 +98,7 @@ export default async function ArticlePage({
 
                 {/* Description */}
                 <div className="mb-6 border-l-4 border-[#1e3a5f] bg-blue-50 p-4">
-                  <p className="text-[14px] leading-relaxed text-gray-600">{post.description}</p>
+                  <p className="text-[14px] leading-relaxed text-gray-600">{post.excerpt}</p>
                 </div>
 
                 {/* Tags */}

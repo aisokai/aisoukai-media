@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   "矯正歯科": Smile,
 }
 
-export function ArticleCard({ slug, title, description, category, date, image }: PostMeta) {
+export function ArticleCard({ slug, title, excerpt, category, date, image }: PostMeta) {
   const color = CATEGORY_COLORS[category] ?? '#6b7280'
   const Icon = CATEGORY_ICONS[category] ?? HelpCircle
 
@@ -70,7 +70,7 @@ export function ArticleCard({ slug, title, description, category, date, image }:
           {title}
         </h3>
         <p className="mb-3 line-clamp-2 flex-1 text-[13px] leading-relaxed text-gray-500">
-          {description}
+          {excerpt}
         </p>
         <div className="flex items-center gap-1 text-[11px] text-gray-400">
           <Clock className="h-3 w-3" />
