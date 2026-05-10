@@ -56,6 +56,14 @@ function validatePost(filename) {
     errors.push('excerpt が空です')
   }
 
+  if (typeof data.author === 'string' && data.author.trim() === '') {
+    errors.push('author が空です')
+  }
+
+  if (typeof data.image === 'string' && data.image.trim() !== '' && !data.image.startsWith('/')) {
+    errors.push(`image のパスが "/" で始まっていません: "${data.image}"`)
+  }
+
   if (data.category !== undefined && !VALID_CATEGORIES.includes(data.category)) {
     errors.push(`category が無効です: "${data.category}"`)
   }
