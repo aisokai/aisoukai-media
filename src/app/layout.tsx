@@ -5,8 +5,8 @@ import Footer from '@/components/Footer';
 
 export const metadata: Metadata = {
   title: {
-    default: '愛走会メディア | 歯科医療・AI技術の最新情報',
-    template: '%s | 愛走会メディア',
+    default: '藍想会メディア | 歯科医療・AI技術の最新情報',
+    template: '%s | 藍想会メディア',
   },
   description:
     '歯科医療・AI技術・口腔健康に関する最新情報を専門家の視点でお届けする歯科メディアです。',
