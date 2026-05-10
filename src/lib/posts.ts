@@ -13,6 +13,7 @@ export type PostMeta = {
   description: string;
   category: string;
   tags: string[];
+  image?: string;   // frontmatter の image フィールド（省略可）
 };
 
 export type Post = PostMeta & {
@@ -37,6 +38,7 @@ export function getAllPosts(): PostMeta[] {
       description: data.description as string,
       category: data.category as string,
       tags: (data.tags as string[]) ?? [],
+      image: data.image as string | undefined,
     };
   });
 
@@ -64,6 +66,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
     description: data.description as string,
     category: data.category as string,
     tags: (data.tags as string[]) ?? [],
+    image: data.image as string | undefined,
     contentHtml,
   };
 }
