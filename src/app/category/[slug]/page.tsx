@@ -39,7 +39,7 @@ export default async function CategoryPage({ params }: Props) {
   const { slug } = await params
   const category = CATEGORY_SLUG_MAP[slug]
 
-  if (!category) notFound()
+  if (!category) return notFound()
 
   const posts = getAllPosts().filter((p) => p.category === category)
 
