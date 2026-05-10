@@ -13,6 +13,7 @@ const navItems = [
   { name: "親知らず", href: "/category/wisdom-tooth", color: "#ec4899" },
   { name: "インプラント", href: "/category/implant", color: "#0ea5e9" },
   { name: "その他", href: "/category/other", color: "#6b7280" },
+  { name: "お知らせ", href: "/category/news", color: "#8b5cf6" },
 ]
 
 export function Header() {
