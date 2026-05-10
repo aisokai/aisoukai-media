@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const POSTS_DIR = join(ROOT, 'content', 'posts')
+
+// YAML文字列内の特殊文字をエスケープ（Bug 1: YAML注入対策）
+const esc = (s) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
 const VALID_CATEGORIES = [
   '虫歯治療', '根管治療', '歯周病治療', '予防歯科', '小児歯科',
@@ -53,12 +56,12 @@ function titleToSlug(title, category) {
 }
 
 function buildFrontmatter({ title, date, category, excerpt, tags }) {
-  const tagsYaml = tags.map((t) => `  - ${t}`).join('\n')
+  const tagsYaml = tags.map((t) => `  - ${esc(t)}`).join('\n')
   return `---
-title: "${title}"
+title: "${esc(title)}"
 date: "${date}"
 category: "${category}"
-excerpt: "${excerpt}"
+excerpt: "${esc(excerpt)}"
 tags:
 ${tagsYaml}
 author: 藍想会メディア編集部
@@ -102,6 +105,11 @@ if (!VALID_CATEGORIES.includes(category)) {
   process.exit(1)
 }
 
+// Bug 2: ブール値の場合の型チェック
+if (typeof tagsRaw !== 'string') {
+  console.error('エラー: --tags には値を指定してください (例: --tags "タグ1,タグ2")')
+  process.exit(1)
+}
 const tags = tagsRaw.split(',').map((t) => t.trim()).filter(Boolean)
 const date = new Date().toISOString().slice(0, 10)
 const slug = titleToSlug(title, category)
@@ -114,5 +122,7 @@ if (existsSync(filePath)) {
 }
 
 const content = buildFrontmatter({ title, date, category, excerpt, tags }) + '\n' + buildBody()
+// Bug 3: ディレクトリが存在しない環境対応
+mkdirSync(POSTS_DIR, { recursive: true })
 writeFileSync(filePath, content, 'utf8')
 console.log(`✅ 作成しました: content/posts/${filename}`)
