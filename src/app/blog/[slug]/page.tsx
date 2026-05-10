@@ -85,6 +85,11 @@ export default async function ArticlePage({
                   >
                     {post.category}
                   </span>
+                  {!post.reviewed && (
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+                      未レビュー
+                    </span>
+                  )}
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {post.date}

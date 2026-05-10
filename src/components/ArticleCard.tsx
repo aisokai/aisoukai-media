@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   "矯正歯科": Smile,
 }
 
-export function ArticleCard({ slug, title, excerpt, category, date, image }: PostMeta) {
+export function ArticleCard({ slug, title, excerpt, category, date, image, reviewed }: PostMeta) {
   const color = CATEGORY_COLORS[category] ?? '#6b7280'
   const Icon = CATEGORY_ICONS[category] ?? HelpCircle
 
@@ -69,6 +69,13 @@ export function ArticleCard({ slug, title, excerpt, category, date, image }: Pos
         <h3 className="mb-2 line-clamp-2 text-[15px] font-bold leading-snug text-gray-800 group-hover:text-[#1e3a5f]">
           {title}
         </h3>
+        {!reviewed && (
+          <div className="mb-2">
+            <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700">
+              未レビュー
+            </span>
+          </div>
+        )}
         <p className="mb-3 line-clamp-2 flex-1 text-[13px] leading-relaxed text-gray-500">
           {excerpt}
         </p>

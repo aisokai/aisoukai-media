@@ -13,6 +13,7 @@ export type PostMeta = {
   excerpt: string;
   category: string;
   tags: string[];
+  reviewed: boolean;
   image?: string;   // frontmatter の image フィールド（省略可）
 };
 
@@ -38,6 +39,7 @@ export function getAllPosts(): PostMeta[] {
       excerpt: (data.excerpt ?? data.description) as string,
       category: data.category as string,
       tags: (data.tags as string[]) ?? [],
+      reviewed: data.reviewed === true,
       image: data.image as string | undefined,
     };
   });
@@ -66,6 +68,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
     excerpt: (data.excerpt ?? data.description) as string,
     category: data.category as string,
     tags: (data.tags as string[]) ?? [],
+    reviewed: data.reviewed === true,
     image: data.image as string | undefined,
     contentHtml,
   };

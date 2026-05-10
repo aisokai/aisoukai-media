@@ -11,6 +11,7 @@ const CATEGORY_SLUG_MAP: Record<string, string> = {
   'periodontal':  '歯周病治療',
   'preventive':   '予防歯科',
   'pediatric':    '小児歯科',
+  'orthodontics': '矯正歯科',
   'wisdom-tooth': '親知らず',
   'implant':      'インプラント',
   'other':        'その他',

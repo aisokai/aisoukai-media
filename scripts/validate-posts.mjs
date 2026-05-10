@@ -13,7 +13,7 @@ const VALID_CATEGORIES = [
   '親知らず', 'インプラント', 'その他', 'お知らせ',
 ]
 
-const REQUIRED_FIELDS = ['title', 'date', 'category', 'excerpt', 'tags', 'author', 'reviewed', 'image']
+const REQUIRED_FIELDS = ['title', 'date', 'category', 'tags', 'author', 'reviewed', 'image']
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-.+\.md$/
 
@@ -52,8 +52,12 @@ function validatePost(filename) {
     errors.push('title が空です')
   }
 
-  if (typeof data.excerpt === 'string' && data.excerpt.trim() === '') {
-    errors.push('excerpt が空です')
+  const excerpt = typeof data.excerpt === 'string' && data.excerpt.trim() !== ''
+    ? data.excerpt
+    : (typeof data.description === 'string' ? data.description : '')
+
+  if (excerpt.trim() === '') {
+    errors.push('excerpt がありません（互換として description でも可）')
   }
 
   if (typeof data.author === 'string' && data.author.trim() === '') {

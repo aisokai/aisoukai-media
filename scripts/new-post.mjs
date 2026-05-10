@@ -91,11 +91,17 @@ function buildBody() {
 }
 
 const args = parseArgs(process.argv.slice(2))
-const { title, category, excerpt, tags: tagsRaw } = args
+const { title, category, tags: tagsRaw } = args
+const excerpt = args.excerpt ?? args.description
 
-const missing = ['title', 'category', 'excerpt', 'tags'].filter((k) => !args[k])
+const missing = ['title', 'category', 'tags'].filter((k) => !args[k])
 if (missing.length > 0) {
   console.error(`エラー: 必須引数が不足しています: ${missing.map((k) => `--${k}`).join(', ')}`)
+  process.exit(1)
+}
+
+if (typeof excerpt !== 'string' || excerpt.trim() === '') {
+  console.error('エラー: --excerpt を指定してください (互換として --description も使用できます)')
   process.exit(1)
 }
 
