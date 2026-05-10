@@ -1,16 +1,35 @@
 import Link from 'next/link'
-import { Search, FileText, FolderOpen, User, ChevronRight } from 'lucide-react'
+import { Search, TrendingUp, FolderOpen, User, ChevronRight } from 'lucide-react'
 import { getAllPosts } from '@/lib/posts'
 
-// カテゴリ一覧（静的定義）
 const categories = [
+  { name: "虫歯治療", count: 12, color: "#3b82f6", href: "/category/cavity" },
+  { name: "根管治療", count: 8, color: "#ef4444", href: "/category/root-canal" },
+  { name: "歯周病治療", count: 10, color: "#f97316", href: "/category/periodontal" },
   { name: "予防歯科", count: 15, color: "#22c55e", href: "/category/preventive" },
-  { name: "訪問歯科", count: 8, color: "#14b8a6", href: "/category/home-visit" },
-  { name: "小児歯科", count: 9, color: "#f97316", href: "/category/pediatric" },
-  { name: "医院からのお知らせ", count: 4, color: "#8b5cf6", href: "/category/news" },
+  { name: "小児歯科", count: 9, color: "#14b8a6", href: "/category/pediatric" },
+  { name: "矯正歯科", count: 7, color: "#8b5cf6", href: "/category/orthodontics" },
+  { name: "親知らずの抜歯", count: 5, color: "#ec4899", href: "/category/wisdom-tooth" },
+  { name: "インプラント治療", count: 6, color: "#0ea5e9", href: "/category/implant" },
+  { name: "その他", count: 4, color: "#6b7280", href: "/category/other" },
 ]
 
-// ランクバッジの色: 1位=金、2位=銀、3位=銅、4〜5位=グレー
+const CATEGORY_COLORS: Record<string, string> = {
+  "AI歯科": "#3b82f6",
+  "虫歯治療": "#3b82f6",
+  "根管治療": "#ef4444",
+  "歯周病治療": "#f97316",
+  "予防歯科": "#22c55e",
+  "小児歯科": "#14b8a6",
+  "矯正歯科": "#8b5cf6",
+  "親知らずの抜歯": "#ec4899",
+  "親知らず": "#ec4899",
+  "インプラント治療": "#0ea5e9",
+  "インプラント": "#0ea5e9",
+  "訪問歯科": "#14b8a6",
+  "医院からのお知らせ": "#8b5cf6",
+}
+
 function rankColor(rank: number): string {
   if (rank === 1) return 'bg-[#fbbf24]'
   if (rank === 2) return 'bg-[#9ca3af]'
@@ -18,7 +37,6 @@ function rankColor(rank: number): string {
   return 'bg-gray-300'
 }
 
-// セクション共通ラッパー: ヘッダー（navy 背景 + アイコン + タイトル）と本体領域を持つ
 function SidebarSection({
   icon: Icon,
   title,
@@ -41,13 +59,12 @@ function SidebarSection({
   )
 }
 
-// Server Component: データ取得は getAllPosts() で行い、外部画像は一切使わない
 export function Sidebar() {
-  const recentPosts = getAllPosts().slice(0, 5)
+  const popularPosts = getAllPosts().slice(0, 5)
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 1. 検索 — 静的 UI のみ（動作不要） */}
+      {/* 記事を検索 */}
       <SidebarSection icon={Search} title="記事を検索">
         <div className="relative">
           <input
@@ -65,17 +82,18 @@ export function Sidebar() {
         </div>
       </SidebarSection>
 
-      {/* 2. 最新記事 — getAllPosts() から上位 5 件を表示 */}
-      <SidebarSection icon={FileText} title="最新記事">
+      {/* 人気の記事 */}
+      <SidebarSection icon={TrendingUp} title="人気の記事">
         <div className="flex flex-col">
-          {recentPosts.map((post, index) => {
+          {popularPosts.map((post, index) => {
             const rank = index + 1
+            const color = CATEGORY_COLORS[post.category] ?? '#6b7280'
             return (
               <Link
                 key={post.slug}
                 href={`/blog/${post.slug}`}
                 className={`group flex items-start gap-3 py-3 ${
-                  index !== recentPosts.length - 1 ? 'border-b border-gray-100' : ''
+                  index !== popularPosts.length - 1 ? 'border-b border-gray-100' : ''
                 }`}
               >
                 {/* ランクバッジ */}
@@ -84,6 +102,12 @@ export function Sidebar() {
                 >
                   {rank}
                 </div>
+                {/* カテゴリカラーのサムネイル（外部画像の代替） */}
+                <div
+                  className="h-14 w-14 shrink-0 rounded"
+                  style={{ backgroundColor: color }}
+                  aria-hidden="true"
+                />
                 {/* タイトル */}
                 <p className="flex-1 text-[13px] leading-snug text-gray-700 group-hover:text-[#1e3a5f]">
                   {post.title}
@@ -94,21 +118,20 @@ export function Sidebar() {
         </div>
       </SidebarSection>
 
-      {/* 3. カテゴリ — 静的 4 カテゴリ */}
+      {/* カテゴリ */}
       <SidebarSection icon={FolderOpen} title="カテゴリ">
         <div className="flex flex-col">
           {categories.map((category, index) => (
             <Link
               key={category.name}
               href={category.href}
-              className={`group flex items-center justify-between py-3 ${
+              className={`group flex items-center justify-between py-2.5 ${
                 index !== categories.length - 1 ? 'border-b border-gray-100' : ''
               }`}
             >
               <span className="flex items-center gap-2">
-                {/* カテゴリカラー丸 */}
                 <span
-                  className="h-3 w-3 rounded-full"
+                  className="h-3 w-3 rounded"
                   style={{ backgroundColor: category.color }}
                 />
                 <span className="text-[13px] text-gray-700 group-hover:text-[#1e3a5f]">
@@ -124,10 +147,9 @@ export function Sidebar() {
         </div>
       </SidebarSection>
 
-      {/* 4. ブログ管理者 — 外部画像なし、文字アバター */}
-      <SidebarSection icon={User} title="ブログ管理者">
+      {/* この記事を書いた人 */}
+      <SidebarSection icon={User} title="この記事を書いた人">
         <div className="flex flex-col items-center text-center">
-          {/* 文字アバター: 外部画像不使用 */}
           <div className="mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-[#1e3a5f]">
             <span className="text-3xl font-bold text-white">藍</span>
           </div>
