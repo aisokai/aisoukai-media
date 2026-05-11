@@ -6,6 +6,12 @@ import remarkHtml from 'remark-html';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
+// reviewed: true かつ draft でない記事のみ公開対象とする。
+// AI生成記事は生成時 reviewed: false で作られ、Human approval 後に reviewed: true へ変更する。
+function isPublishReady(data: Record<string, unknown>): boolean {
+  return data['reviewed'] === true && data['draft'] !== true
+}
+
 export type PostMeta = {
   slug: string;
   title: string;
@@ -26,23 +32,29 @@ export function getAllPosts(): PostMeta[] {
 
   const fileNames = fs.readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'));
 
-  const posts = fileNames.map((fileName): PostMeta => {
-    const slug = fileName.replace(/\.md$/, '');
-    const fullPath = path.join(POSTS_DIR, fileName);
-    const fileContents = fs.readFileSync(fullPath, 'utf8');
-    const { data } = matter(fileContents);
+  const posts = fileNames
+    .filter((fileName) => {
+      const fullPath = path.join(POSTS_DIR, fileName);
+      const { data } = matter(fs.readFileSync(fullPath, 'utf8'));
+      return isPublishReady(data as Record<string, unknown>);
+    })
+    .map((fileName): PostMeta => {
+      const slug = fileName.replace(/\.md$/, '');
+      const fullPath = path.join(POSTS_DIR, fileName);
+      const fileContents = fs.readFileSync(fullPath, 'utf8');
+      const { data } = matter(fileContents);
 
-    return {
-      slug,
-      title: data.title as string,
-      date: data.date as string,
-      excerpt: (data.excerpt ?? data.description) as string,
-      category: data.category as string,
-      tags: (data.tags as string[]) ?? [],
-      reviewed: data.reviewed === true,
-      image: data.image as string | undefined,
-    };
-  });
+      return {
+        slug,
+        title: data.title as string,
+        date: data.date as string,
+        excerpt: (data.excerpt ?? data.description) as string,
+        category: data.category as string,
+        tags: (data.tags as string[]) ?? [],
+        reviewed: true,
+        image: data.image as string | undefined,
+      };
+    });
 
   return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
 }
@@ -55,6 +67,8 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
 
   const fileContents = fs.readFileSync(fullPath, 'utf8');
   const { data, content } = matter(fileContents);
+
+  if (!isPublishReady(data as Record<string, unknown>)) return null;
 
   const processed = await remark()
     .use(remarkHtml, { sanitize: true })

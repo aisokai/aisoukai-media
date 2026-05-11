@@ -74,9 +74,27 @@ aisoukai-media/
 └── public/
 ```
 
+## 公開条件（Approval Gate）
+
+記事がサイトに表示・静的生成されるには、以下の条件を両方満たす必要があります:
+
+| 条件 | 説明 |
+|------|------|
+| `reviewed: true` | 人間がレビュー済みであることを示す必須フラグ |
+| `draft: true` でない | ドラフト明示がない（フィールド自体なしでも可） |
+
+- `reviewed: false` のままではサイトに表示されず、静的ページも生成されません
+- AI生成記事は `generate:draft` 実行時に `reviewed: false` / `ai_generated: true` で作られます
+- 内容を確認した後、手動で `reviewed: true` に変更してから公開してください
+
+```bash
+# 公開承認状態の確認（reviewed: false があると exit 1）
+npm run validate:publish-ready
+```
+
 ## 記事の追加方法
 
-`content/posts/` に Markdown ファイルを追加するだけで記事が公開されます。
+`content/posts/` に Markdown ファイルを追加するだけで記事が公開されます（`reviewed: true` の場合のみ）。
 
 ファイル名規則: `YYYY-MM-DD-slug.md`
 
@@ -116,6 +134,7 @@ tags:
 | `npm run new:post -- --title "..." --category "..." --excerpt "..." --tags "..."` | 空の記事ファイルを新規作成する |
 | `npm run validate:posts` | `content/posts/` の全記事 frontmatter を検証する |
 | `npm run research:trends` | AIトレンド調査の記事候補を `data/research/` に出力する（dry-run） |
+| `npm run validate:publish-ready` | 公開承認状態を確認する（reviewed: true / 必須項目充足チェック） |
 
 ## generate:draft の使い方
 
