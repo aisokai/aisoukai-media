@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "new:post": "node scripts/new-post.mjs",
-    "validate:posts": "node scripts/validate-posts.mjs"
+    "import:topic": "node scripts/import-topic.mjs",
+    "validate:posts": "node scripts/validate-posts.mjs",
+    "validate:topics": "node scripts/validate-topics.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

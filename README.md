@@ -12,6 +12,41 @@
 | gray-matter | Markdown frontmatter パース |
 | remark / remark-html | Markdown → HTML 変換（sanitize:true） |
 
+## 記事ネタDB
+
+記事ネタDB は、今後 AI が歯科メディアの記事候補を定期収集し、下書き作成へ接続するための企画・進行管理の正本です。
+
+初期段階では Google Sheets API には接続せず、Google スプレッドシートに入力した内容を CSV でエクスポートまたは貼り付けして運用します。
+
+### 使い方
+
+1. `data/article-topics.sample.csv` をテンプレートとして使う
+2. スプレッドシートで候補を管理する
+3. `npm run validate:topics` で CSV の整合性を確認する
+4. 公開記事の本文は `content/posts/*.md` を正本として管理する
+
+### 記録する項目
+
+- ネタの発見日
+- 収集元の種別
+- 記事テーマ
+- 候補タイトル
+- カテゴリ
+- 検索キーワード
+- 患者の検索意図
+- 優先度
+- 医療リスク
+- 進捗ステータス
+
+### status の使い分け
+
+- `idea`: アイデア段階
+- `approved`: 採用済み
+- `drafting`: 下書き作成中
+- `reviewed`: レビュー完了
+- `published`: 公開済み
+- `hold`: 保留
+
 ## 開発環境
 
 ```bash
@@ -66,6 +101,7 @@ tags:
 3. **デプロイ自動化**: `npm run build` → Vercel / GitHub Actions でデプロイ可能
 4. **OGP画像生成**: `opengraph-image.tsx` を各ページに追加で SNS対応
 5. **カテゴリ管理**: 記事数増加後は `content/categories.json` 等でマスタ管理を検討
+6. **記事ネタDB連携**: Google スプレッドシート由来の CSV を `validate:topics` で検証し、採用ネタを `content/posts/` の下書きへ接続する
 
 ## コマンド
 
@@ -74,3 +110,33 @@ tags:
 | `npm run dev` | 開発サーバー起動 (http://localhost:3000) |
 | `npm run build` | 本番ビルド |
 | `npm run lint` | ESLint 実行 |
+| `npm run validate:topics` | `data/article-topics.sample.csv` の整合性を検証する |
+| `npm run import:topic -- TOPIC-XXXX` | CSVから指定 topic_id の下書き記事を生成する |
+| `npm run new:post -- --title "..." --category "..." --excerpt "..." --tags "..."` | 空の記事ファイルを新規作成する |
+| `npm run validate:posts` | `content/posts/` の全記事 frontmatter を検証する |
+
+## import:topic の使い方
+
+`data/article-topics.sample.csv` に承認済みの記事ネタが登録されている場合、以下のコマンドで `content/posts/` に下書きを生成します。
+
+```bash
+# 記事ネタ CSV の整合性確認
+npm run validate:topics
+
+# 指定した topic_id の下書きを生成
+npm run import:topic -- TOPIC-20260511-007
+
+# 生成された下書きを確認
+npm run validate:posts
+```
+
+生成先: `content/posts/YYYY-MM-DD-topic-id.md`
+
+テンプレートは category に応じて自動選択されます:
+- 医療系カテゴリ（虫歯治療・根管治療など）→ 受診目安・原因・対応の構成
+- お知らせ → お知らせ概要・対象・実施日・まとめの構成
+
+注意:
+- `title_candidate`・`target_keyword`・`patient_intent`・`publish_date` が空の場合はエラー終了します
+- 同一 topic_id が CSV に複数行ある場合はデータ不整合としてエラー終了します
+- 同名ファイルが既に存在する場合は上書きせずエラー終了します
