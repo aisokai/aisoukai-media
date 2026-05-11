@@ -111,9 +111,45 @@ tags:
 | `npm run build` | 本番ビルド |
 | `npm run lint` | ESLint 実行 |
 | `npm run validate:topics` | `data/article-topics.sample.csv` の整合性を検証する |
-| `npm run import:topic -- TOPIC-XXXX` | CSVから指定 topic_id の下書き記事を生成する |
+| `npm run import:topic -- TOPIC-XXXX` | CSVから指定 topic_id のテンプレート下書きを生成する |
+| `npm run generate:draft -- TOPIC-XXXX` | CSVから指定 topic_id の AI 生成下書きを作成する（要 API キー） |
 | `npm run new:post -- --title "..." --category "..." --excerpt "..." --tags "..."` | 空の記事ファイルを新規作成する |
 | `npm run validate:posts` | `content/posts/` の全記事 frontmatter を検証する |
+
+## generate:draft の使い方
+
+AI（Claude）が記事本文を自動生成します。生成した記事は必ず `reviewed: false` のドラフト扱いです。
+
+### セットアップ
+
+```bash
+# .env.local.example をコピーして API キーを設定する
+cp .env.local.example .env.local
+# .env.local を開いて ANTHROPIC_API_KEY=sk-ant-... を記入
+# .env.local は絶対に commit しないこと（.gitignore で除外済み）
+```
+
+### 実行例
+
+```bash
+# 記事ネタ CSV の整合性確認
+npm run validate:topics
+
+# 指定した topic_id の AI 下書きを生成
+npm run generate:draft -- TOPIC-20260511-007
+
+# 生成された下書きを確認・修正する（本文は必ず手動レビュー）
+npm run validate:posts
+npm run build
+```
+
+生成先: `content/posts/YYYY-MM-DD-topic-id.md`
+
+注意:
+- 生成記事は `reviewed: false` のまま公開しないこと（Human approval が必須）
+- 生成後は必ず本文を読み、医療情報の正確性を確認すること
+- `ANTHROPIC_API_KEY` が未設定の場合はエラーで終了します（API は呼びません）
+- 同名ファイルが既に存在する場合は上書きせずエラー終了します
 
 ## import:topic の使い方
 
