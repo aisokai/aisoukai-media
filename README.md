@@ -115,6 +115,7 @@ tags:
 | `npm run generate:draft -- TOPIC-XXXX` | CSVから指定 topic_id の AI 生成下書きを作成する（要 API キー） |
 | `npm run new:post -- --title "..." --category "..." --excerpt "..." --tags "..."` | 空の記事ファイルを新規作成する |
 | `npm run validate:posts` | `content/posts/` の全記事 frontmatter を検証する |
+| `npm run research:trends` | AIトレンド調査の記事候補を `data/research/` に出力する（dry-run） |
 
 ## generate:draft の使い方
 
@@ -150,6 +151,38 @@ npm run build
 - 生成後は必ず本文を読み、医療情報の正確性を確認すること
 - `ANTHROPIC_API_KEY` が未設定の場合はエラーで終了します（API は呼びません）
 - 同名ファイルが既に存在する場合は上書きせずエラー終了します
+
+## research:trends の使い方
+
+記事ネタの候補を dry-run で生成し、`data/research/` に JSON/CSV として保存します。外部APIは呼ばず、生成物は必ず人間がレビューしてから `data/article-topics.sample.csv` に手動で追記します。
+
+```bash
+# 候補ファイルを生成
+npm run research:trends
+
+# 出力された候補を確認
+# data/research/YYYY-MM-DD-trends.json
+# data/research/YYYY-MM-DD-trends.csv
+```
+
+レビュー手順:
+1. `data/research/*.json` / `data/research/*.csv` を開いて候補を確認する
+2. 医療安全上問題のある候補は除外する
+3. 採用候補だけを手動で `data/article-topics.sample.csv` に追記する
+4. `npm run validate:topics` で追記内容を検証する
+
+フィールドのマッピング（topic DB へ採用する際の対応）:
+
+| research 出力フィールド | topic DB フィールド | 備考 |
+|------------------------|---------------------|------|
+| `researched_at` | `discovered_at` | 調査日 → ネタ発見日として扱う |
+| `title_candidate` | `title_candidate` | そのまま使用 |
+| `target_keyword` | `target_keyword` | そのまま使用 |
+| `source_type` の有効値 | `source_type` | `trend` / `news` / `seasonal` / `clinic` / `seo` / `patient_question` |
+
+注意:
+- 生成物はあくまで候補メモです — AI hallucination を前提に必ず人間が再確認してください
+- `data/research/` は人間確認前の scratch 出力であり、`.gitignore` で除外済みです（調査履歴を git 管理する場合は除外設定を変更してください）
 
 ## import:topic の使い方
 

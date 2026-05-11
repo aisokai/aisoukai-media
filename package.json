@@ -11,7 +11,8 @@
     "import:topic": "node scripts/import-topic.mjs",
     "generate:draft": "node scripts/generate-draft.mjs",
     "validate:posts": "node scripts/validate-posts.mjs",
-    "validate:topics": "node scripts/validate-topics.mjs"
+    "validate:topics": "node scripts/validate-topics.mjs",
+    "research:trends": "node scripts/research-trends.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
