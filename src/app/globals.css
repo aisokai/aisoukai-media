@@ -2,6 +2,11 @@
 
 @layer base {
   body {
+    /* 日本語システムフォントスタック。next/font/google 不使用のため外部通信なしで日本語を表示する */
+    font-family:
+      "Hiragino Kaku Gothic ProN", "Hiragino Sans",
+      Meiryo, "Yu Gothic", "Yu Gothic UI",
+      system-ui, sans-serif;
     @apply bg-[#f7f7f7] text-gray-800;
   }
 }

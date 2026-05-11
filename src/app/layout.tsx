@@ -1,17 +1,12 @@
 import type { Metadata } from 'next'
-import { Noto_Sans_JP } from 'next/font/google'
+import { SITE_URL } from '@/lib/seo'
 import './globals.css'
 import { Header } from '@/components/Header'
 import { Footer } from '@/components/Footer'
 
-const notoSansJP = Noto_Sans_JP({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '700'],
-  variable: '--font-noto-sans-jp',
-  display: 'swap',
-})
-
 export const metadata: Metadata = {
+  // metadataBase を設定することで、og:image 等の相対パスが絶対 URL に解決される
+  metadataBase: new URL(SITE_URL),
   title: {
     default: '医療法人藍想会 | 三谷ファミリー歯科クリニック',
     template: '%s | 三谷ファミリー歯科クリニック',
@@ -25,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ja" className={notoSansJP.variable}>
+    <html lang="ja">
       <body className="min-h-screen flex flex-col font-sans bg-[#f7f7f7] text-gray-800">
         <Header />
         <main className="flex-1">

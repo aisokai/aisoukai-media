@@ -74,6 +74,23 @@ aisoukai-media/
 └── public/
 ```
 
+## 環境変数（本番必須）
+
+| 変数名 | 必須 | 説明 |
+|--------|------|------|
+| `NEXT_PUBLIC_SITE_URL` | **本番必須** | サイトの公開 URL（末尾スラッシュなし）。sitemap.xml・OGP・canonical の絶対 URL 生成に使用する |
+| `ANTHROPIC_API_KEY` | generate:draft 実行時 | Claude API キー。`.env.local` に記述し commit しないこと |
+
+```bash
+# .env.local に設定する例
+NEXT_PUBLIC_SITE_URL=https://your-domain.com
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+**Vercel へのデプロイ時:**
+Vercel ダッシュボード → Settings → Environment Variables に `NEXT_PUBLIC_SITE_URL` を設定してください。
+未設定または localhost URL のままでは本番ビルドがエラーで停止します（sitemap / OGP への localhost 混入を防ぐ安全装置）。
+
 ## 公開条件（Approval Gate）
 
 記事がサイトに表示・静的生成されるには、以下の条件を両方満たす必要があります:

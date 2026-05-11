@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Home, ChevronRight, Clock, Tag } from 'lucide-react'
 import { getAllPosts, getPostBySlug } from '@/lib/posts'
+import { buildArticleMetadata, buildBlogPostingJsonLd } from '@/lib/seo'
 import { Sidebar } from '@/components/Sidebar'
 import type { Metadata } from 'next'
 
@@ -32,10 +33,7 @@ export async function generateMetadata({
   const { slug } = await params
   const post = await getPostBySlug(slug)
   if (!post) return {}
-  return {
-    title: post.title,
-    description: post.excerpt,
-  }
+  return buildArticleMetadata(post, slug)
 }
 
 export default async function ArticlePage({
@@ -51,6 +49,12 @@ export default async function ArticlePage({
 
   return (
     <>
+      {/* BlogPosting JSON-LD — reviewed:true 記事のみここに到達するため未承認記事への挿入はない */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(buildBlogPostingJsonLd(post, slug)) }}
+      />
+
       {/* Hero with breadcrumb */}
       <div className="bg-[#1e3a5f] py-8">
         <div className="mx-auto max-w-[1100px] px-4">
