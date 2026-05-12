@@ -99,7 +99,7 @@ MitaniOS の患者 FAQ データやスタッフ向けメモを `research:trends`
 | # | タイトル | フェーズ | 状態 |
 |---|---------|---------|------|
 | 1 | generate:draft --force オプション | 3A | 完了 |
-| 2 | publish_at と date の二重管理解消 | 3A | 未着手 |
+| 2 | publish_at と date の二重管理解消 | 3A | 完了 |
 | 3 | research:trends --import フラグ | 3A | 未着手 |
 | 4 | AI下書き品質改善 | 3B | 未着手 |
 | 5 | 医療広告チェック補助 | 3B | 未着手 |

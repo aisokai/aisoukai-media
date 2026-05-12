@@ -217,6 +217,7 @@ async function main() {
   const content = `---
 title: "${esc(title)}"
 date: "${publishDate}"
+publish_at: "${publishDate}"
 category: "${esc(category)}"
 excerpt: "${esc(excerpt)}"
 tags:
