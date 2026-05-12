@@ -103,7 +103,7 @@ MitaniOS の患者 FAQ データやスタッフ向けメモを `research:trends`
 | 3 | research:trends --import フラグ | 3A | 完了 |
 | 4 | AI下書き品質改善 | 3B | 完了 |
 | 5 | 医療広告チェック補助 | 3B | 完了 |
-| 6 | Search Console / Analytics | 3B | 未着手 |
+| 6 | Search Console / Analytics | 3B | 完了 |
 | 7 | Review Dashboard UI | 3C | 未着手 |
 | 8 | Multi-site 化 | 3C | 未着手 |
 | 9 | MitaniOS 連携 | 3C | 未着手 |
