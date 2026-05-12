@@ -56,6 +56,11 @@ npm run dev
 
 → http://localhost:3000
 
+## 共通ルール
+
+この repo の作業ルールは [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) を正本とする。  
+ここでは主に使い方を案内し、公開条件・review・Telegram・完了報告の共通ルールはそちらに集約する。
+
 ## ディレクトリ構成
 
 ```
@@ -110,27 +115,14 @@ TELEGRAM_CHAT_ID=<チャット ID>
 Vercel ダッシュボード → Settings → Environment Variables に `NEXT_PUBLIC_SITE_URL` を設定してください。
 未設定または localhost URL のままでは本番ビルドがエラーで停止します（sitemap / OGP への localhost 混入を防ぐ安全装置）。
 
-## 公開条件（Approval Gate）
+## 公開条件
 
-記事がサイトに表示・静的生成されるには、以下の条件を両方満たす必要があります:
-
-| 条件 | 説明 |
-|------|------|
-| `reviewed: true` | 人間がレビュー済みであることを示す必須フラグ |
-| `draft: true` でない | ドラフト明示がない（フィールド自体なしでも可） |
-
-- `reviewed: false` のままではサイトに表示されず、静的ページも生成されません
-- AI生成記事は `generate:draft` 実行時に `reviewed: false` / `ai_generated: true` で作られます
-- 内容を確認した後、手動で `reviewed: true` に変更してから公開してください
-
-```bash
-# 公開承認状態の確認（reviewed: false があると exit 1）
-npm run validate:publish-ready
-```
+公開条件・review・Telegram・報告の共通ルールは [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) を参照する。  
+この README では、関連コマンドの使い方を中心に案内する。
 
 ## 記事の追加方法
 
-`content/posts/` に Markdown ファイルを追加するだけで記事が公開されます（`reviewed: true` の場合のみ）。
+`content/posts/` に Markdown ファイルを追加するだけで記事候補になります。公開可否は共通ルールに従います。
 
 ファイル名規則: `YYYY-MM-DD-slug.md`
 
@@ -205,7 +197,7 @@ tags:
 7. npm run validate:publish-ready
    → publish-ready 件数を確認（exit 0 なら全承認済み）
 
-8. npm run build → git push → deploy（Human が判断・実行）
+8. npm run build → Human が手動で push / deploy を判断・実行
    → reviewed:true の記事のみ静的生成・sitemap 収録
 ```
 
@@ -226,7 +218,7 @@ tags:
 
 > 詳細手順: [docs/manual-request-to-telegram-review-flow.md](docs/manual-request-to-telegram-review-flow.md)
 
-スケジュール公開: frontmatter に `publish_at: "YYYY-MM-DD"` を設定すると、その日以降のビルドで公開される（自動 cron なし、Human がビルド・デプロイを判断）。日付比較は **UTC 基準**（JST 基準対応は後続改善）。gray-matter が日付文字列を Date 型に変換するケースにも対応済み。
+スケジュール公開の判定は共通ルールと workflow docs に従う。実装の詳細は各 workflow を参照する。
 
 ## generate:draft の使い方
 
