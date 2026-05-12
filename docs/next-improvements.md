@@ -107,3 +107,8 @@ MitaniOS の患者 FAQ データやスタッフ向けメモを `research:trends`
 | 7 | Review Dashboard UI | 3C | 完了 |
 | 8 | Multi-site 化 | 3C | 完了 |
 | 9 | MitaniOS 連携 | 3C | 完了 |
+| 10 | 承認制AI編集部 運用設計 docs | 4A | 完了 |
+| 11 | 手動依頼 CLI (request-article.mjs) | 4B | 未着手 |
+| 12 | LINE/Telegram 通知のみ連携 | 4C | 未着手 |
+| 13 | Approval UX（ブラウザ承認UI） | 4D | 未着手 |
+| 14 | 定期提案型 cron 実装 | 4E | 未着手 |
