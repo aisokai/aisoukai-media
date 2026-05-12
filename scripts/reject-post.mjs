@@ -2,7 +2,7 @@
 // reject-post.mjs
 // Human が実行する差し戻し CLI。AIが自動実行してはならない。
 // reviewed:false を維持し、rejection_reason を記録する。
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
@@ -23,6 +23,28 @@ function parseArgs(argv) {
     }
   }
   return args
+}
+
+function getJstTimestamp() {
+  const now = new Date()
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return jst.toISOString().replace('Z', '+09:00')
+}
+
+const LOGS_DIR = join(ROOT, 'logs')
+const LOG_PATH = join(LOGS_DIR, 'review-history.md')
+
+function appendReviewLog(entry) {
+  const lines = [`## ${entry.timestamp}`]
+  lines.push(`action: ${entry.action}`)
+  lines.push(`slug: ${entry.slug}`)
+  if (entry.reason)     lines.push(`reason: ${entry.reason}`)
+  if (entry.date)       lines.push(`date: ${entry.date}`)
+  if (entry.publish_at) lines.push(`publish_at: ${entry.publish_at}`)
+  lines.push('')
+
+  if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true })
+  appendFileSync(LOG_PATH, lines.join('\n') + '\n', 'utf8')
 }
 
 function normalizeDates(data) {
@@ -80,10 +102,20 @@ function main() {
   const parsed = matter(raw)
   const data   = normalizeDates(parsed.data)
 
+  const slug = filePath.split('/').pop().replace(/\.md$/, '')
   data.reviewed = false
   if (reason) data.rejection_reason = reason
 
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
+
+  appendReviewLog({
+    timestamp: getJstTimestamp(),
+    action:    'reject',
+    slug,
+    reason:    reason || undefined,
+    date:      data.date,
+    publish_at: data.publish_at,
+  })
 
   console.log('━'.repeat(52))
   console.log('差し戻し完了')

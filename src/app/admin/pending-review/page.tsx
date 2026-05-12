@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { getPendingReviewPosts } from '@/lib/posts'
+import { getRecentReviewLog } from '@/lib/reviewLog'
 import { NOINDEX_METADATA } from '@/lib/seo'
 import CopyButton from './CopyButton'
 
@@ -13,6 +14,7 @@ export default function PendingReviewPage() {
   const allPosts = getPendingReviewPosts()
   const pending  = allPosts.filter((p) => !p.rejectionReason)
   const rejected = allPosts.filter((p) =>  p.rejectionReason)
+  const recentLog = getRecentReviewLog(8)
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-10">
@@ -186,6 +188,39 @@ export default function PendingReviewPage() {
                 </div>
               )
             })}
+          </div>
+        </section>
+      )}
+
+      {/* ── 承認履歴ログ ── */}
+      {recentLog.length > 0 && (
+        <section className="mt-12">
+          <h2 className="mb-3 text-base font-semibold text-gray-500">最近の承認履歴</h2>
+          <div className="space-y-1.5">
+            {recentLog.map((entry, i) => (
+              <div
+                key={i}
+                className={`flex flex-wrap items-center gap-2 rounded-lg border px-4 py-2.5 text-xs ${
+                  entry.action === 'approve'
+                    ? 'border-green-100 bg-green-50'
+                    : 'border-red-100 bg-red-50'
+                }`}
+              >
+                <span className={`shrink-0 font-bold ${entry.action === 'approve' ? 'text-green-700' : 'text-red-700'}`}>
+                  {entry.action === 'approve' ? '✓ 承認' : '✗ 差戻'}
+                </span>
+                <span className="font-mono text-gray-600">{entry.slug}</span>
+                {entry.reviewedBy && (
+                  <span className="text-gray-500">by {entry.reviewedBy}</span>
+                )}
+                {entry.reason && (
+                  <span className="text-red-600">理由: {entry.reason}</span>
+                )}
+                <span className="ml-auto shrink-0 text-gray-400">
+                  {entry.timestamp.slice(0, 16).replace('T', ' ')}
+                </span>
+              </div>
+            ))}
           </div>
         </section>
       )}

@@ -2,7 +2,7 @@
 // approve-post.mjs
 // Human が実行する承認 CLI。AIが自動実行してはならない。
 // 対象記事の reviewed:true / draft:false / reviewed_at を設定する。
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
@@ -13,6 +13,28 @@ const POSTS_DIR = join(ROOT, 'content', 'posts')
 
 function getTodayIso() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function getJstTimestamp() {
+  const now = new Date()
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000)
+  return jst.toISOString().replace('Z', '+09:00')
+}
+
+const LOGS_DIR = join(ROOT, 'logs')
+const LOG_PATH = join(LOGS_DIR, 'review-history.md')
+
+function appendReviewLog(entry) {
+  const lines = [`## ${entry.timestamp}`]
+  lines.push(`action: ${entry.action}`)
+  lines.push(`slug: ${entry.slug}`)
+  if (entry.reviewed_by) lines.push(`reviewed_by: ${entry.reviewed_by}`)
+  if (entry.date)        lines.push(`date: ${entry.date}`)
+  if (entry.publish_at)  lines.push(`publish_at: ${entry.publish_at}`)
+  lines.push('')
+
+  if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true })
+  appendFileSync(LOG_PATH, lines.join('\n') + '\n', 'utf8')
 }
 
 function parseArgs(argv) {
@@ -104,7 +126,17 @@ function main() {
   data.reviewed_at  = today
   data.reviewed_by  = by
 
+  const slug = filePath.split('/').pop().replace(/\.md$/, '')
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
+
+  appendReviewLog({
+    timestamp:   getJstTimestamp(),
+    action:      'approve',
+    slug,
+    reviewed_by: by,
+    date:        data.date,
+    publish_at:  data.publish_at,
+  })
 
   console.log('━'.repeat(52))
   console.log('承認完了')

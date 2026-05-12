@@ -30,16 +30,20 @@ function toDateStr(val) {
 function getPendingPosts() {
   if (!existsSync(POSTS_DIR)) return []
 
+  const today = new Date().toISOString().slice(0, 10)
+
   return readdirSync(POSTS_DIR)
     .filter((f) => f.endsWith('.md'))
     .map((f) => {
       const { data } = matter(readFileSync(join(POSTS_DIR, f), 'utf8'))
+      const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
       return {
-        slug:        f.replace(/\.md$/, ''),
-        title:       String(data.title ?? '（タイトル未設定）'),
-        publishAt:   data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date),
-        reviewed:    data.reviewed === true,
-        aiGenerated: data.ai_generated === true,
+        slug:            f.replace(/\.md$/, ''),
+        title:           String(data.title ?? '（タイトル未設定）'),
+        publishAt,
+        reviewed:        data.reviewed === true,
+        rejectionReason: data.rejection_reason ? String(data.rejection_reason) : null,
+        isFuture:        publishAt > today,
       }
     })
     .filter((p) => !p.reviewed)
@@ -48,24 +52,33 @@ function getPendingPosts() {
 
 function buildNotificationText(posts, dashboardUrl) {
   if (posts.length === 0) {
-    return 'No pending review articles'
+    return '✅ pending-review: レビュー待ちの記事はありません'
   }
 
-  const lines = [
-    `📋 Human review 待ち記事: ${posts.length} 件`,
-    '',
-  ]
+  const rejected = posts.filter((p) => p.rejectionReason)
+  const future   = posts.filter((p) => !p.rejectionReason && p.isFuture)
+  const pending  = posts.filter((p) => !p.rejectionReason && !p.isFuture)
 
-  for (const [i, post] of posts.entries()) {
-    const aiLabel = post.aiGenerated ? ' [AI生成]' : ''
-    lines.push(`${i + 1}. ${post.title}${aiLabel}`)
-    lines.push(`   slug      : ${post.slug}`)
-    lines.push(`   publish_at: ${post.publishAt}`)
-    lines.push(`   approve   : npm run approve:post -- ${post.slug} --reviewed-by "氏名"`)
+  const lines = ['📝 pending-review summary', '']
+  lines.push(`- review待ち: ${pending.length}件`)
+  lines.push(`- future記事: ${future.length}件`)
+  lines.push(`- 差し戻し済み: ${rejected.length}件`)
+
+  const latest = [...pending, ...future].slice(0, 10)
+  if (latest.length > 0) {
     lines.push('')
+    lines.push('最新:')
+    for (const [i, post] of latest.entries()) {
+      const futureTag = post.isFuture ? ` [📅${post.publishAt}]` : ''
+      lines.push(`${i + 1}. ${post.title}${futureTag}`)
+    }
+    if (pending.length + future.length > 10) {
+      lines.push(`  ...他 ${pending.length + future.length - 10} 件`)
+    }
   }
 
-  lines.push(`🔗 確認ページ: ${dashboardUrl}`)
+  lines.push('')
+  lines.push(`管理画面:\n${dashboardUrl}`)
 
   return lines.join('\n')
 }
