@@ -227,15 +227,30 @@ npm run build
 npm run research:trends
 
 # 出力された候補を確認
-# data/research/YYYY-MM-DD-trends.json
+# data/research/YYYY-MM-DD-trends.json  ← 0〜4 のインデックスで候補を確認
 # data/research/YYYY-MM-DD-trends.csv
 ```
 
 レビュー手順:
-1. `data/research/*.json` / `data/research/*.csv` を開いて候補を確認する
+1. `data/research/*.json` を開いて候補を確認する（candidates 配列のインデックスを控えておく）
 2. 医療安全上問題のある候補は除外する
-3. 採用候補だけを手動で `data/article-topics.sample.csv` に追記する
+3. 採用する候補のインデックスを指定して CSV に追記する（または手動追記）
 4. `npm run validate:topics` で追記内容を検証する
+
+```bash
+# 採用候補を --import <インデックス> で CSV に追記（Human 承認後に実行）
+npm run research:trends -- --import 0   # candidates[0] を追記
+npm run research:trends -- --import 2   # candidates[2] を追記
+
+# 追記内容を確認
+npm run validate:topics
+```
+
+`--import` の動作:
+- 最新の `data/research/*-trends.json` から指定インデックスの候補を読み込む
+- `title_candidate` が既に CSV に存在する場合は重複エラーで停止する
+- `status` は常に `idea`（Human approval フローは変わらない）
+- topic ID は `TOPIC-YYYYMMDD-NNN` 形式で自動採番される
 
 フィールドのマッピング（topic DB へ採用する際の対応）:
 
