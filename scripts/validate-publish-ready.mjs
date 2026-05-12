@@ -84,12 +84,21 @@ function checkPost(filename) {
     blockers.push('draft: true — ドラフト明示記事は公開対象外です')
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+
   // ── publish_at: 未来日付はまだ公開しない ──
   if (data.publish_at) {
     const publishAtStr = toDateStr(data.publish_at)
-    const today = new Date().toISOString().slice(0, 10)
     if (publishAtStr && publishAtStr > today) {
       blockers.push(`publish_at: ${publishAtStr} — 公開予定日が未来です（scheduled: ${publishAtStr}）`)
+    }
+  }
+
+  // ── date: publish_at がない場合は date も未来判定に使う ──
+  if (!data.publish_at && data.date) {
+    const dateStr = toDateStr(data.date)
+    if (dateStr && dateStr > today) {
+      blockers.push(`date: ${dateStr} — 記事日付が未来です（scheduled: ${dateStr}）`)
     }
   }
 

@@ -7,18 +7,24 @@ import remarkHtml from 'remark-html';
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
 // reviewed: true かつ draft でない記事のみ公開対象とする。
-// publish_at が設定されている場合は当日以降のみ公開対象とする（スケジュール公開の最小実装）。
+// publish_at または date が今日より未来の場合は公開しない（スケジュール公開）。
 // AI生成記事は生成時 reviewed: false で作られ、Human approval 後に reviewed: true へ変更する。
 function isPublishReady(data: Record<string, unknown>): boolean {
   if (data['reviewed'] !== true || data['draft'] === true) return false
 
+  const today = new Date().toISOString().slice(0, 10)
+
+  const toStr = (v: unknown): string =>
+    v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '')
+
+  // publish_at が設定されていれば優先して未来判定する
   const publishAt = data['publish_at']
-  if (publishAt) {
-    const publishAtStr = publishAt instanceof Date
-      ? publishAt.toISOString().slice(0, 10)
-      : String(publishAt)
-    const today = new Date().toISOString().slice(0, 10)
-    if (publishAtStr > today) return false
+  if (publishAt && toStr(publishAt) > today) return false
+
+  // publish_at がない場合は date を未来判定に使う
+  if (!publishAt) {
+    const dateVal = data['date']
+    if (dateVal && toStr(dateVal) > today) return false
   }
 
   return true
