@@ -21,7 +21,9 @@
     "notify:pending-review": "node scripts/notify-pending-review.mjs",
     "test:telegram": "node scripts/test-telegram-notify.mjs",
     "article:manual": "node scripts/manual-article-flow.mjs",
-    "article:scheduled": "node scripts/scheduled-article-flow.mjs"
+    "article:scheduled": "node scripts/scheduled-article-flow.mjs",
+    "status:content": "node scripts/status-content.mjs",
+    "status:publish-ready": "node scripts/validate-publish-ready.mjs || true"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

@@ -210,8 +210,15 @@ if (ready.length > 0) {
 } else {
   console.log()
   console.log('publish-ready な記事はありません。')
-  console.log('記事を公開するには reviewed: true に変更し、内容を確認してください。')
+  console.log('  → npm run approve:post -- <slug> --reviewed-by "氏名"  で承認後に再確認してください')
+  console.log('  → npm run status:content  でコンテンツ全体の状態を確認できます')
 }
 
-// blocker が1件でもある記事が存在する場合は exit 1
+console.log()
+console.log('exit コードについて:')
+console.log('  exit 0  = publish-ready のみ（blocker なし）')
+console.log('  exit 1  = review待ち記事あり（ビルドエラーではありません）')
+console.log('  日常確認には status:content / status:publish-ready が便利です')
+
+// blocker が1件でもある記事が存在する場合は exit 1（CI ゲートとして維持）
 process.exit(notReady.length > 0 ? 1 : 0)
