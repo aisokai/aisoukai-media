@@ -80,12 +80,31 @@ aisoukai-media/
 |--------|------|------|
 | `NEXT_PUBLIC_SITE_URL` | **本番必須** | サイトの公開 URL（末尾スラッシュなし）。sitemap.xml・OGP・canonical の絶対 URL 生成に使用する |
 | `ANTHROPIC_API_KEY` | generate:draft 実行時 | Claude API キー。`.env.local` に記述し commit しないこと |
+| `TELEGRAM_BOT_TOKEN` | test:telegram / 将来の通知連携 | BotFather で取得したトークン。`.env.local` に記述し commit しないこと |
+| `TELEGRAM_CHAT_ID` | test:telegram / 将来の通知連携 | 通知先チャット ID（個人 DM の場合は数値 ID）。`.env.local` に記述し commit しないこと |
 
 ```bash
 # .env.local に設定する例
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
 ANTHROPIC_API_KEY=sk-ant-...
+TELEGRAM_BOT_TOKEN=<BotFather から取得したトークン>
+TELEGRAM_CHAT_ID=<チャット ID>
 ```
+
+### Telegram Bot セットアップ手順
+
+1. Telegram で [@BotFather](https://t.me/BotFather) に `/newbot` を送信してトークンを取得
+2. 作成した Bot に DM を送信する（または追加したグループで `/start` を送信）
+3. チャット ID を確認する:
+   ```bash
+   curl "https://api.telegram.org/bot<TOKEN>/getUpdates"
+   # result[0].message.chat.id の値を使う
+   ```
+4. `.env.local` に `TELEGRAM_BOT_TOKEN` と `TELEGRAM_CHAT_ID` を設定する
+5. 疎通確認:
+   ```bash
+   npm run test:telegram
+   ```
 
 **Vercel へのデプロイ時:**
 Vercel ダッシュボード → Settings → Environment Variables に `NEXT_PUBLIC_SITE_URL` を設定してください。
@@ -155,6 +174,7 @@ tags:
 | `npm run list:pending-review` | Human review 待ちの記事一覧を表示する |
 | `npm run request:article -- --title "..." --category "..." --date YYYY-MM-DD` | テーマを手動指定して記事ネタ CSV に追加する（generate:draft の前段） |
 | `npm run notify:pending-review` | pending review 記事の通知テキストを出力する（将来 LINE/Telegram 送信に拡張予定） |
+| `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run approve:post -- <slug> --reviewed-by "氏名"` | 記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
 | `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason を記録） |
 
