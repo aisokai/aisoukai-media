@@ -173,35 +173,56 @@ tags:
 | `npm run validate:publish-ready` | 公開承認状態を確認する（reviewed: true / 必須項目充足チェック） |
 | `npm run list:pending-review` | Human review 待ちの記事一覧を表示する |
 | `npm run request:article -- --title "..." --category "..." --date YYYY-MM-DD` | テーマを手動指定して記事ネタ CSV に追加する（generate:draft の前段） |
-| `npm run notify:pending-review` | pending review 記事の通知テキストを出力する（将来 LINE/Telegram 送信に拡張予定） |
+| `npm run notify:pending-review` | pending review 記事の一覧を console 出力し、Telegram Bot に通知する（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run approve:post -- <slug> --reviewed-by "氏名"` | 記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
 | `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason を記録） |
 
 ## 運用開始フロー
 
+### パターン A — AI トレンド調査起点
+
 ```
 1. npm run research:trends
    → data/research/YYYY-MM-DD-trends.json で候補確認
 
-2. 採用候補を data/article-topics.sample.csv に手動追記
+2. 採用候補を data/article-topics.sample.csv に手動追記（または --import フラグで半自動）
    → npm run validate:topics で確認
 
 3. npm run generate:draft -- TOPIC-XXXX
    → content/posts/ に reviewed:false の下書きを生成
 
-4. npm run list:pending-review で一覧確認
-   → 記事本文・医療情報の安全性を Human が確認
+4. npm run notify:pending-review
+   → Telegram に一覧を通知（Human がトリガー。通知からの approve は禁止）
 
-5. npm run approve:post -- SLUG --reviewed-by "氏名"
+5. http://localhost:3000/admin/pending-review で本文を確認
+
+6. npm run approve:post -- SLUG --reviewed-by "氏名"
    → reviewed:true になり公開対象に入る（--reviewed-by は必須）
 
-6. npm run validate:publish-ready
+7. npm run validate:publish-ready
    → publish-ready 件数を確認（exit 0 なら全承認済み）
 
-7. npm run build → deploy
+8. npm run build → git push → deploy（Human が判断・実行）
    → reviewed:true の記事のみ静的生成・sitemap 収録
 ```
+
+### パターン B — 手動テーマ指定起点
+
+```
+1. npm run request:article -- --title "タイトル" --category "カテゴリ" --date YYYY-MM-DD
+   → data/article-topics.sample.csv に status:approved で登録
+
+2. npm run generate:draft -- TOPIC-XXXX
+   → content/posts/ に reviewed:false の下書きを生成
+
+3. npm run notify:pending-review
+   → Telegram に一覧を通知（Human がトリガー）
+
+4〜8. パターン A の 5〜8 と同じ
+```
+
+> 詳細手順: [docs/manual-request-to-telegram-review-flow.md](docs/manual-request-to-telegram-review-flow.md)
 
 スケジュール公開: frontmatter に `publish_at: "YYYY-MM-DD"` を設定すると、その日以降のビルドで公開される（自動 cron なし、Human がビルド・デプロイを判断）。日付比較は **UTC 基準**（JST 基準対応は後続改善）。gray-matter が日付文字列を Date 型に変換するケースにも対応済み。
 
