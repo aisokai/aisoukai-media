@@ -154,6 +154,7 @@ tags:
 | `npm run validate:publish-ready` | 公開承認状態を確認する（reviewed: true / 必須項目充足チェック） |
 | `npm run list:pending-review` | Human review 待ちの記事一覧を表示する |
 | `npm run request:article -- --title "..." --category "..." --date YYYY-MM-DD` | テーマを手動指定して記事ネタ CSV に追加する（generate:draft の前段） |
+| `npm run notify:pending-review` | pending review 記事の通知テキストを出力する（将来 LINE/Telegram 送信に拡張予定） |
 | `npm run approve:post -- <slug> --reviewed-by "氏名"` | 記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
 | `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason を記録） |
 

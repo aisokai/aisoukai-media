@@ -17,7 +17,8 @@
     "approve:post": "node scripts/approve-post.mjs",
     "reject:post": "node scripts/reject-post.mjs",
     "list:pending-review": "node scripts/list-pending-review.mjs",
-    "request:article": "node scripts/request-article.mjs"
+    "request:article": "node scripts/request-article.mjs",
+    "notify:pending-review": "node scripts/notify-pending-review.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
