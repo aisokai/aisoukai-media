@@ -157,15 +157,31 @@ Webhook エンドポイントの実装が必要。Vercel Edge Function または
 - `generate:draft` の完了後に呼び出す or 単独で実行
 - Human approval フローは変更しない
 
-### Phase 4D: Approval UX 改善
+### Phase 4D: 手動依頼・定期提案フロー CLI（今回）
+
+**手動依頼フロー（`article:manual`）:**
+- `scripts/manual-article-flow.mjs` を追加
+  - `--title` / `--category` / `--date` を受け取り、topic 登録 → generate:draft → notify を一括実行
+  - `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` で呼べる
+  - Human が必ずトリガーする。AI の自動実行は禁止
+
+**定期提案フロー（`article:scheduled`）:**
+- `scripts/scheduled-article-flow.mjs` を追加
+  - 承認済みで下書き未生成の topic を優先度順に 1 件選択
+  - なければ `research:trends` で候補を補充して approved で登録
+  - generate:draft → notify を実行
+  - cron 化前の手動実行版（`npm run article:scheduled`）
+  - approve / publish は一切行わない
+
+### Phase 4E: Approval UX 改善
 - `/admin/pending-review` に記事本文プレビューを追加
 - approve / reject ボタンを追加（**サーバーサイド Action 経由**、API なしで実行）
 - ボタン押下は「CLI コマンドをサーバーサイドで実行」と同等の扱いにし、
   審査フローの本質（Human による明示的操作）を維持する
 
-### Phase 4E: 定期提案型（cron）
+### Phase 4F: 定期提案型（cron 本番化）
 - GitHub Actions の schedule trigger または Vercel Cron を使用
-- `research:trends → --import → generate:draft → notify` を自動実行
+- `article:scheduled` を定期実行する
 - Human approval なしには公開されないことをワークフローで保証する
 - cron が直接 approve / deploy しないことを明示する
 
