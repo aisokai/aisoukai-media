@@ -1,7 +1,27 @@
+import type { Metadata } from 'next'
 import { getAllPosts } from '@/lib/posts'
+import { SITE_URL, SITE_NAME } from '@/lib/seo'
 import { ArticleCard } from '@/components/ArticleCard'
 import { Sidebar } from '@/components/Sidebar'
 import { HeroSection } from '@/components/HeroSection'
+
+export const metadata: Metadata = {
+  title: '記事一覧',
+  description: '三谷ファミリー歯科クリニックによる歯科情報メディア。虫歯・歯周病・予防歯科・訪問歯科など専門的な情報をわかりやすく解説します。',
+  alternates: { canonical: `${SITE_URL}/blog` },
+  openGraph: {
+    type: 'website',
+    title: '記事一覧',
+    description: '三谷ファミリー歯科クリニックによる歯科情報メディア。虫歯・歯周病・予防歯科・訪問歯科など専門的な情報をわかりやすく解説します。',
+    url: `${SITE_URL}/blog`,
+    siteName: SITE_NAME,
+  },
+  twitter: {
+    card: 'summary',
+    title: '記事一覧',
+    description: '三谷ファミリー歯科クリニックによる歯科情報メディア。虫歯・歯周病・予防歯科・訪問歯科など専門的な情報をわかりやすく解説します。',
+  },
+}
 
 export default function BlogPage() {
   const posts = getAllPosts()

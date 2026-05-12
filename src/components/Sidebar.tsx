@@ -2,16 +2,17 @@ import Link from 'next/link'
 import { Search, TrendingUp, FolderOpen, User, ChevronRight } from 'lucide-react'
 import { getAllPosts } from '@/lib/posts'
 
-const categories = [
-  { name: "虫歯治療", count: 12, color: "#3b82f6", href: "/category/cavity" },
-  { name: "根管治療", count: 8, color: "#ef4444", href: "/category/root-canal" },
-  { name: "歯周病治療", count: 10, color: "#f97316", href: "/category/periodontal" },
-  { name: "予防歯科", count: 15, color: "#22c55e", href: "/category/preventive" },
-  { name: "小児歯科", count: 9, color: "#14b8a6", href: "/category/pediatric" },
-  { name: "矯正歯科", count: 7, color: "#8b5cf6", href: "/category/orthodontics" },
-  { name: "親知らずの抜歯", count: 5, color: "#ec4899", href: "/category/wisdom-tooth" },
-  { name: "インプラント治療", count: 6, color: "#0ea5e9", href: "/category/implant" },
-  { name: "その他", count: 4, color: "#6b7280", href: "/category/other" },
+// カテゴリのナビゲーション定義（順序・色・URLの正本）
+const CATEGORY_NAV = [
+  { name: "虫歯治療",      color: "#3b82f6", href: "/category/cavity" },
+  { name: "根管治療",      color: "#ef4444", href: "/category/root-canal" },
+  { name: "歯周病治療",    color: "#f97316", href: "/category/periodontal" },
+  { name: "予防歯科",      color: "#22c55e", href: "/category/preventive" },
+  { name: "小児歯科",      color: "#14b8a6", href: "/category/pediatric" },
+  { name: "矯正歯科",      color: "#8b5cf6", href: "/category/orthodontics" },
+  { name: "親知らずの抜歯", color: "#ec4899", href: "/category/wisdom-tooth" },
+  { name: "インプラント治療",color: "#0ea5e9", href: "/category/implant" },
+  { name: "その他",        color: "#6b7280", href: "/category/other" },
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -60,7 +61,19 @@ function SidebarSection({
 }
 
 export function Sidebar() {
-  const popularPosts = getAllPosts().slice(0, 5)
+  const posts = getAllPosts()
+  const popularPosts = posts.slice(0, 5)
+
+  // 公開済み記事（getAllPosts が Approval Gate 済みのみ返す）のカテゴリ別件数
+  const countByCategory = posts.reduce<Record<string, number>>((acc, p) => {
+    acc[p.category] = (acc[p.category] ?? 0) + 1
+    return acc
+  }, {})
+
+  const categories = CATEGORY_NAV.map((c) => ({
+    ...c,
+    count: countByCategory[c.name] ?? 0,
+  }))
 
   return (
     <div className="flex flex-col gap-6">
