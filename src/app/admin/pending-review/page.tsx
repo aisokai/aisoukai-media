@@ -8,7 +8,9 @@ export const metadata: Metadata = {
 }
 
 export default function PendingReviewPage() {
-  const posts = getPendingReviewPosts()
+  const allPosts = getPendingReviewPosts()
+  const pending  = allPosts.filter((p) => !p.rejectionReason)
+  const rejected = allPosts.filter((p) =>  p.rejectionReason)
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-10">
@@ -23,15 +25,16 @@ export default function PendingReviewPage() {
         </pre>
       </div>
 
-      {posts.length === 0 ? (
+      {/* ── 通常 pending セクション ── */}
+      {pending.length === 0 ? (
         <div className="rounded-lg border border-green-200 bg-green-50 px-6 py-10 text-center text-green-700">
           Review 待ちの記事はありません。
         </div>
       ) : (
         <>
-          <p className="mb-4 text-sm text-gray-500">{posts.length} 件</p>
+          <p className="mb-4 text-sm text-gray-500">レビュー待ち: {pending.length} 件</p>
           <div className="space-y-4">
-            {posts.map((post) => (
+            {pending.map((post) => (
               <div
                 key={post.slug}
                 className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
@@ -80,6 +83,34 @@ export default function PendingReviewPage() {
             ))}
           </div>
         </>
+      )}
+
+      {/* ── 差し戻し済みセクション ── */}
+      {rejected.length > 0 && (
+        <div className="mt-10">
+          <h2 className="mb-3 text-base font-semibold text-gray-500">
+            差し戻し済み ({rejected.length} 件)
+          </h2>
+          <div className="space-y-2">
+            {rejected.map((post) => (
+              <div
+                key={post.slug}
+                className="rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium text-gray-700">{post.title}</span>
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    差し戻し
+                  </span>
+                </div>
+                {post.rejectionReason && (
+                  <p className="mt-1 text-xs text-red-600">理由: {post.rejectionReason}</p>
+                )}
+                <p className="mt-1 font-mono text-xs text-gray-400">{post.slug}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )

@@ -87,6 +87,7 @@ export type PendingReviewPost = {
   category: string;
   aiGenerated: boolean;
   excerpt: string;
+  rejectionReason?: string;
 };
 
 function toDateString(val: unknown): string {
@@ -111,12 +112,13 @@ export function getPendingReviewPosts(): PendingReviewPost[] {
       const publishAtRaw = data['publish_at'];
       return {
         slug,
-        title:       String(data['title'] ?? '（タイトル未設定）'),
-        date:        toDateString(data['date']),
-        publishAt:   publishAtRaw ? toDateString(publishAtRaw) : undefined,
-        category:    String(data['category'] ?? '未分類'),
-        aiGenerated: data['ai_generated'] === true,
-        excerpt:     String(data['excerpt'] ?? data['description'] ?? ''),
+        title:           String(data['title'] ?? '（タイトル未設定）'),
+        date:            toDateString(data['date']),
+        publishAt:       publishAtRaw ? toDateString(publishAtRaw) : undefined,
+        category:        String(data['category'] ?? '未分類'),
+        aiGenerated:     data['ai_generated'] === true,
+        excerpt:         String(data['excerpt'] ?? data['description'] ?? ''),
+        rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
       };
     })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
