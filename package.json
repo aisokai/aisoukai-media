@@ -13,7 +13,10 @@
     "validate:posts": "node scripts/validate-posts.mjs",
     "validate:topics": "node scripts/validate-topics.mjs",
     "research:trends": "node scripts/research-trends.mjs",
-    "validate:publish-ready": "node scripts/validate-publish-ready.mjs"
+    "validate:publish-ready": "node scripts/validate-publish-ready.mjs",
+    "approve:post": "node scripts/approve-post.mjs",
+    "reject:post": "node scripts/reject-post.mjs",
+    "list:pending-review": "node scripts/list-pending-review.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

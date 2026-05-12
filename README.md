@@ -152,6 +152,36 @@ tags:
 | `npm run validate:posts` | `content/posts/` の全記事 frontmatter を検証する |
 | `npm run research:trends` | AIトレンド調査の記事候補を `data/research/` に出力する（dry-run） |
 | `npm run validate:publish-ready` | 公開承認状態を確認する（reviewed: true / 必須項目充足チェック） |
+| `npm run list:pending-review` | Human review 待ちの記事一覧を表示する |
+| `npm run approve:post -- <slug> --reviewed-by "氏名"` | 記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
+| `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason を記録） |
+
+## 運用開始フロー
+
+```
+1. npm run research:trends
+   → data/research/YYYY-MM-DD-trends.json で候補確認
+
+2. 採用候補を data/article-topics.sample.csv に手動追記
+   → npm run validate:topics で確認
+
+3. npm run generate:draft -- TOPIC-XXXX
+   → content/posts/ に reviewed:false の下書きを生成
+
+4. npm run list:pending-review で一覧確認
+   → 記事本文・医療情報の安全性を Human が確認
+
+5. npm run approve:post -- SLUG --reviewed-by "氏名"
+   → reviewed:true になり公開対象に入る（--reviewed-by は必須）
+
+6. npm run validate:publish-ready
+   → publish-ready 件数を確認（exit 0 なら全承認済み）
+
+7. npm run build → deploy
+   → reviewed:true の記事のみ静的生成・sitemap 収録
+```
+
+スケジュール公開: frontmatter に `publish_at: "YYYY-MM-DD"` を設定すると、その日以降のビルドで公開される（自動 cron なし、Human がビルド・デプロイを判断）。日付比較は **UTC 基準**（JST 基準対応は後続改善）。gray-matter が日付文字列を Date 型に変換するケースにも対応済み。
 
 ## generate:draft の使い方
 

@@ -7,9 +7,21 @@ import remarkHtml from 'remark-html';
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
 // reviewed: true かつ draft でない記事のみ公開対象とする。
+// publish_at が設定されている場合は当日以降のみ公開対象とする（スケジュール公開の最小実装）。
 // AI生成記事は生成時 reviewed: false で作られ、Human approval 後に reviewed: true へ変更する。
 function isPublishReady(data: Record<string, unknown>): boolean {
-  return data['reviewed'] === true && data['draft'] !== true
+  if (data['reviewed'] !== true || data['draft'] === true) return false
+
+  const publishAt = data['publish_at']
+  if (publishAt) {
+    const publishAtStr = publishAt instanceof Date
+      ? publishAt.toISOString().slice(0, 10)
+      : String(publishAt)
+    const today = new Date().toISOString().slice(0, 10)
+    if (publishAtStr > today) return false
+  }
+
+  return true
 }
 
 export type PostMeta = {
@@ -20,7 +32,11 @@ export type PostMeta = {
   category: string;
   tags: string[];
   reviewed: boolean;
-  image?: string;   // frontmatter の image フィールド（省略可）
+  image?: string;
+  publishAt?: string;        // スケジュール公開日（省略時は date を公開日とする）
+  reviewedAt?: string;       // Human approval 日
+  reviewedBy?: string;       // 承認者名
+  aiGenerated?: boolean;
 };
 
 export type Post = PostMeta & {
@@ -53,6 +69,10 @@ export function getAllPosts(): PostMeta[] {
         tags: (data.tags as string[]) ?? [],
         reviewed: true,
         image: data.image as string | undefined,
+        publishAt: data.publish_at as string | undefined,
+        reviewedAt: data.reviewed_at as string | undefined,
+        reviewedBy: data.reviewed_by as string | undefined,
+        aiGenerated: data.ai_generated === true,
       };
     });
 

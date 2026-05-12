@@ -53,8 +53,27 @@ function checkPost(filename) {
     blockers.push('reviewed: false — Human approval が未完了です')
   }
 
+  // reviewed:true なのに承認メタデータがない場合は blocker
+  if (data.reviewed === true) {
+    if (!data.reviewed_at || String(data.reviewed_at).trim() === '') {
+      blockers.push('reviewed_at がありません（approved:post 経由で承認してください）')
+    }
+    if (!data.reviewed_by || String(data.reviewed_by).trim() === '') {
+      blockers.push('reviewed_by がありません（--reviewed-by オプションで承認者名を指定してください）')
+    }
+  }
+
   if (data.draft === true) {
     blockers.push('draft: true — ドラフト明示記事は公開対象外です')
+  }
+
+  // ── publish_at: 未来日付はまだ公開しない ──
+  if (data.publish_at) {
+    const publishAtStr = toDateStr(data.publish_at)
+    const today = new Date().toISOString().slice(0, 10)
+    if (publishAtStr && publishAtStr > today) {
+      blockers.push(`publish_at: ${publishAtStr} — 公開予定日が未来です（scheduled: ${publishAtStr}）`)
+    }
   }
 
   // ── AI生成フラグ（warning: 内容確認を促す） ──
