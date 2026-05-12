@@ -19,6 +19,21 @@ const VALID_CATEGORIES = new Set([
 const DATE_RE     = /^\d{4}-\d{2}-\d{2}$/
 const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-.+\.md$/
 
+// 医療広告ガイドライン上リスクのある表現パターン
+// publish-ready 記事の本文に含まれていた場合に warning を出す（build は止めない）
+const MEDICAL_AD_PATTERNS = [
+  { re: /必ず/,                              label: '断定表現「必ず」' },
+  { re: /絶対/,                              label: '断定表現「絶対」' },
+  { re: /完全に治る/,                        label: '断定表現「完全に治る」' },
+  { re: /100[%％]/,                          label: '断定数値「100%」' },
+  { re: /No\.?1|NO\.?1|ナンバーワン/,        label: '比較優位「No.1 / ナンバーワン」' },
+  { re: /日本一/,                            label: '比較優位「日本一」' },
+  { re: /最安/,                              label: '比較優位「最安」' },
+  { re: /他院より/,                          label: '比較優位「他院より」' },
+  { re: /痛くない/,                          label: '誇大表現「痛くない」' },
+  { re: /副作用なし/,                        label: '誇大表現「副作用なし」' },
+]
+
 function toDateStr(val) {
   if (val instanceof Date) return val.toISOString().slice(0, 10)
   return String(val ?? '')
@@ -39,13 +54,15 @@ function checkPost(filename) {
   }
 
   const filePath = join(POSTS_DIR, filename)
-  let data
+  let data, content
   try {
     const raw = readFileSync(filePath, 'utf8')
-    data = matter(raw).data
+    const parsed = matter(raw)
+    data    = parsed.data
+    content = parsed.content
   } catch (e) {
     blockers.push(`frontmatter のパースに失敗しました: ${e.message}`)
-    return { blockers, warnings }
+    return { blockers, warnings, content: '' }
   }
 
   // ── 承認状態 ──
@@ -118,7 +135,7 @@ function checkPost(filename) {
     blockers.push(`image のパスが "/" で始まっていません: "${data.image}"`)
   }
 
-  return { blockers, warnings }
+  return { blockers, warnings, content: content ?? '' }
 }
 
 // ── エントリポイント ──
@@ -139,6 +156,15 @@ if (files.length === 0) {
 const results = files.map((file) => ({ file, ...checkPost(file) }))
 const ready     = results.filter((r) => r.blockers.length === 0)
 const notReady  = results.filter((r) => r.blockers.length > 0)
+
+// 医療広告チェック — publish-ready 記事の本文のみをスキャンし warning を追加する
+for (const r of ready) {
+  for (const { re, label } of MEDICAL_AD_PATTERNS) {
+    if (re.test(r.content)) {
+      r.warnings.push(`医療広告注意: ${label} が含まれています`)
+    }
+  }
+}
 
 const BAR = '━'.repeat(56)
 console.log(BAR)
