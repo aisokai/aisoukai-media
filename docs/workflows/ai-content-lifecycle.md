@@ -36,8 +36,8 @@ AIが単独でコンテンツを公開することはない。
     → AIが自動実行してはならない
 
     差し戻しの場合:
-    npm run reject:post -- SLUG [--reason "理由"]
-    → reviewed: false 維持 / rejection_reason を記録
+    npm run reject:post -- SLUG [--reason "理由"] [--reviewed-by "氏名"]
+    → reviewed: false 維持 / rejection_reason と review log を記録
     → [4] に戻る
 
 [6] Publish Check

@@ -25,7 +25,8 @@ const LOGS_DIR = join(ROOT, 'logs')
 const LOG_PATH = join(LOGS_DIR, 'review-history.md')
 
 function appendReviewLog(entry) {
-  const lines = [`## ${entry.timestamp}`]
+  const lines = [`## ${entry.datetime}`]
+  lines.push(`datetime: ${entry.datetime}`)
   lines.push(`action: ${entry.action}`)
   lines.push(`slug: ${entry.slug}`)
   if (entry.reviewed_by) lines.push(`reviewed_by: ${entry.reviewed_by}`)
@@ -130,7 +131,7 @@ function main() {
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
 
   appendReviewLog({
-    timestamp:   getJstTimestamp(),
+    datetime:    getJstTimestamp(),
     action:      'approve',
     slug,
     reviewed_by: by,

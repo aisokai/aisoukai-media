@@ -25,9 +25,9 @@ npm run list:pending-review
 npm run approve:post -- <slug>
 npm run approve:post -- <slug> --reviewed-by "承認者名"
 
-# 差し戻し（reviewed: false 維持、理由を記録）
+# 差し戻し（reviewed: false 維持、理由と review log を記録）
 npm run reject:post -- <slug>
-npm run reject:post -- <slug> --reason "医療情報の根拠が不明確"
+npm run reject:post -- <slug> --reason "医療情報の根拠が不明確" --reviewed-by "承認者名"
 
 # 承認状態の確認
 npm run validate:publish-ready

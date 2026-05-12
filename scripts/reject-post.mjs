@@ -35,10 +35,13 @@ const LOGS_DIR = join(ROOT, 'logs')
 const LOG_PATH = join(LOGS_DIR, 'review-history.md')
 
 function appendReviewLog(entry) {
-  const lines = [`## ${entry.timestamp}`]
+  const lines = [`## ${entry.datetime}`]
+  lines.push(`datetime: ${entry.datetime}`)
   lines.push(`action: ${entry.action}`)
   lines.push(`slug: ${entry.slug}`)
+  if (entry.reviewed_by) lines.push(`reviewed_by: ${entry.reviewed_by}`)
   if (entry.reason)     lines.push(`reason: ${entry.reason}`)
+  if (entry.reject_reason) lines.push(`reject_reason: ${entry.reject_reason}`)
   if (entry.date)       lines.push(`date: ${entry.date}`)
   if (entry.publish_at) lines.push(`publish_at: ${entry.publish_at}`)
   lines.push('')
@@ -79,10 +82,11 @@ function main() {
   const args   = parseArgs(process.argv.slice(2))
   const input  = String(args.slug ?? args._[0] ?? '').trim()
   const reason = String(args.reason ?? args.rejection_reason ?? '').trim()
+  const reviewedBy = String(args.reviewed_by ?? args.by ?? process.env.USER ?? process.env.USERNAME ?? '').trim() || 'unknown'
 
   if (!input) {
     console.error('使い方: npm run reject:post -- <slug または ファイル名>')
-    console.error('   例:  npm run reject:post -- 2026-05-22-topic-20260511-007 --reason "医療情報の根拠が不明確"')
+    console.error('   例:  npm run reject:post -- 2026-05-22-topic-20260511-007 --reason "医療情報の根拠が不明確" --reviewed-by "氏名"')
     process.exit(1)
   }
 
@@ -109,12 +113,14 @@ function main() {
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
 
   appendReviewLog({
-    timestamp: getJstTimestamp(),
-    action:    'reject',
+    datetime:      getJstTimestamp(),
+    action:        'reject',
     slug,
-    reason:    reason || undefined,
-    date:      data.date,
-    publish_at: data.publish_at,
+    reviewed_by:   reviewedBy,
+    reason:        reason || undefined,
+    reject_reason: reason || undefined,
+    date:          data.date,
+    publish_at:    data.publish_at,
   })
 
   console.log('━'.repeat(52))
@@ -122,6 +128,7 @@ function main() {
   console.log('━'.repeat(52))
   console.log(`  ファイル         : ${filePath.replace(ROOT + '/', '')}`)
   console.log(`  reviewed         : false`)
+  console.log(`  reviewed_by      : ${reviewedBy}`)
   if (reason) console.log(`  rejection_reason : ${reason}`)
   console.log('━'.repeat(52))
   console.log()

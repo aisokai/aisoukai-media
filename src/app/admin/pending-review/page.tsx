@@ -213,11 +213,11 @@ export default function PendingReviewPage() {
                 {entry.reviewedBy && (
                   <span className="text-gray-500">by {entry.reviewedBy}</span>
                 )}
-                {entry.reason && (
-                  <span className="text-red-600">理由: {entry.reason}</span>
+                {(entry.rejectReason ?? entry.reason) && (
+                  <span className="text-red-600">理由: {entry.rejectReason ?? entry.reason}</span>
                 )}
                 <span className="ml-auto shrink-0 text-gray-400">
-                  {entry.timestamp.slice(0, 16).replace('T', ' ')}
+                  {entry.datetime.slice(0, 16).replace('T', ' ')}
                 </span>
               </div>
             ))}

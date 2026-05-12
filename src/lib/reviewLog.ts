@@ -2,11 +2,13 @@ import fs from 'fs'
 import path from 'path'
 
 export type ReviewLogEntry = {
+  datetime: string
   timestamp: string
   action: 'approve' | 'reject'
   slug: string
   reviewedBy?: string
   reason?: string
+  rejectReason?: string
   date?: string
   publishAt?: string
 }
@@ -22,20 +24,23 @@ export function getRecentReviewLog(limit = 10): ReviewLogEntry[] {
 
   const entries: ReviewLogEntry[] = blocks.map((block) => {
     const lines = block.trim().split('\n')
-    const timestamp = lines[0].trim()
+    const headerDateTime = lines[0].trim()
     const fields: Record<string, string> = {}
     for (const line of lines.slice(1)) {
       const m = line.match(/^([a-z_]+):\s*(.+)$/)
       if (m) fields[m[1]] = m[2].trim()
     }
+    const datetime = fields['datetime'] ?? headerDateTime
     return {
-      timestamp,
-      action:     (fields['action'] as 'approve' | 'reject') ?? 'approve',
-      slug:       fields['slug'] ?? '',
-      reviewedBy: fields['reviewed_by'],
-      reason:     fields['reason'],
-      date:       fields['date'],
-      publishAt:  fields['publish_at'],
+      datetime,
+      timestamp: datetime,
+      action:       (fields['action'] as 'approve' | 'reject') ?? 'approve',
+      slug:         fields['slug'] ?? '',
+      reviewedBy:   fields['reviewed_by'],
+      reason:       fields['reason'] ?? fields['reject_reason'],
+      rejectReason: fields['reject_reason'] ?? fields['reason'],
+      date:         fields['date'],
+      publishAt:    fields['publish_at'],
     }
   })
 

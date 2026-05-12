@@ -47,7 +47,12 @@ function getPendingPosts() {
       }
     })
     .filter((p) => !p.reviewed)
-    .sort((a, b) => (a.publishAt < b.publishAt ? -1 : 1))
+    .sort((a, b) => {
+      const aDate = a.publishAt || ''
+      const bDate = b.publishAt || ''
+      if (aDate !== bDate) return aDate < bDate ? 1 : -1
+      return a.title.localeCompare(b.title, 'ja')
+    })
 }
 
 function buildNotificationText(posts, dashboardUrl) {
@@ -58,13 +63,14 @@ function buildNotificationText(posts, dashboardUrl) {
   const rejected = posts.filter((p) => p.rejectionReason)
   const future   = posts.filter((p) => !p.rejectionReason && p.isFuture)
   const pending  = posts.filter((p) => !p.rejectionReason && !p.isFuture)
+  const active   = [...pending, ...future]
 
   const lines = ['📝 pending-review summary', '']
   lines.push(`- review待ち: ${pending.length}件`)
   lines.push(`- future記事: ${future.length}件`)
   lines.push(`- 差し戻し済み: ${rejected.length}件`)
 
-  const latest = [...pending, ...future].slice(0, 10)
+  const latest = active.slice(0, 10)
   if (latest.length > 0) {
     lines.push('')
     lines.push('最新:')
@@ -72,8 +78,8 @@ function buildNotificationText(posts, dashboardUrl) {
       const futureTag = post.isFuture ? ` [📅${post.publishAt}]` : ''
       lines.push(`${i + 1}. ${post.title}${futureTag}`)
     }
-    if (pending.length + future.length > 10) {
-      lines.push(`  ...他 ${pending.length + future.length - 10} 件`)
+    if (active.length > 10) {
+      lines.push(`  ...他 ${active.length - 10} 件`)
     }
   }
 
