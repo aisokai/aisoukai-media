@@ -51,10 +51,13 @@ export const SITE_URL = resolveSiteUrl()
 
 /**
  * 記事ページ用 Metadata を組み立てる。
- * OGP / canonical / article メタを含む。動的 OGP 画像は未実装のため og:image は省略。
+ * OGP / canonical / twitter card / article メタを含む。
+ * og:image は同ディレクトリの opengraph-image.tsx が自動生成する。
  */
 export function buildArticleMetadata(post: PostMeta, slug: string): Partial<Metadata> {
   const url = `${SITE_URL}/blog/${slug}`
+  // opengraph-image.tsx が /blog/[slug]/opengraph-image に画像を生成する
+  const ogImage = `/blog/${slug}/opengraph-image`
   return {
     title: post.title,
     description: post.excerpt,
@@ -70,6 +73,40 @@ export function buildArticleMetadata(post: PostMeta, slug: string): Partial<Meta
       modifiedTime: `${post.date}T00:00:00Z`,
       authors: [AUTHOR_NAME],
       tags: post.tags,
+      images: [{ url: ogImage, width: 1200, height: 630, alt: post.title }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description: post.excerpt,
+      images: [ogImage],
+    },
+  }
+}
+
+/**
+ * カテゴリ一覧ページ用 Metadata を組み立てる。
+ * canonical / OGP / twitter card を含む。
+ */
+export function buildCategoryMetadata(category: string, slug: string): Partial<Metadata> {
+  const url = `${SITE_URL}/category/${slug}`
+  const title = `${category}の記事一覧`
+  const description = `${category}に関する記事一覧です。三谷ファミリー歯科クリニックが専門情報をわかりやすく解説します。`
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      title,
+      description,
+      url,
+      siteName: SITE_NAME,
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
     },
   }
 }

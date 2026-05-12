@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getAllPosts } from '@/lib/posts'
 import { CATEGORY_SLUG_MAP } from '@/lib/categories'
+import { buildCategoryMetadata } from '@/lib/seo'
 import { ArticleCard } from '@/components/ArticleCard'
 import { Sidebar } from '@/components/Sidebar'
 import { HeroSection } from '@/components/HeroSection'
@@ -18,10 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const category = CATEGORY_SLUG_MAP[slug]
   if (!category) return {}
-  return {
-    title: `${category}の記事一覧 | 三谷ファミリー歯科クリニック`,
-    description: `${category}に関する記事の一覧ページです。歯科の専門情報をわかりやすくお届けします。`,
-  }
+  return buildCategoryMetadata(category, slug)
 }
 
 export default async function CategoryPage({ params }: Props) {
