@@ -1,4 +1,10 @@
+import type { Metadata } from 'next'
 import { HeroSection } from '@/components/HeroSection'
+
+export const metadata: Metadata = {
+  title: '運営者情報',
+  description: '三谷ファミリー歯科クリニックによる歯科情報メディアの運営方針と掲載内容の位置づけをご案内します。',
+}
 
 export default function AboutPage() {
   return (

@@ -5,6 +5,17 @@ export { CATEGORY_URL_MAP } from './categories'
 export const SITE_NAME = '三谷ファミリー歯科クリニック'
 export const AUTHOR_NAME = '藍想会メディア編集部'
 
+// canonical URL を組み立てるヘルパー
+export function buildCanonicalUrl(path: string): string {
+  return `${SITE_URL}${path.startsWith('/') ? path : `/${path}`}`
+}
+
+// 検索エンジンにインデックスさせたくないページ用の metadata 断片
+// 適用先: /contact, /privacy, /sitemap 等のユーティリティページ
+export const NOINDEX_METADATA = {
+  robots: { index: false, follow: true },
+} as const
+
 // 本番環境では NEXT_PUBLIC_SITE_URL または SITE_URL の設定が必須。
 // - development: 未設定なら http://localhost:3000 にフォールバック
 // - production : 未設定または localhost URL は即 throw（sitemap / OGP の誤出力を防ぐ）

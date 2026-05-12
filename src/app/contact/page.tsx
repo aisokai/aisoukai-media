@@ -1,4 +1,12 @@
+import type { Metadata } from 'next'
+import { NOINDEX_METADATA } from '@/lib/seo'
 import { HeroSection } from '@/components/HeroSection'
+
+export const metadata: Metadata = {
+  title: 'お問い合わせ',
+  description: 'お問い合わせ方法のご案内です。',
+  ...NOINDEX_METADATA,
+}
 
 export default function ContactPage() {
   return (

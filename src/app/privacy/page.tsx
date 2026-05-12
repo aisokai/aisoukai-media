@@ -1,4 +1,12 @@
+import type { Metadata } from 'next'
+import { NOINDEX_METADATA } from '@/lib/seo'
 import { HeroSection } from '@/components/HeroSection'
+
+export const metadata: Metadata = {
+  title: 'プライバシーポリシー',
+  description: 'プライバシーポリシーのご案内です。',
+  ...NOINDEX_METADATA,
+}
 
 export default function PrivacyPage() {
   return (
