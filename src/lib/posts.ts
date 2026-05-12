@@ -79,6 +79,49 @@ export function getAllPosts(): PostMeta[] {
   return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
+export type PendingReviewPost = {
+  slug: string;
+  title: string;
+  date: string;
+  publishAt?: string;
+  category: string;
+  aiGenerated: boolean;
+  excerpt: string;
+};
+
+function toDateString(val: unknown): string {
+  if (val instanceof Date) return val.toISOString().slice(0, 10);
+  return String(val ?? '');
+}
+
+/** reviewed !== true の記事をすべて返す（Human review 待ち一覧用）。本文は含まない。 */
+export function getPendingReviewPosts(): PendingReviewPost[] {
+  if (!fs.existsSync(POSTS_DIR)) return [];
+
+  return fs
+    .readdirSync(POSTS_DIR)
+    .filter((f) => f.endsWith('.md'))
+    .filter((fileName) => {
+      const { data } = matter(fs.readFileSync(path.join(POSTS_DIR, fileName), 'utf8'));
+      return data['reviewed'] !== true;
+    })
+    .map((fileName): PendingReviewPost => {
+      const slug = fileName.replace(/\.md$/, '');
+      const { data } = matter(fs.readFileSync(path.join(POSTS_DIR, fileName), 'utf8'));
+      const publishAtRaw = data['publish_at'];
+      return {
+        slug,
+        title:       String(data['title'] ?? '（タイトル未設定）'),
+        date:        toDateString(data['date']),
+        publishAt:   publishAtRaw ? toDateString(publishAtRaw) : undefined,
+        category:    String(data['category'] ?? '未分類'),
+        aiGenerated: data['ai_generated'] === true,
+        excerpt:     String(data['excerpt'] ?? data['description'] ?? ''),
+      };
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
 // contentHtml は remark-html(sanitize:true) で処理済みの信頼済みHTML。
 // content/posts/ は管理者のみ編集可能なため XSS リスクなし。
 export async function getPostBySlug(slug: string): Promise<Post | null> {
