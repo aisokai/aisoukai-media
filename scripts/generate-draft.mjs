@@ -88,6 +88,7 @@ async function main() {
 
   const args = parseArgs(process.argv.slice(2))
   const topicId = String(args.topic_id ?? args._[0] ?? '').trim()
+  const force = args.force === true
 
   if (!topicId) {
     console.error('使い方: npm run generate:draft -- TOPIC-20260511-001')
@@ -165,11 +166,14 @@ async function main() {
   const filename = `${publishDate}-${slug}.md`
   const filePath = join(POSTS_DIR, filename)
 
-  // 既存ファイル上書き禁止
+  // 既存ファイルチェック（--force なしは安全停止）
   if (existsSync(filePath)) {
-    console.error(`エラー: ファイルが既に存在します: content/posts/${filename}`)
-    console.error('既存の下書きを削除してから再実行してください')
-    process.exit(1)
+    if (!force) {
+      console.error(`エラー: ファイルが既に存在します: content/posts/${filename}`)
+      console.error('既存の下書きを削除するか、--force を付けて再実行してください')
+      process.exit(1)
+    }
+    console.warn(`⚠️  Overwriting existing draft because --force was specified: content/posts/${filename}`)
   }
 
   // 生成前にトピック要約を表示
