@@ -9,9 +9,11 @@ tags:
   - 口腔ケア
 author: 藍想会メディア編集部
 image: ''
-reviewed: false
+reviewed: true
 draft: false
 ai_generated: false
+reviewed_at: '2026-05-12'
+reviewed_by: 三谷
 ---
 
 ## はじめに
