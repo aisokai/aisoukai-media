@@ -397,7 +397,8 @@ public/images/library/
   general/         汎用・その他
 ```
 
-ファイル名規則: `<category>-<連番>.jpg`（例: `cavity-01.jpg`）
+ファイル名規則: `<category>-<PixtaID>.jpg`（例: `cavity-3291061.jpg`）  
+Pixta 以外の場合は `<category>-<任意ID>.jpg` で重複しない ID を付与する。
 
 ### image-library.json の書き方
 
@@ -406,17 +407,21 @@ public/images/library/
 {
   "images": [
     {
-      "id": "cavity-01",                          // 一意 ID（英数字・ハイフン）
-      "path": "/images/library/cavity/cavity-01.jpg",  // public/ 配下のパス
-      "category": "cavity",                       // フォルダ名と合わせる
-      "tags": ["虫歯", "治療", "麻酔", "痛み"],  // 記事マッチングに使うキーワード
-      "alt": "歯科医師が虫歯の治療を行っているイメージ", // 必須
-      "license_source": "Pixta",                  // 素材サイト名
-      "license_note": "ID: 123456789 購入済み"   // ライセンス番号・購入情報
+      "id": "cavity-3291061",                                 // 一意 ID（英数字・ハイフン）
+      "path": "/images/library/cavity/cavity-3291061.jpg",   // public/ 配下のパス
+      "category": "cavity",                                   // フォルダ名と合わせる
+      "tags": ["虫歯", "治療", "歯科"],                       // 記事マッチングに使うキーワード
+      "alt": "頬を押さえて歯の痛みに顔をしかめる女性",       // 必須・内容を具体的に記述
+      "license_source": "Pixta",                              // 素材サイト名
+      "license_note": "Pixta ID: 3291061 — 購入日: 2026-05-13 / プラン: シングルパック"
     }
   ]
 }
 ```
+
+**`license_note` の TODO 運用:**  
+購入直後に記入できない場合は `"購入日: TODO / プラン: TODO"` と記入する。  
+`npm run image:check` が TODO 文字列を警告として検出するため、漏れなく追跡できる。
 
 ### inbox から画像を一括インポートする（`image:import-inbox`）
 
@@ -444,11 +449,14 @@ npm run image:import-inbox -- --apply --move
 - `_s` / `_m` / `_l` サフィックスを除去して ID を正規化（例: `34130816_s.jpg` → `general-34130816.jpg`）
 
 **インポート後の作業:**
-1. `data/image-library.json` を開き、`general` の画像を適切な category に修正する
-2. `alt` テキストを実際の画像内容に合わせて書き直す
-3. `license_note` に Pixta 購入 ID・購入日などを記入する
-4. `npm run validate:posts` — image パス整合性を確認
-5. `npm run image:suggest -- <slug>` で記事への割当候補を確認する
+1. `npm run image:list` でインポート結果を確認（alt 未カスタマイズ / license 未更新 の件数）
+2. `npm run image:check` でエラーがないことを確認（エラーがあれば修正してから次へ）
+3. `data/image-library.json` を開き、`general` の画像を適切な category に修正する
+   - `npm run image:reclassify -- <image-id> --category <category>` で分類変更（dry-run → `--apply`）
+   - `--alt "..."` オプションで alt も同時に更新できる
+4. `alt` テキストを実際の画像内容に合わせて書き直す
+5. `license_note` に Pixta 購入 ID・購入日などを記入する（TODO のままでも OK。image:check が警告する）
+6. `npm run image:suggest -- <slug>` で記事への割当候補を確認する
 
 ### 画像の追加から記事への割当まで
 
@@ -470,6 +478,30 @@ git add content/posts/<slug>.md data/image-library.json
 git commit -m "chore: assign image to <slug>"
 ```
 
+### 画像の分類変更（`image:reclassify`）
+
+インポート時に `general` に分類された画像を正しいカテゴリに移す:
+
+```bash
+# dry-run（確認のみ）
+npm run image:reclassify -- <image-id> --category preventive
+
+# 実行（ファイル移動 + JSON + 記事 frontmatter を更新）
+npm run image:reclassify -- <image-id> --category preventive --apply
+
+# alt も同時に上書きする場合
+npm run image:reclassify -- <image-id> --category preventive --alt "実際の画像の説明" --apply
+```
+
+### 不足カテゴリの追加購入
+
+`root-canal` / `periodontal` / `wisdom-tooth` の 3 カテゴリは画像が 0 件のため、  
+記事公開時に preventive / cavity の画像で代替している。
+
+購入候補・推奨キーワード・医療広告上の注意点: [docs/image-purchase-guide.md](docs/image-purchase-guide.md)
+
+購入後は inbox に配置して `image:import-inbox` で取り込む。
+
 ### 画像運用ルール
 
 | ルール | 詳細 |
@@ -478,7 +510,7 @@ git commit -m "chore: assign image to <slug>"
 | before/after 風画像 | 禁止（医療広告ガイドライン違反の恐れ） |
 | 治療効果を保証する画像 | 禁止（例：完治した歯の比較写真） |
 | `image_alt` | 必須。`image:assign` で自動設定されるが、内容を確認すること |
-| ライセンス情報 | `image-library.json` の `license_source` / `license_note` に必ず記載 |
+| ライセンス情報 | `image-library.json` の `license_source` / `license_note` に必ず記載。購入情報不明の場合は `TODO` と書いて後で埋める |
 | AI 画像生成 | 補助扱い。医療情報の補足イラスト程度に留め、誤解を招く写実的な医療行為の描写は使わない |
 
 ---

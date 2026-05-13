@@ -117,7 +117,7 @@ function main() {
     const note = img.license_note ?? ''
     if (!note.trim()) {
       warnings.push(`${label} license_note が空です`)
-    } else if (note.includes('ライセンス詳細を確認して更新すること')) {
+    } else if (note.includes('ライセンス詳細を確認して更新すること') || note.includes('TODO')) {
       warnings.push(`${label} license_note が未更新です（購入情報を記入してください）`)
     }
 
