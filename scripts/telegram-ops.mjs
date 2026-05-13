@@ -10,9 +10,18 @@
 //   publish / push / deploy 等     → スキップ
 //
 // フラグ:
-//   （引数なし） : dry-run — コンソール表示のみ、ファイル書き込みなし、Telegram 返信なし
-//   --apply      : ファイル書き込み + Telegram 返信
-//   --build      : --apply 時に承認後 npm run build も実行
+//   --dry-run  : コンソール表示のみ。書き込み・Git 操作・Telegram 返信なし（--apply がなければ暗黙 dry-run）
+//   --apply    : ファイル書き込み + Telegram 返信（build/git なし）
+//   --apply --build : approve → validate → build → git add → commit → push → Telegram 返信
+//
+// 安全条件:
+//   - TELEGRAM_ALLOWED_CHAT_IDS に含まれる chat_id/from_id のみ approve/reject を受け付ける
+//   - build 失敗時は commit/push しない（approve は済んでいるため手動 push に切り替える）
+//   - staged ファイルに機密ファイルが混入した場合は push しない
+//   - 機密パターン（.env / .key 等）の未追跡ファイルがある場合は push しない
+//   - .env.local は絶対に git add しない
+//   - reject 時は git 操作しない
+//   - publish コマンドは存在しない
 
 import {
   appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync,
@@ -74,7 +83,6 @@ async function sendTelegram(botToken, chatId, text) {
 
 // ── ファイルユーティリティ ────────────────────────────────────────────────
 
-// gray-matter が ISO 日付文字列を Date に変換するケースへの対処
 function normalizeDates(data) {
   const out = { ...data }
   for (const [k, v] of Object.entries(out)) {
@@ -85,7 +93,6 @@ function normalizeDates(data) {
 
 const DATE_PREFIX_RE = /^\d{4}-\d{2}-\d{2}-/
 
-// フルファイル名またはスラグ（日付プレフィックスあり/なし）でファイルを探す
 function resolveFilePath(input) {
   const name   = input.endsWith('.md') ? input : `${input}.md`
   const direct = join(POSTS_DIR, name)
@@ -150,7 +157,7 @@ function detectCategory(text) {
 function makeSlug(text) {
   return text
     .toLowerCase()
-    .replace(/[^\x20-\x7e]/g, '')   // 非ASCII（日本語等）を除去
+    .replace(/[^\x20-\x7e]/g, '')
     .replace(/[^a-z0-9\s-]/g, '')
     .trim()
     .replace(/\s+/g, '-')
@@ -164,15 +171,12 @@ function makeSlug(text) {
 function parseMessage(text) {
   const t = text.trim()
 
-  // approve <slug> [by <名前>]
   const approveM = t.match(/^approve\s+(\S+)(?:\s+by\s+(.+))?$/i)
   if (approveM) return { type: 'approve', slug: approveM[1].trim(), reviewedBy: approveM[2]?.trim() ?? '' }
 
-  // reject <slug> [<理由>]
   const rejectM = t.match(/^reject\s+(\S+)(?:\s+(.+))?$/i)
   if (rejectM) return { type: 'reject', slug: rejectM[1].trim(), reason: rejectM[2]?.trim() ?? '' }
 
-  // 明示的に禁止するコマンド
   if (/^publish/i.test(t)) return { type: 'skip', reason: 'publish コマンドは Telegram から禁止' }
   if (/^push/i.test(t))    return { type: 'skip', reason: 'push コマンドは Telegram から禁止' }
   if (/^deploy/i.test(t))  return { type: 'skip', reason: 'deploy コマンドは禁止' }
@@ -211,7 +215,7 @@ function approvePost(slug, reviewedBy) {
     date:        data.date,
   })
 
-  return { ok: true, slug: actualSlug, reviewedBy: data.reviewed_by, today }
+  return { ok: true, slug: actualSlug, reviewedBy: data.reviewed_by, today, filePath }
 }
 
 // ── 差し戻しフロー ────────────────────────────────────────────────────────
@@ -254,7 +258,6 @@ function generateDraft(requestText, updateId, fromUser) {
   let slug       = `${date}-${slugBase}`
   let filename   = `${slug}.md`
 
-  // 同名ファイルが存在する場合は update_id ベースにフォールバック
   if (existsSync(join(POSTS_DIR, filename))) {
     slug     = `${date}-req-${updateId}`
     filename = `${slug}.md`
@@ -299,7 +302,6 @@ function generateDraft(requestText, updateId, fromUser) {
 
   writeFileSync(filePath, `---\n${fmLines}\n---\n\n${body}\n`, 'utf8')
 
-  // article-requests.json を更新（重複 update_id は上書き更新）
   let entry = store.requests.find((r) => r.update_id === updateId)
   if (!entry) {
     entry = {
@@ -323,16 +325,192 @@ function generateDraft(requestText, updateId, fromUser) {
   return { ok: true, slug, category, filename }
 }
 
-// ── サブコマンド実行（シェルを使わない spawnSync ） ───────────────────────
+// ── プロセス実行ユーティリティ ────────────────────────────────────────────
 
 function runNpm(subcommand) {
   const result = spawnSync('npm', ['run', subcommand], {
-    cwd:     ROOT,
-    encoding: 'utf8',
-    timeout:  180000,
+    cwd: ROOT, encoding: 'utf8', timeout: 300000,
   })
-  const out = (result.stdout ?? '') + (result.stderr ?? '')
-  return { ok: result.status === 0, output: out.trim() }
+  return { ok: result.status === 0 && !result.error, output: ((result.stdout ?? '') + (result.stderr ?? '')).trim() }
+}
+
+function runGit(args) {
+  const result = spawnSync('git', args, {
+    cwd: ROOT, encoding: 'utf8', timeout: 60000,
+  })
+  return { ok: result.status === 0 && !result.error, output: ((result.stdout ?? '') + (result.stderr ?? '')).trim() }
+}
+
+// ── git 安全チェック ──────────────────────────────────────────────────────
+
+// ステージ済みファイルのパス一覧を返す
+function getStagedFiles() {
+  const r = runGit(['diff', '--staged', '--name-only'])
+  return r.output.split('\n').filter(Boolean)
+}
+
+// 未追跡ファイルのパス一覧を返す
+function getUntrackedFiles() {
+  const r = runGit(['status', '--porcelain'])
+  return r.output
+    .split('\n')
+    .filter((l) => l.startsWith('??'))
+    .map((l) => l.slice(3).trim())
+}
+
+// .env.local / *.key / credentials 等の機密パターン
+const SENSITIVE_RE = /\.(env|key|pem|p12|pfx|cert)(\.local)?$|\.env($|\.)|credentials|secrets\//i
+
+function filterSensitive(files) {
+  return files.filter((f) => SENSITIVE_RE.test(f))
+}
+
+// ── approve → validate → build → git add/commit/push パイプライン ─────────
+
+async function runApprovePipeline({ slug, by, build, botToken, replyId }) {
+
+  const steps = []    // { name, ok, output }
+  let postSlug = ''
+  let postFilePath = ''
+
+  // ─ 1. approve ─────────────────────────────────────────────────────────────
+
+  const ar = approvePost(slug, by)
+  if (!ar.ok) {
+    return { ok: false, failedAt: 'approve', error: ar.error, steps }
+  }
+  postSlug     = ar.slug
+  postFilePath = ar.filePath
+  steps.push({ name: 'approve', ok: true, output: `reviewed_by: ${ar.reviewedBy}, date: ${ar.today}` })
+
+  // ─ 2. validate:posts ──────────────────────────────────────────────────────
+
+  const vr = runNpm('validate:posts')
+  steps.push({ name: 'validate:posts', ok: vr.ok, output: vr.output.slice(0, 200) })
+  if (!vr.ok) {
+    return { ok: false, failedAt: 'validate:posts', error: vr.output, steps, slug: postSlug }
+  }
+
+  // ─ build + git（--build 指定時のみ） ────────────────────────────────────
+
+  if (!build) {
+    return { ok: true, slug: postSlug, reviewedBy: ar.reviewedBy, today: ar.today, steps, pushed: false }
+  }
+
+  // ─ 3. build ───────────────────────────────────────────────────────────────
+
+  const br = runNpm('build')
+  steps.push({ name: 'build', ok: br.ok, output: br.output.slice(0, 300) })
+  if (!br.ok) {
+    return { ok: false, failedAt: 'build', error: br.output, steps, slug: postSlug }
+  }
+
+  // ─ 4. git add（指定ファイルのみ）─────────────────────────────────────────
+
+  const relPost = `content/posts/${postSlug}.md`
+  const relLog  = 'logs/review-history.md'
+  const addR    = runGit(['add', relPost, relLog])
+  steps.push({ name: 'git add', ok: addR.ok, output: addR.output })
+  if (!addR.ok) {
+    return { ok: false, failedAt: 'git add', error: addR.output, steps, slug: postSlug }
+  }
+
+  // ─ 5. 安全チェック ────────────────────────────────────────────────────────
+
+  // ステージ済みファイルに機密ファイルが混入していないか確認
+  const staged   = getStagedFiles()
+  const badStaged = filterSensitive(staged)
+  if (badStaged.length > 0) {
+    runGit(['reset', 'HEAD'])   // ステージをすべて戻す
+    return {
+      ok: false, failedAt: 'safety-check',
+      error: `機密ファイルがステージに含まれています: ${badStaged.join(', ')}`,
+      steps, slug: postSlug,
+    }
+  }
+
+  // 未追跡ファイルに機密ファイルがないか確認（add はしていないが念のため）
+  const untracked    = getUntrackedFiles()
+  const badUntracked = filterSensitive(untracked)
+  if (badUntracked.length > 0) {
+    runGit(['reset', 'HEAD'])
+    return {
+      ok: false, failedAt: 'safety-check',
+      error: `未追跡に機密ファイルがあります（push を中止）: ${badUntracked.join(', ')}`,
+      steps, slug: postSlug,
+    }
+  }
+
+  // ステージが空なら "already committed" として扱う
+  if (staged.length === 0) {
+    steps.push({ name: 'git commit', ok: true, output: 'nothing to commit (既に最新)' })
+    steps.push({ name: 'git push',   ok: true, output: 'skipped (nothing to push)' })
+    return { ok: true, slug: postSlug, reviewedBy: ar.reviewedBy, today: ar.today, steps, pushed: false }
+  }
+
+  steps.push({ name: 'safety-check', ok: true, output: `staged: ${staged.join(', ')}` })
+
+  // ─ 6. git commit ──────────────────────────────────────────────────────────
+
+  const commitMsg = `approve: ${postSlug}\n\nApproved via Telegram by ${ar.reviewedBy}`
+  const cr        = runGit(['commit', '-m', commitMsg])
+  steps.push({ name: 'git commit', ok: cr.ok, output: cr.output.slice(0, 200) })
+  if (!cr.ok) {
+    return { ok: false, failedAt: 'git commit', error: cr.output, steps, slug: postSlug }
+  }
+
+  // ─ 7. git push ────────────────────────────────────────────────────────────
+
+  const pr = runGit(['push', 'origin', 'main'])
+  steps.push({ name: 'git push', ok: pr.ok, output: pr.output.slice(0, 200) })
+  if (!pr.ok) {
+    return { ok: false, failedAt: 'git push', error: pr.output, steps, slug: postSlug }
+  }
+
+  return { ok: true, slug: postSlug, reviewedBy: ar.reviewedBy, today: ar.today, steps, pushed: true }
+}
+
+// ── パイプライン結果を Telegram 返信テキストに変換 ────────────────────────
+
+function formatPipelineReply(result) {
+  const stepLines = result.steps.map((s) => {
+    const icon = s.ok ? '✅' : '❌'
+    return `${icon} ${s.name}`
+  })
+
+  if (result.ok) {
+    const lines = [
+      result.pushed
+        ? `✅ 承認 → build → push 完了`
+        : `✅ 承認 → validate 完了（build/push なし）`,
+      `スラグ: ${result.slug}`,
+      `reviewed_by: ${result.reviewedBy}`,
+      ``,
+      ...stepLines,
+    ]
+    if (result.pushed) {
+      lines.push(``, `🌐 デプロイ対象に追加済み（Vercel 等の CI/CD が自動検知します）`)
+    }
+    return lines.join('\n')
+  }
+
+  const lines = [
+    `❌ パイプライン失敗（${result.failedAt} で停止）`,
+    `スラグ: ${result.slug ?? '(不明)'}`,
+    ``,
+    ...stepLines,
+    ``,
+    `エラー:`,
+    result.error?.slice(0, 300) ?? '(詳細なし)',
+  ]
+
+  if (result.failedAt === 'build') {
+    lines.push(``, `▼ build 修正後に再実行:`, `  approve ${result.slug} by <名前>`)
+  } else if (result.failedAt === 'git push') {
+    lines.push(``, `▼ push を手動で実行:`, `  git push origin main`)
+  }
+
+  return lines.join('\n')
 }
 
 // ── メイン ────────────────────────────────────────────────────────────────
@@ -340,19 +518,21 @@ function runNpm(subcommand) {
 async function main() {
   loadEnv()
 
-  const argv  = process.argv.slice(2)
-  const apply = argv.includes('--apply')
-  const build = argv.includes('--build')
-  const BAR   = '━'.repeat(56)
+  const argv   = process.argv.slice(2)
+  const dryRun = argv.includes('--dry-run') || !argv.includes('--apply')
+  const build  = argv.includes('--build')
+  const BAR    = '━'.repeat(56)
+
+  const modeLabel = dryRun
+    ? '[dry-run]'
+    : build ? '--apply --build' : '--apply'
 
   console.log(BAR)
-  console.log(`telegram:ops${apply ? ' --apply' : ' [dry-run]'}${build ? ' --build' : ''}`)
+  console.log(`telegram:ops ${modeLabel}`)
   console.log(BAR)
 
   const botToken      = process.env.TELEGRAM_BOT_TOKEN
   const defaultChatId = process.env.TELEGRAM_CHAT_ID
-  // TELEGRAM_ALLOWED_CHAT_IDS: approve/reject を許可する chat_id または from_id のリスト
-  // 未設定時は TELEGRAM_CHAT_ID にフォールバック（1:1 Bot 運用向け）
   const allowedRaw     = process.env.TELEGRAM_ALLOWED_CHAT_IDS ?? process.env.TELEGRAM_CHAT_ID ?? ''
   const allowedChatIds = new Set(allowedRaw.split(',').map((s) => s.trim()).filter(Boolean))
 
@@ -361,8 +541,8 @@ async function main() {
     process.exit(1)
   }
 
-  const store          = loadRequests()
-  const offset         = (store.last_update_id ?? 0) + 1
+  const store           = loadRequests()
+  const offset          = (store.last_update_id ?? 0) + 1
   const knownRequestIds = new Set(store.requests.map((r) => r.update_id))
 
   console.log(`  既存リクエスト数        : ${store.requests.length} 件`)
@@ -392,7 +572,6 @@ async function main() {
     const msgFromId = String(msg.from?.id ?? '')
     const fromUser  = msg.from?.username ?? msg.from?.first_name ?? '(unknown)'
 
-    // チャンネル / ユーザーフィルタ（TELEGRAM_CHAT_ID が未設定なら全受信）
     if (defaultChatId) {
       if (msgChatId !== String(defaultChatId) && msgFromId !== String(defaultChatId)) continue
     }
@@ -407,85 +586,72 @@ async function main() {
     // ── スキップ ────────────────────────────────────────────────────────
 
     if (parsed.type === 'skip') {
-      console.log(`    ⏭ スキップ: ${parsed.reason}`)
+      console.log(`    ⏭ ${parsed.reason}`)
       continue
     }
 
     // ── approve / reject ────────────────────────────────────────────────
 
     if (parsed.type === 'approve' || parsed.type === 'reject') {
-      // 送信者の chat_id と from_id の両方をホワイトリストに照合
       const authorized = allowedChatIds.has(msgChatId) || allowedChatIds.has(msgFromId)
 
       if (!authorized) {
-        console.log(`    ⛔ 権限なし: chat_id=${msgChatId} / from_id=${msgFromId} は TELEGRAM_ALLOWED_CHAT_IDS に未登録`)
-        if (apply && (defaultChatId || msgChatId)) {
+        console.log(`    ⛔ 権限なし: chat_id=${msgChatId} / from_id=${msgFromId}`)
+        if (!dryRun && (defaultChatId || msgChatId)) {
           await sendTelegram(
-            botToken,
-            msgChatId || defaultChatId,
-            `⛔ 権限エラー: このチャット・ユーザーは approve/reject できません。\n許可済み ID: ${[...allowedChatIds].join(', ')}`,
+            botToken, msgChatId || defaultChatId,
+            `⛔ 権限エラー: このチャット・ユーザーは approve/reject できません。\n許可済み: ${[...allowedChatIds].join(', ')}`,
           ).catch(() => {})
         }
         continue
       }
+
+      // ── approve ─────────────────────────────────────────────────────
 
       if (parsed.type === 'approve') {
         const by = parsed.reviewedBy || fromUser
+        const pipelineDesc = build
+          ? 'approve → validate → build → git add → commit → push'
+          : 'approve → validate（build/push は --build で有効化）'
+
         console.log(`    → 承認: ${parsed.slug}  by: ${by}`)
+        console.log(`    パイプライン: ${pipelineDesc}`)
 
-        if (!apply) {
-          console.log(`    [dry-run] 書き込みをスキップ`)
+        if (dryRun) {
+          console.log(`    [dry-run] 書き込み・Git 操作をスキップ`)
           continue
         }
 
-        const result = approvePost(parsed.slug, by)
-        if (!result.ok) {
-          console.log(`    ❌ 承認エラー: ${result.error}`)
-          await sendTelegram(
-            botToken, msgChatId || defaultChatId,
-            `❌ 承認エラー\nスラグ: ${parsed.slug}\n理由: ${result.error}`,
-          ).catch(() => {})
-          continue
-        }
-        console.log(`    ✅ 承認完了: ${result.slug}`)
-
-        // validate:posts
-        const vr = runNpm('validate:posts')
-        const validateLine = vr.ok ? `✅ validate:posts: OK` : `⚠️ validate:posts: エラー\n${vr.output.slice(0, 200)}`
-        console.log(`    validate:posts: ${vr.ok ? 'OK' : 'エラー'}`)
-
-        // build（--build 指定時のみ）
-        let buildLine = ''
-        if (build) {
-          console.log(`    🔨 build 実行中…`)
-          const br = runNpm('build')
-          buildLine = br.ok ? `\n✅ build: OK` : `\n❌ build: 失敗\n${br.output.slice(0, 300)}`
-        }
-
-        const replyText = [
-          `✅ 承認完了: ${result.slug}`,
-          `reviewed_by: ${result.reviewedBy}`,
-          `date: ${result.today}`,
-          ``,
-          validateLine,
-          buildLine,
-          ``,
-          `次のステップ（Human が手動実行）:`,
-          `  git add content/posts/${result.slug}.md`,
-          `  git commit -m "approve: ${result.slug}"`,
-          `  git push`,
-        ].join('\n')
-
-        await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
-          console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+        const result = await runApprovePipeline({
+          slug: parsed.slug, by, build, botToken, replyId: msgChatId || defaultChatId,
         })
+
+        // コンソール出力
+        for (const s of result.steps) {
+          console.log(`    ${s.ok ? '✅' : '❌'} ${s.name}: ${s.output ? s.output.slice(0, 80) : ''}`)
+        }
+        if (!result.ok) {
+          console.log(`    ❌ 失敗: ${result.failedAt} — ${result.error?.slice(0, 100)}`)
+        } else if (result.pushed) {
+          console.log(`    🚀 push 完了`)
+        }
+
+        // Telegram 返信
+        const replyText = formatPipelineReply(result)
+        if (defaultChatId || msgChatId) {
+          await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
+            console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+          })
+        }
         continue
       }
+
+      // ── reject ──────────────────────────────────────────────────────
 
       if (parsed.type === 'reject') {
         console.log(`    → 差し戻し: ${parsed.slug}  reason: "${parsed.reason || '（理由なし）'}"`)
 
-        if (!apply) {
+        if (dryRun) {
           console.log(`    [dry-run] 書き込みをスキップ`)
           continue
         }
@@ -519,16 +685,15 @@ async function main() {
     // ── 記事リクエスト → 下書き生成 ────────────────────────────────────
 
     if (parsed.type === 'request') {
-      // 既に処理済みの update_id はスキップ
       if (knownRequestIds.has(upd.update_id)) {
-        console.log(`    ⏭ スキップ: update_id ${upd.update_id} は処理済み`)
+        console.log(`    ⏭ 処理済み update_id ${upd.update_id}`)
         continue
       }
 
       const category = detectCategory(parsed.text)
       console.log(`    → 記事リクエスト  カテゴリ推定: ${category}`)
 
-      if (!apply) {
+      if (dryRun) {
         const slugBase = makeSlug(parsed.text) || `req-${upd.update_id}`
         console.log(`    [dry-run] 推定スラグ: ${getTodayJst()}-${slugBase}`)
         continue
@@ -564,8 +729,8 @@ async function main() {
     }
   } // end for updates
 
-  // --apply 時のみ last_update_id を更新（dry-run では変更しない）
-  if (apply && maxUpdateId > (store.last_update_id ?? 0)) {
+  // dry-run 以外で last_update_id を更新
+  if (!dryRun && maxUpdateId > (store.last_update_id ?? 0)) {
     const freshStore = loadRequests()
     freshStore.last_update_id = maxUpdateId
     saveRequests(freshStore)
@@ -575,10 +740,10 @@ async function main() {
 
   console.log()
   console.log(BAR)
-  if (!apply) {
-    console.log('dry-run 完了 — 書き込みなし。実行するには:')
-    console.log('  npm run telegram:ops -- --apply')
-    console.log('  npm run telegram:ops -- --apply --build')
+  if (dryRun) {
+    console.log('dry-run 完了。実行するには:')
+    console.log('  npm run telegram:ops -- --apply           # approve/validate のみ')
+    console.log('  npm run telegram:ops -- --apply --build   # 承認 → build → push')
   } else {
     console.log('完了')
   }
