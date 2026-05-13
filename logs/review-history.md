@@ -117,3 +117,10 @@ slug: 2026-01-20-cavity-treatment
 reviewed_by: 氏名
 date: 2026-01-20
 
+## 2026-05-13T23:50:10.587+09:00
+datetime: 2026-05-13T23:50:10.587+09:00
+action: approve
+slug: 2026-05-13-cadcam
+reviewed_by: 三谷
+date: 2026-05-13
+

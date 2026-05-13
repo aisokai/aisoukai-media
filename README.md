@@ -87,6 +87,7 @@ aisoukai-media/
 | `ANTHROPIC_API_KEY` | generate:draft 実行時 | Claude API キー。`.env.local` に記述し commit しないこと |
 | `TELEGRAM_BOT_TOKEN` | test:telegram / 将来の通知連携 | BotFather で取得したトークン。`.env.local` に記述し commit しないこと |
 | `TELEGRAM_CHAT_ID` | test:telegram / 将来の通知連携 | 通知先チャット ID（個人 DM の場合は数値 ID）。`.env.local` に記述し commit しないこと |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | telegram:ops | `approve` / `reject` コマンドを受け付ける chat_id または from_id のカンマ区切りリスト。未設定時は `TELEGRAM_CHAT_ID` にフォールバック |
 
 ```bash
 # .env.local に設定する例
@@ -168,6 +169,7 @@ tags:
 | `npm run notify:pending-review` | pending review 記事の一覧を console 出力し、Telegram Bot に通知する（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run notify:posting-reminder` | 月・水・金にコンテンツ状態サマリーを Telegram に送る投稿確認リマインド。`--force` で曜日に関係なく送信 |
 | `npm run telegram:requests` | Telegram 受信メッセージから記事リクエストを取得（デフォルト dry-run / `--apply` で保存） |
+| `npm run telegram:ops` | Telegram 記事運用フロー: 新着メッセージを解析し、記事リクエスト→下書き生成・`approve <slug>`→承認・`reject <slug>`→差し戻しを処理（デフォルト dry-run / `--apply` で実行 / `--build` で build も実行） |
 | `npm run request:list` | `data/article-requests.json` の記事リクエスト一覧を表示（読み取り専用） |
 | `npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD` | リクエストから frontmatter のみの下書き記事を生成し、pending-review に追加する（Human がトリガー） |
 | `npm run request:ignore -- <update_id> --reason "理由"` | リクエストを見送り（ignored）にする。元メッセージは削除しない |
