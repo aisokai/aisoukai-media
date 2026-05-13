@@ -22,6 +22,7 @@
     "test:telegram": "node scripts/test-telegram-notify.mjs",
     "article:manual": "node scripts/manual-article-flow.mjs",
     "article:scheduled": "node scripts/scheduled-article-flow.mjs",
+    "resubmit:post": "node scripts/resubmit-post.mjs",
     "status:content": "node scripts/status-content.mjs",
     "status:publish-ready": "node scripts/validate-publish-ready.mjs || true"
   },

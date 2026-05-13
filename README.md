@@ -171,6 +171,7 @@ tags:
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
 | `npm run approve:post -- <slug> --reviewed-by "氏名"` | 記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
 | `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason と review log を記録。--reviewed-by も指定可） |
+| `npm run resubmit:post -- <slug> --reviewed-by "氏名" --reason "理由"` | 差し戻し済み記事を pending-review に戻す。元の差し戻し履歴は logs/ に保持。自動 approve しない |
 | `npm run status:content` | 公開中・公開予定・review待ち・差し戻し済みの件数と一覧を表示する（読み取り専用） |
 | `npm run status:publish-ready` | publish-ready 判定チェック（exit 1 でも CI エラー扱いしない確認用コマンド） |
 
@@ -264,6 +265,22 @@ npm run notify:pending-review
 
 通知には 公開中・公開予定・review待ち・差し戻し済みの全件数を含む。  
 **通知から直接 approve / publish を行わないこと（AGENTS.md 絶対禁止）。**
+
+### 差し戻し済み記事の再提出
+
+差し戻し済み（rejected）記事は削除ではなく**再検討キュー**として扱う。
+
+```bash
+# 再提出（pending-review に戻す）
+npm run resubmit:post -- <slug> --reviewed-by "氏名" --reason "本文を修正して再提出"
+
+# 再提出後は通常の approve フローへ
+npm run approve:post -- <slug> --reviewed-by "氏名"
+```
+
+- `rejection_reason` を削除することで pending-review に復帰する
+- 元の差し戻し理由は `logs/review-history.md` に保持（append-only）
+- 再提出後も `reviewed: false` のまま — 自動 approve / 自動 publish はしない
 
 ## generate:draft の使い方
 
