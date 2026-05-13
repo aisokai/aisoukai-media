@@ -10,7 +10,6 @@ tags:
 author: 藍想会メディア編集部
 reviewed: false
 image: ''
-rejection_reason: 実運用前の整理
 ---
 
 ## 親知らずとは
