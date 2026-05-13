@@ -38,6 +38,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import matter from 'gray-matter'
+import Anthropic from '@anthropic-ai/sdk'
+import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 
 const __dirname      = dirname(fileURLToPath(import.meta.url))
 const ROOT           = join(__dirname, '..')
@@ -307,17 +309,80 @@ function rejectPost(slug, reason) {
   return { ok: true, slug: actualSlug }
 }
 
-// ── 下書き生成フロー ──────────────────────────────────────────────────────
+// ── 下書き生成フロー（AI本文生成付き） ───────────────────────────────────
 
-function generateDraft(requestText, updateId, fromUser) {
+async function generateDraft(requestText, updateId, fromUser) {
   const store    = loadRequests()
   const date     = getTodayJst()
   const category = detectCategory(requestText)
   const now      = getJstTimestamp()
+  const apiKey   = process.env.ANTHROPIC_API_KEY
 
-  const slugBase = makeSlug(requestText) || `req-${updateId}`
-  let slug       = `${date}-${slugBase}`
-  let filename   = `${slug}.md`
+  // AI タイトル + 本文生成（ANTHROPIC_API_KEY がある場合）
+  let title       = requestText.slice(0, 60).trim()
+  let bodyContent = null
+  let aiUsed      = false
+
+  if (apiKey) {
+    try {
+      const client = new Anthropic({ apiKey })
+
+      // タイトル生成（haiku: 軽量 1 call）
+      const titlePrompt = [
+        'あなたは歯科医院の医療情報ライターです。',
+        '以下の依頼内容から、患者向けブログ記事のタイトルを1行だけ生成してください。',
+        '・60文字以内',
+        '・具体的で検索されやすいタイトル',
+        '・断定・保証表現（「必ず」「確実に」等）は使わない',
+        '・タイトルのみ出力すること（前置き・説明不要）',
+        '',
+        `依頼: ${requestText}`,
+      ].join('\n')
+      const titleResp = await client.messages.create({
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: 80,
+        messages:   [{ role: 'user', content: titlePrompt }],
+      })
+      const aiTitle = titleResp.content[0]?.type === 'text' ? titleResp.content[0].text.trim() : ''
+      if (aiTitle) title = aiTitle.slice(0, 60)
+
+      // 本文生成（buildArticlePrompt を再利用）
+      const bodyPrompt = buildArticlePrompt({
+        title,
+        category,
+        keyword:     requestText.slice(0, 50),
+        intent:      requestText,
+        medicalRisk: 'medium',
+        topic:       requestText,
+      })
+      const bodyResp = await client.messages.create({
+        model:      'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        messages:   [{ role: 'user', content: bodyPrompt }],
+      })
+      const aiBody = bodyResp.content[0]?.type === 'text' ? bodyResp.content[0].text.trim() : ''
+      if (aiBody) { bodyContent = aiBody; aiUsed = true }
+    } catch (e) {
+      console.log(`    ⚠️ AI生成エラー（フォールバック）: ${e.message}`)
+    }
+  } else {
+    console.log(`    ℹ️ ANTHROPIC_API_KEY 未設定 → プレースホルダー本文`)
+  }
+
+  if (!bodyContent) {
+    bodyContent = [
+      '<!-- AI本文生成をスキップしました。手動で記入してください。 -->',
+      '',
+      '## はじめに',
+      '',
+      '（本文を記入してください）',
+    ].join('\n')
+  }
+
+  // slug と出力ファイルを確定（AI タイトルからスラグを生成）
+  const slugBase = makeSlug(title || requestText) || `req-${updateId}`
+  let slug     = `${date}-${slugBase}`
+  let filename = `${slug}.md`
 
   if (existsSync(join(POSTS_DIR, filename))) {
     slug     = `${date}-req-${updateId}`
@@ -325,17 +390,23 @@ function generateDraft(requestText, updateId, fromUser) {
   }
 
   const filePath = join(POSTS_DIR, filename)
+  const excerpt  = category === 'お知らせ'
+    ? `${title}についてお知らせします。`
+    : `${title}について、原因・受診目安・注意点を整理します。`
 
+  // frontmatter 組み立て
   const frontmatter = {
-    title:               requestText.slice(0, 60).trim(),
+    title,
     date,
-    excerpt:             requestText.slice(0, 80),
+    publish_at:          date,
+    excerpt,
     category,
     tags:                [category],
     author:              '藍想会メディア編集部',
     reviewed:            false,
     draft:               false,
     image:               '',
+    ai_generated:        aiUsed,
     source_request_id:   String(updateId),
     source_request_text: requestText.slice(0, 80),
   }
@@ -348,20 +419,7 @@ function generateDraft(requestText, updateId, fromUser) {
     })
     .join('\n')
 
-  const body = [
-    '<!-- リクエスト内容:',
-    `     ${requestText}`,
-    '     本文は未入力です。以下のいずれかで内容を追加してください。',
-    '     1. npm run generate:draft でAI下書きを生成する',
-    '     2. 本文を手動で記入する',
-    '-->',
-    '',
-    '## はじめに',
-    '',
-    '（本文を記入してください）',
-  ].join('\n')
-
-  writeFileSync(filePath, `---\n${fmLines}\n---\n\n${body}\n`, 'utf8')
+  writeFileSync(filePath, `---\n${fmLines}\n---\n\n${bodyContent}\n`, 'utf8')
 
   let entry = store.requests.find((r) => r.update_id === updateId)
   if (!entry) {
@@ -383,7 +441,7 @@ function generateDraft(requestText, updateId, fromUser) {
   ]
   saveRequests(store)
 
-  return { ok: true, slug, category, filename }
+  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed }
 }
 
 // ── プロセス実行ユーティリティ ────────────────────────────────────────────
@@ -868,24 +926,42 @@ async function main() {
         continue
       }
 
-      const result = generateDraft(parsed.text, upd.update_id, fromUser)
-      console.log(`    ✅ 下書き生成: ${result.slug}`)
+      const result = await generateDraft(parsed.text, upd.update_id, fromUser)
+      console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}`)
 
       // chat_id ごとに直近 pending slug を記録（日本語承認コマンドで参照）
-      setSessionPending(msgChatId || defaultChatId || '', result.slug, parsed.text.slice(0, 60))
+      setSessionPending(msgChatId || defaultChatId || '', result.slug, result.title)
 
-      const replyText = [
-        `📝 下書きを作成しました。`,
+      // 本文冒頭プレビュー（HTMLコメントを除去して最初の250文字）
+      const bodyPreview = result.bodyContent
+        ? result.bodyContent.replace(/<!--[\s\S]*?-->/g, '').trim().slice(0, 250)
+        : ''
+
+      const replyLines = [
+        `📝 下書きを生成しました${result.aiUsed ? '（AI）' : '（要手動入力）'}`,
         ``,
-        `タイトル : ${parsed.text.slice(0, 50)}`,
+        `タイトル : ${result.title}`,
         `スラグ   : ${result.slug}`,
         `カテゴリ : ${result.category}`,
         ``,
-        `本文を確認して、問題なければ「承認」と返信してください。`,
+      ]
+      if (bodyPreview) {
+        replyLines.push(
+          `── 本文冒頭 ──────────────────`,
+          bodyPreview,
+          `──────────────────────────────`,
+          ``,
+        )
+      }
+      replyLines.push(
+        `管理画面: /admin/pending-review`,
+        ``,
+        `問題なければ「承認」と返信してください。`,
         `修正する場合は「差し戻し」と返信してください。`,
         ``,
-        `（画像割当はローカルで: npm run image:suggest -- ${result.slug}）`,
-      ].join('\n')
+        `（画像割当: npm run image:suggest -- ${result.slug}）`,
+      )
+      const replyText = replyLines.join('\n')
 
       if (defaultChatId || msgChatId) {
         await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
