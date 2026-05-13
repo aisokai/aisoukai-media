@@ -2,25 +2,29 @@
   "images": [
     {
       "id": "general-34130816",
-      "path": "/images/library/general/general-34130816.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34130816.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "ピンク制服の歯科スタッフが歯の模型を持って説明するイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34130816（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34407493",
-      "path": "/images/library/general/general-34407493.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34407493.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯ブラシを持って微笑む若い女性",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34407493（ライセンス詳細を確認して更新すること）"
     },
@@ -38,373 +42,425 @@
     },
     {
       "id": "general-34431025",
-      "path": "/images/library/general/general-34431025.jpg",
-      "category": "general",
+      "path": "/images/library/cavity/cavity-34431025.jpg",
+      "category": "cavity",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "虫歯",
+        "治療",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "セラミッククラウンと歯科技工ケースのイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34431025（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34431026",
-      "path": "/images/library/general/general-34431026.jpg",
-      "category": "general",
+      "path": "/images/library/cavity/cavity-34431026.jpg",
+      "category": "cavity",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "虫歯",
+        "治療",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "ゴールドクラウンと歯科技工ケースのイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34431026（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34621196",
-      "path": "/images/library/general/general-34621196.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34621196.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科のデンタルX線照射機器（レントゲンアームとセンサー）",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34621196（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34660571",
-      "path": "/images/library/general/general-34660571.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34660571.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "青い背景の前で白い歯を見せて微笑む女性",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34660571（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34660573",
-      "path": "/images/library/general/general-34660573.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34660573.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "青い背景の前で頬に手を当てて微笑む女性",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34660573（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34674550",
-      "path": "/images/library/general/general-34674550.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34674550.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "白い歯で笑顔の3人の女性（ピンク背景）",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34674550（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34707854",
-      "path": "/images/library/general/general-34707854.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-34707854.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科スタッフが母と子に絵本を使って説明しているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34707854（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-33802469",
-      "path": "/images/library/general/general-33802469.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-33802469.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科医師がクリップボードで患者に診察内容を説明しているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 33802469（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-33802476",
-      "path": "/images/library/general/general-33802476.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-33802476.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科医師がパノラマX線画像の前で患者に説明しているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 33802476（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34197345",
-      "path": "/images/library/general/general-34197345.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34197345.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "ホワイトニングトレーがケースに収められているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34197345（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34197349",
-      "path": "/images/library/general/general-34197349.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34197349.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "ホワイトニングトレーと薬液シリンジのセット",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34197349（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34231494",
-      "path": "/images/library/general/general-34231494.jpg",
-      "category": "general",
+      "path": "/images/library/announcement/announcement-34231494.jpg",
+      "category": "announcement",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "お知らせ",
+        "藍想会"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "医療スタッフがスマートフォンでお知らせを案内しているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34231494（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34389468",
-      "path": "/images/library/general/general-34389468.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34389468.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "透明マウスピースを口に装着しようとしている女性",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34389468（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34558722",
-      "path": "/images/library/general/general-34558722.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34558722.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "両手の指できれいな白い歯を見せる女性",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34558722（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-34607605",
-      "path": "/images/library/general/general-34607605.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34607605.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "白い糸ようじ（フロスピック）3本",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34607605（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-3986645",
-      "path": "/images/library/general/general-3986645.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-3986645.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科衛生士が患者の口腔内を診ているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 3986645（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-22581516",
-      "path": "/images/library/general/general-22581516.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-22581516.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯ブラシ・フロス・歯型オブジェと「DENTAL CARE」の文字",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 22581516（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-23763993",
-      "path": "/images/library/general/general-23763993.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-23763993.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "笑顔の木製歯型フィギュア2体",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 23763993（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-24778598",
-      "path": "/images/library/general/general-24778598.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-24778598.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "子どもの口腔内に装着された矯正用急速拡大装置",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 24778598（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-24785313",
-      "path": "/images/library/general/general-24785313.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-24785313.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "ピンク色の矯正用拡大装置を手に持つイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 24785313（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-24785478",
-      "path": "/images/library/general/general-24785478.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-24785478.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "矯正用拡大装置を手に持つイメージ（別角度）",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 24785478（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-27785292",
-      "path": "/images/library/general/general-27785292.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-27785292.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "男の子が歯科でフッ素塗布を受けているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 27785292（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-33802485",
-      "path": "/images/library/general/general-33802485.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-33802485.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科衛生士が歯のモデルを手に口腔ケアを指導しているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 33802485（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-3798978",
-      "path": "/images/library/general/general-3798978.jpg",
-      "category": "general",
+      "path": "/images/library/cavity/cavity-3798978.jpg",
+      "category": "cavity",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "虫歯",
+        "治療",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "虫歯の穴を修復するミニチュア作業員のジオラマ（歯ブラシが上方から迫る）",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 3798978（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-3986826",
-      "path": "/images/library/general/general-3986826.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-3986826.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科衛生士がX線モニターを指しながら患者に説明するイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 3986826（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-4007710",
-      "path": "/images/library/general/general-4007710.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-4007710.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "虫眼鏡で歯型を覗き込む「歯科検診」の文字入り画像",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 4007710（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-23179123",
-      "path": "/images/library/general/general-23179123.jpg",
-      "category": "general",
+      "path": "/images/library/implant/implant-23179123.jpg",
+      "category": "implant",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "インプラント",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "インプラントの構造を示す断面3Dイラスト（スクリュー・クラウン）",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 23179123（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-23179141",
-      "path": "/images/library/general/general-23179141.jpg",
-      "category": "general",
+      "path": "/images/library/implant/implant-23179141.jpg",
+      "category": "implant",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "インプラント",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "インプラント上部構造を取り付ける3Dイラスト",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 23179141（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-28437413",
-      "path": "/images/library/general/general-28437413.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-28437413.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "ピンクの歯ブラシを持って微笑む女子学生",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 28437413（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-28883739",
-      "path": "/images/library/general/general-28883739.jpg",
-      "category": "general",
+      "path": "/images/library/pediatric/pediatric-28883739.jpg",
+      "category": "pediatric",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "小児歯科",
+        "子ども",
+        "乳歯",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "紫色の上下顎用矯正装置2セット",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 28883739（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-3291061",
-      "path": "/images/library/general/general-3291061.jpg",
-      "category": "general",
+      "path": "/images/library/cavity/cavity-3291061.jpg",
+      "category": "cavity",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "虫歯",
+        "治療",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "頬を押さえて歯の痛みに顔をしかめる女性",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 3291061（ライセンス詳細を確認して更新すること）"
     },
@@ -434,37 +490,41 @@
     },
     {
       "id": "general-34336381",
-      "path": "/images/library/general/general-34336381.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-34336381.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "「正しい歯のみがき方」と書かれたノートとカラフルなステーショナリー",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 34336381（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-3987247",
-      "path": "/images/library/general/general-3987247.jpg",
-      "category": "general",
+      "path": "/images/library/preventive/preventive-3987247.jpg",
+      "category": "preventive",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "歯科スタッフがパノラマX線画像をパソコンで確認しているイメージ",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 3987247（ライセンス詳細を確認して更新すること）"
     },
     {
       "id": "general-4029170",
-      "path": "/images/library/general/general-4029170.jpg",
-      "category": "general",
+      "path": "/images/library/announcement/announcement-4029170.jpg",
+      "category": "announcement",
       "tags": [
-        "歯科",
-        "歯科診療"
+        "お知らせ",
+        "藍想会"
       ],
-      "alt": "歯科診療に関するイメージ",
+      "alt": "「実費」「保険」と書かれたクリップボード2枚",
       "license_source": "Pixta",
       "license_note": "Pixta ID: 4029170（ライセンス詳細を確認して更新すること）"
     }
