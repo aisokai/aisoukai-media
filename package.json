@@ -26,6 +26,7 @@
     "request:ignore": "node scripts/request-ignore.mjs",
     "request:archive": "node scripts/request-archive.mjs",
     "notify:requests": "node scripts/notify-requests.mjs",
+    "ops:mwf": "node scripts/ops-mwf.mjs",
     "test:telegram": "node scripts/test-telegram-notify.mjs",
     "article:manual": "node scripts/manual-article-flow.mjs",
     "article:scheduled": "node scripts/scheduled-article-flow.mjs",

@@ -100,10 +100,13 @@ function main() {
   const category = String(args.category ?? '').trim()
   const date     = String(args.date ?? getTodayJst()).trim()
   const slugArg  = String(args.slug ?? '').trim()
+  // --yes がない場合は dry-run（ファイル生成・JSON 更新をしない）
+  const yes      = args.yes === true
 
   if (!updateId || Number.isNaN(updateId)) {
-    console.error('使い方: npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD')
-    console.error('   例:  npm run request:draft -- 145026171 --category "虫歯治療" --date 2026-06-01')
+    console.error('使い方: npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD --yes')
+    console.error('   例:  npm run request:draft -- 145026171 --category "虫歯治療" --date 2026-06-01 --yes')
+    console.error('   ※ --yes がない場合は dry-run（確認のみ）')
     process.exit(1)
   }
 
@@ -151,10 +154,42 @@ function main() {
     process.exit(1)
   }
 
+  // ── dry-run 確認表示 ────────────────────────────────────────
+  const BAR = '━'.repeat(56)
+  console.log(BAR)
+  if (yes) {
+    console.log('下書き生成 — 確認')
+  } else {
+    console.log('[DRY-RUN] 以下の内容で下書きを生成します（--yes で実行）')
+  }
+  console.log(BAR)
+  console.log(`  update_id   : ${updateId}`)
+  console.log(`  from        : @${request.from}`)
+  console.log(`  受信日時    : ${request.received_at?.slice(0, 16).replace('T', ' ')} JST`)
+  console.log(`  リクエスト  : "${request.text.slice(0, 60)}${request.text.length > 60 ? '…' : ''}"`)
+  console.log(`  category    : ${category}`)
+  console.log(`  date        : ${date}`)
+  console.log(`  ファイル    : content/posts/${filename}`)
+  console.log(`  reviewed    : false（公開対象外 — Human approval が必須）`)
+  console.log(BAR)
+
+  if (!yes) {
+    console.log()
+    console.log('実行するには --yes をつけてください:')
+    const slugOpt = slugArg ? ` --slug ${slugArg}` : ''
+    const titleOpt = args.title ? ` --title "${title}"` : ''
+    console.log(`  npm run request:draft -- ${updateId} --category "${category}" --date ${date}${slugOpt}${titleOpt} --yes`)
+    console.log()
+    console.log('見送る場合:')
+    console.log(`  npm run request:ignore -- ${updateId} --reason "理由"`)
+    return
+  }
+
   const frontmatter = {
     title,
     date,
-    excerpt:             '',
+    // リクエスト本文を仮 excerpt として設定（本文記入時に差し替えること）
+    excerpt:             request.text.slice(0, 80),
     category,
     tags:                [category],
     author:              '藍想会メディア編集部',
@@ -178,23 +213,17 @@ function main() {
   ]
   saveRequests(store)
 
-  const BAR = '━'.repeat(52)
-  console.log(BAR)
-  console.log('下書き生成完了（pending-review に追加されました）')
-  console.log(BAR)
-  console.log(`  ファイル          : content/posts/${filename}`)
-  console.log(`  タイトル          : ${title}`)
-  console.log(`  カテゴリ          : ${category}`)
-  console.log(`  公開日            : ${date}`)
-  console.log(`  reviewed          : false（公開対象外）`)
-  console.log(`  source_request_id : ${updateId}`)
-  console.log(BAR)
+  console.log()
+  console.log('✅ 下書き生成完了（pending-review に追加されました）')
   console.log()
   console.log('次のステップ:')
   console.log(`  1. content/posts/${filename} を開いて本文を確認・記入する`)
   console.log('     または npm run generate:draft でAI下書きを生成する')
   console.log('  2. http://localhost:3000/admin/pending-review で確認する')
   console.log(`  3. npm run approve:post -- ${slug} --reviewed-by "氏名" で承認する`)
+  console.log()
+  console.log('完了後のクリーンアップ:')
+  console.log(`  npm run request:archive -- ${updateId}`)
 }
 
 main()

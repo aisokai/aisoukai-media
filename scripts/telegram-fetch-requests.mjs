@@ -40,18 +40,22 @@ function loadRequests() {
 }
 
 // approve/publish 系・コマンド・短すぎるメッセージを除外する
-const IGNORE_PATTERNS = [
-  /^approve/i, /^reject/i, /^publish/i, /^push/i, /^deploy/i,
-  /^\/[a-z]/,   // ボットコマンド (/start, /help 等)
-  /npm run/i,
-]
+// 戻り値: null = 記事リクエストとして採用 / string = スキップ理由
+function getSkipReason(text) {
+  if (!text || text.trim().length < 8) return 'テキストが短すぎます（8文字未満）'
+  const t = text.trim()
+  if (/^approve/i.test(t))  return 'approve コマンドのため除外（Telegram からの approve 禁止）'
+  if (/^reject/i.test(t))   return 'reject コマンドのため除外'
+  if (/^publish/i.test(t))  return 'publish コマンドのため除外（Telegram からの publish 禁止）'
+  if (/^push/i.test(t))     return 'push コマンドのため除外'
+  if (/^deploy/i.test(t))   return 'deploy コマンドのため除外'
+  if (/^\/[a-z]/i.test(t))  return 'Bot コマンド（/ 始まり）のため除外'
+  if (/npm run/i.test(t))   return 'npm run コマンドのため除外'
+  return null
+}
 
 function isArticleRequest(text) {
-  if (!text || text.trim().length < 8) return false
-  for (const re of IGNORE_PATTERNS) {
-    if (re.test(text.trim())) return false
-  }
-  return true
+  return getSkipReason(text) === null
 }
 
 async function fetchUpdates(botToken, offset) {
@@ -109,8 +113,10 @@ async function main() {
     if (!msg?.text) continue
     if (chatId && String(msg.chat?.id) !== String(chatId) && String(msg.from?.id) !== String(chatId)) continue
     if (knownIds.has(upd.update_id)) continue
-    if (!isArticleRequest(msg.text)) {
-      console.log(`  スキップ [${upd.update_id}]: "${msg.text.slice(0, 40)}"`)
+    const skipReason = getSkipReason(msg.text)
+    if (skipReason !== null) {
+      console.log(`  ⏭ スキップ [${upd.update_id}]: "${msg.text.slice(0, 35)}"`)
+      console.log(`           理由: ${skipReason}`)
       continue
     }
 

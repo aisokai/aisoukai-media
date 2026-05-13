@@ -174,6 +174,7 @@ tags:
 | `npm run request:archive -- <update_id>` | リクエストを archived にする（最終状態。一覧から省略表示） |
 | `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
+| `npm run ops:mwf` | 月水金 定期運用チェックを一括実行（status→fetch→list→通知×3）。月水金以外は警告。`--force` で強制実行 |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
@@ -232,6 +233,42 @@ tags:
 スケジュール公開の判定は共通ルールと workflow docs に従う。実装の詳細は各 workflow を参照する。
 
 ## 日常運用フロー
+
+### 月水金 定期運用（`ops:mwf`）
+
+**月・水・金に1コマンドで全チェックを実行する:**
+
+```bash
+npm run ops:mwf               # 月・水・金のみ実行
+npm run ops:mwf -- --force    # 曜日に関わらず実行
+```
+
+`ops:mwf` が順に実行すること（destructive 操作なし）:
+1. `status:content` — 公開中/予定/review待ちの件数確認
+2. `telegram:requests --apply` — 新着リクエストを取得・保存
+3. `request:list` — リクエスト一覧とトリアージコマンドを表示
+4. `notify:posting-reminder` — 投稿確認リマインドを Telegram に送信
+5. `notify:requests` — リクエスト状態サマリーを Telegram に送信
+6. `notify:pending-review` — review待ち記事一覧を Telegram に送信
+
+**ops:mwf 後に Human が実行するアクション:**
+
+```bash
+# ① 未処理リクエストを下書きへ変換（request:list に表示されるコマンド例をコピペ）
+npm run request:draft -- <update_id> --category "虫歯治療" --date 2026-06-01 --yes
+
+# ② review待ちを承認
+npm run approve:post -- <slug> --reviewed-by "三谷"
+
+# ③ 承認後にデプロイ（Human が手動実行）
+npm run build
+git push origin main
+
+# ④ 下書き完了 / 見送り後のクリーンアップ
+npm run request:archive -- --all-done
+```
+
+> `approve / publish / request:draft` は `ops:mwf` が自動実行しない。Human 判断が必要。
 
 ### 毎朝の確認（所要 1〜2 分）
 
