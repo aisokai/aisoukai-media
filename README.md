@@ -181,6 +181,10 @@ tags:
 | `npm run image:reclassify -- <image-id> --category <category>` | 画像のカテゴリを変更してファイルを移動し、JSON と記事 frontmatter を更新する（デフォルト dry-run / `--apply` で実行 / `--alt "..."` で alt を上書き） |
 | `npm run image:suggest -- <slug>` | 記事に合う画像を `data/image-library.json` から候補提示する（読み取り専用） |
 | `npm run image:assign -- <slug> --image <image-id>` | 画像 ID を記事 frontmatter に割り当てる（`image` / `image_alt` を更新。`reviewed` は変更しない） |
+| `npm run image:license:list` | `license_note` に TODO が残っている画像を一覧表示する（読み取り専用 / `--all` で全件） |
+| `npm run image:license:update -- <image-id> --date YYYY-MM-DD --plan "プラン"` | 指定画像の `license_note` を Pixta 購入情報で更新する |
+| `npm run image:purchase:list` | 不足カテゴリの購入候補・検索キーワード・医療広告注意点を表示する（読み取り専用） |
+| `npm run image:usage` | 記事 ↔ 画像の対応一覧を表示する（未割当記事・共用画像も表示。読み取り専用） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
@@ -455,27 +459,57 @@ npm run image:import-inbox -- --apply --move
    - `npm run image:reclassify -- <image-id> --category <category>` で分類変更（dry-run → `--apply`）
    - `--alt "..."` オプションで alt も同時に更新できる
 4. `alt` テキストを実際の画像内容に合わせて書き直す
-5. `license_note` に Pixta 購入 ID・購入日などを記入する（TODO のままでも OK。image:check が警告する）
+5. Pixta 購入情報を記入する（TODO のままでも OK。後で `image:license:update` で一件ずつ記入できる）
 6. `npm run image:suggest -- <slug>` で記事への割当候補を確認する
 
-### 画像の追加から記事への割当まで
+### Pixta 購入後の license_note を入力する（`image:license:update`）
 
 ```bash
-# 1. 素材を購入して public/images/library/<category>/ に配置（または image:import-inbox を使う）
-# 2. data/image-library.json にメタデータを追記
-# 3. 記事に合う候補を確認
-npm run image:suggest -- <slug>
+# 購入情報が未入力の画像を確認（TODO 件数を一覧表示）
+npm run image:license:list
 
-# 4. 割り当て（reviewed / draft は変更しない）
-npm run image:assign -- <slug> --image <image-id>
+# 1件ずつ購入情報を記入（--date と --plan は必須）
+npm run image:license:update -- <image-id> --date YYYY-MM-DD --plan "シングルパック"
 
-# 5. 検証
+# 例
+npm run image:license:update -- general-3291061 --date 2026-05-13 --plan "シングルパック"
+
+# 記入後に整合性確認
+npm run image:check
+```
+
+プラン名の例: `シングルパック` / `定額プラン（月XX点）` / `法人プラン`
+
+### 画像の追加から記事への割当まで（全体フロー）
+
+```bash
+# ── STEP 1: 購入 ──
+npm run image:purchase:list    # 不足カテゴリの購入候補・検索キーワードを確認
+# → Pixta で購入してダウンロード
+
+# ── STEP 2: インポート ──
+# public/images/library/inbox/ にダウンロードした画像を置く
+npm run image:import-inbox              # dry-run で確認
+npm run image:import-inbox -- --apply   # 実行
+
+# ── STEP 3: 分類・メタデータ整備 ──
+npm run image:reclassify -- <id> --category <cat> --alt "画像説明" --apply  # 必要な場合
+npm run image:license:update -- <id> --date YYYY-MM-DD --plan "プラン名"
+
+# ── STEP 4: 記事への割当 ──
+npm run image:usage           # 画像未割当の記事を確認
+npm run image:suggest -- <slug>         # 記事に合う候補を確認
+npm run image:assign -- <slug> --image <image-id>  # 割当
+
+# ── STEP 5: 検証 ──
+npm run image:check           # エラー 0・警告を確認
 npm run validate:posts        # image ファイルの存在と image_alt を確認
 npm run build                 # 表示崩れがないか確認
 
-# 6. commit（push は Human が手動実行）
+# ── STEP 6: commit ──
 git add content/posts/<slug>.md data/image-library.json
 git commit -m "chore: assign image to <slug>"
+# push は Human が手動実行
 ```
 
 ### 画像の分類変更（`image:reclassify`）

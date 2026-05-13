@@ -52,8 +52,10 @@ function main() {
   }
 
   const images = library.images ?? []
-  const errors   = []
-  const warnings = []
+  const errors        = []
+  const warnings      = []   // alt / tags / article 参照 など構造的な警告
+  const licenseTodos  = []   // license_note が TODO のまま（Human 作業）
+  const catWarnings   = []   // カテゴリ不足（推奨購入）
 
   // ── 1. id 重複確認 ──
   const idSeen = new Map()
@@ -113,17 +115,35 @@ function main() {
       warnings.push(`${label} license_source が "不明" です。確認が必要です`)
     }
 
-    // license_note 確認
+    // license_note 確認（TODO は別グループ）
     const note = img.license_note ?? ''
     if (!note.trim()) {
       warnings.push(`${label} license_note が空です`)
     } else if (note.includes('ライセンス詳細を確認して更新すること') || note.includes('TODO')) {
-      warnings.push(`${label} license_note が未更新です（購入情報を記入してください）`)
+      const pixtaId = img.id.slice(img.id.indexOf('-') + 1)
+      licenseTodos.push({ id: img.id, pixtaId, category: img.category, note })
     }
 
     // tags 確認
     if (!Array.isArray(img.tags) || img.tags.length === 0) {
       warnings.push(`${label} tags が空配列です（image:suggest のスコアが 0 になります）`)
+    }
+  }
+
+  // ── 3b. 不足カテゴリの確認 ──
+  const SHORTAGE_CATS = {
+    'root-canal':   { label: '根管治療', min: 1 },
+    'periodontal':  { label: '歯周病治療', min: 1 },
+    'wisdom-tooth': { label: '親知らず', min: 1 },
+  }
+  const countByCat = {}
+  for (const img of images) {
+    countByCat[img.category] = (countByCat[img.category] ?? 0) + 1
+  }
+  for (const [cat, info] of Object.entries(SHORTAGE_CATS)) {
+    const count = countByCat[cat] ?? 0
+    if (count < info.min) {
+      catWarnings.push(`${info.label}（${cat}）の専用画像が ${count} 件です（npm run image:purchase:list で購入候補を確認）`)
     }
   }
 
@@ -153,17 +173,21 @@ function main() {
   console.log(`  確認記事数     : ${postFiles.length} 件`)
   console.log()
 
-  const hasErrors   = errors.length > 0
-  const hasWarnings = warnings.length > 0
+  const hasErrors      = errors.length > 0
+  const hasWarnings    = warnings.length > 0
+  const hasCatWarnings = catWarnings.length > 0
+  const hasTodos       = licenseTodos.length > 0
+  const hasAnyIssue    = hasErrors || hasWarnings || hasCatWarnings || hasTodos
 
-  if (!hasErrors && !hasWarnings) {
+  if (!hasAnyIssue) {
     console.log('✅ All checks passed')
     console.log(BAR)
     process.exit(0)
   }
 
+  // エラー（要修正）
   if (hasErrors) {
-    console.log(`エラー（${errors.length} 件）:`)
+    console.log(`❌ エラー（${errors.length} 件）— 要修正:`)
     console.log(DIV)
     for (const e of errors) {
       console.error(`  ❌ ${e}`)
@@ -172,13 +196,43 @@ function main() {
     console.log()
   }
 
+  // 構造的警告（alt / tags / 記事参照など）
   if (hasWarnings) {
-    console.log(`警告（${warnings.length} 件）:`)
+    console.log(`⚠️  構造的警告（${warnings.length} 件）:`)
     console.log(DIV)
     for (const w of warnings) {
       console.warn(`  ⚠️  ${w}`)
     }
     console.log(DIV)
+    console.log()
+  }
+
+  // カテゴリ不足警告（推奨購入）
+  if (hasCatWarnings) {
+    console.log(`📦 カテゴリ不足（${catWarnings.length} 件）— 購入推奨:`)
+    console.log(DIV)
+    for (const w of catWarnings) {
+      console.warn(`  📦 ${w}`)
+    }
+    console.log(DIV)
+    console.log()
+  }
+
+  // license_note TODO（Human 作業）
+  if (hasTodos) {
+    console.log(`📝 license_note 未入力（${licenseTodos.length} 件）— Human が購入情報を記入:`)
+    console.log(DIV)
+    const SHOW = Math.min(licenseTodos.length, 5)
+    for (let i = 0; i < SHOW; i++) {
+      const t = licenseTodos[i]
+      console.log(`  📝 [${t.id}]  Pixta ID: ${t.pixtaId}  category: ${t.category}`)
+    }
+    if (licenseTodos.length > SHOW) {
+      console.log(`  ... 他 ${licenseTodos.length - SHOW} 件（npm run image:license:list で全件確認）`)
+    }
+    console.log(DIV)
+    console.log('  更新コマンド:')
+    console.log('    npm run image:license:update -- <image-id> --date YYYY-MM-DD --plan "プラン名"')
     console.log()
   }
 
@@ -189,7 +243,8 @@ function main() {
   }
 
   // 警告のみ
-  console.log(`⚠️  警告 ${warnings.length} 件あり。エラーなし。`)
+  const totalWarn = warnings.length + catWarnings.length + licenseTodos.length
+  console.log(`⚠️  警告 ${totalWarn} 件あり。エラーなし。`)
   console.log(BAR)
   process.exit(0)
 }
