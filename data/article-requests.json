@@ -1,4 +1,27 @@
 {
-  "last_update_id": 145026171,
-  "requests": []
+  "last_update_id": 145026172,
+  "requests": [
+    {
+      "update_id": 145026172,
+      "message_id": 21,
+      "from": "カエルス",
+      "text": "記事を作ってください。\n内容は、CADCAMによるデジタルの技工物についてです。",
+      "date_unix": 1778683172,
+      "received_at": "2026-05-13T23:41:10.418+09:00",
+      "status": "drafted",
+      "status_updated_at": "2026-05-13T23:44:04.803+09:00",
+      "draft_slug": "2026-05-13-cadcam",
+      "history": [
+        {
+          "action": "received",
+          "at": "2026-05-13T23:41:10.418+09:00"
+        },
+        {
+          "action": "drafted",
+          "at": "2026-05-13T23:44:04.803+09:00",
+          "draft_slug": "2026-05-13-cadcam"
+        }
+      ]
+    }
+  ]
 }

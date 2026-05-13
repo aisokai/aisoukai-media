@@ -183,6 +183,7 @@ tags:
 | `npm run image:assign -- <slug> --image <image-id>` | 画像 ID を記事 frontmatter に割り当てる（`image` / `image_alt` を更新。`reviewed` は変更しない） |
 | `npm run image:license:list` | `license_note` に TODO が残っている画像を一覧表示する（読み取り専用 / `--all` で全件） |
 | `npm run image:license:update -- <image-id> --date YYYY-MM-DD --plan "プラン"` | 指定画像の `license_note` を Pixta 購入情報で更新する |
+| `npm run image:license:bulk-template` | TODO 残件を Markdown テーブル（`docs/license-bulk-template.md`）に出力する。一覧を確認しながら `image:license:update` で順次記入 |
 | `npm run image:purchase:list` | 不足カテゴリの購入候補・検索キーワード・医療広告注意点を表示する（読み取り専用） |
 | `npm run image:usage` | 記事 ↔ 画像の対応一覧を表示する（未割当記事・共用画像も表示。読み取り専用） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
