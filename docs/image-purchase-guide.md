@@ -1,5 +1,49 @@
 # 画像追加購入ガイド
 
+---
+
+## ⚡ 購入後チェックリスト（Pixta 購入済み → 記事公開まで）
+
+画像を Pixta で購入したら、以下の順番で作業する:
+
+```
+1. Pixta からダウンロードし、ファイルを保存する
+   → public/images/library/inbox/ に配置
+
+2. インポート確認（dry-run）
+   npm run image:import-inbox -- --dry-run
+
+3. インポート実行
+   npm run image:import-inbox -- --apply
+
+4. ライブラリ一覧を確認
+   npm run image:list
+
+5. カテゴリを整理する（general が残っている場合）
+   npm run image:reclassify
+
+6. ライセンス情報を入力する（購入日・プランを記入）
+   npm run image:license:bulk-template   # → docs/license-bulk-template.md を確認し purchase_date と plan を埋める
+   npm run image:license:update -- <image-id> --date YYYY-MM-DD --plan "シングルパック"
+
+7. 画像候補を確認する
+   npm run image:suggest -- <slug>
+
+8. 記事に割り当てる
+   npm run image:assign -- <slug> --image <image-id>
+
+9. 整合性チェック
+   npm run image:check
+
+10. ビルド確認
+    npm run build
+```
+
+> ライセンス情報を一括確認したい場合は `npm run image:license:bulk-template` を先に実行すると、
+> 全 TODO 画像を Markdown テーブルで確認できます（`docs/license-bulk-template.md` に出力）。
+
+---
+
 ## 現在のライブラリ状況（2026-05-13）
 
 | カテゴリ | 件数 | 状態 |

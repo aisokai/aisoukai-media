@@ -35,6 +35,7 @@
     "image:reclassify": "node scripts/image-reclassify.mjs",
     "image:license:list": "node scripts/image-license-list.mjs",
     "image:license:update": "node scripts/image-license-update.mjs",
+    "image:license:bulk-template": "node scripts/image-license-bulk-template.mjs",
     "image:purchase:list": "node scripts/image-purchase-list.mjs",
     "image:usage": "node scripts/image-usage.mjs",
     "test:telegram": "node scripts/test-telegram-notify.mjs",
