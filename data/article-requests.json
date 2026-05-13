@@ -1,5 +1,5 @@
 {
-  "last_update_id": 145026174,
+  "last_update_id": 145026176,
   "requests": [
     {
       "update_id": 145026172,
@@ -64,6 +64,26 @@
           "action": "ignored",
           "at": "2026-05-14T00:21:21.594+09:00",
           "reason": "approve regex バグ修正に伴い削除"
+        }
+      ]
+    },
+    {
+      "update_id": 145026175,
+      "from": "カエルス",
+      "text": "CAD CAMによるデジタル技工物についてのブログを書いて",
+      "received_at": "2026-05-14T07:30:54.866+09:00",
+      "status": "drafted",
+      "status_updated_at": "2026-05-14T07:30:54.866+09:00",
+      "draft_slug": "2026-05-14-req-145026175",
+      "history": [
+        {
+          "action": "received",
+          "at": "2026-05-14T07:30:54.866+09:00"
+        },
+        {
+          "action": "drafted",
+          "at": "2026-05-14T07:30:54.866+09:00",
+          "draft_slug": "2026-05-14-req-145026175"
         }
       ]
     }

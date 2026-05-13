@@ -44,3 +44,6 @@ next-env.d.ts
 # research output (human-review candidates, not committed by default)
 data/research/
 public/images/library/inbox/
+
+# Telegram runtime session state (volatile, not version-controlled)
+data/telegram-session.json
