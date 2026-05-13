@@ -4,10 +4,485 @@
       "id": "cavity-01",
       "path": "/images/library/cavity/cavity-01.jpg",
       "category": "cavity",
-      "tags": ["虫歯", "治療", "麻酔", "痛み", "歯科", "歯"],
+      "tags": [
+        "虫歯",
+        "治療",
+        "麻酔",
+        "痛み",
+        "歯科",
+        "歯"
+      ],
       "alt": "歯科医師が虫歯の治療を行っているイメージ",
       "license_source": "未購入",
       "license_note": "サンプルエントリ。素材購入後に path / license_source / license_note を更新すること。"
+    },
+    {
+      "id": "general-34130816",
+      "path": "/images/library/general/general-34130816.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34130816（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34407493",
+      "path": "/images/library/general/general-34407493.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34407493（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34430968",
+      "path": "/images/library/general/general-34430968.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34430968（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34431025",
+      "path": "/images/library/general/general-34431025.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34431025（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34431026",
+      "path": "/images/library/general/general-34431026.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34431026（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34621196",
+      "path": "/images/library/general/general-34621196.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34621196（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34660571",
+      "path": "/images/library/general/general-34660571.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34660571（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34660573",
+      "path": "/images/library/general/general-34660573.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34660573（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34674550",
+      "path": "/images/library/general/general-34674550.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34674550（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34707854",
+      "path": "/images/library/general/general-34707854.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34707854（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-33802469",
+      "path": "/images/library/general/general-33802469.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 33802469（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-33802476",
+      "path": "/images/library/general/general-33802476.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 33802476（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34197345",
+      "path": "/images/library/general/general-34197345.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34197345（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34197349",
+      "path": "/images/library/general/general-34197349.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34197349（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34231494",
+      "path": "/images/library/general/general-34231494.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34231494（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34389468",
+      "path": "/images/library/general/general-34389468.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34389468（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34558722",
+      "path": "/images/library/general/general-34558722.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34558722（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34607605",
+      "path": "/images/library/general/general-34607605.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34607605（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-3986645",
+      "path": "/images/library/general/general-3986645.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 3986645（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-22581516",
+      "path": "/images/library/general/general-22581516.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 22581516（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-23763993",
+      "path": "/images/library/general/general-23763993.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 23763993（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-24778598",
+      "path": "/images/library/general/general-24778598.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 24778598（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-24785313",
+      "path": "/images/library/general/general-24785313.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 24785313（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-24785478",
+      "path": "/images/library/general/general-24785478.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 24785478（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-27785292",
+      "path": "/images/library/general/general-27785292.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 27785292（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-33802485",
+      "path": "/images/library/general/general-33802485.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 33802485（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-3798978",
+      "path": "/images/library/general/general-3798978.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 3798978（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-3986826",
+      "path": "/images/library/general/general-3986826.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 3986826（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-4007710",
+      "path": "/images/library/general/general-4007710.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 4007710（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-23179123",
+      "path": "/images/library/general/general-23179123.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 23179123（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-23179141",
+      "path": "/images/library/general/general-23179141.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 23179141（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-28437413",
+      "path": "/images/library/general/general-28437413.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 28437413（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-28883739",
+      "path": "/images/library/general/general-28883739.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 28883739（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-3291061",
+      "path": "/images/library/general/general-3291061.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 3291061（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-32960996",
+      "path": "/images/library/general/general-32960996.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 32960996（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-33909232",
+      "path": "/images/library/general/general-33909232.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 33909232（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-34336381",
+      "path": "/images/library/general/general-34336381.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 34336381（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-3987247",
+      "path": "/images/library/general/general-3987247.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 3987247（ライセンス詳細を確認して更新すること）"
+    },
+    {
+      "id": "general-4029170",
+      "path": "/images/library/general/general-4029170.jpg",
+      "category": "general",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "alt": "歯科診療に関するイメージ",
+      "license_source": "Pixta",
+      "license_note": "Pixta ID: 4029170（ライセンス詳細を確認して更新すること）"
     }
   ]
 }

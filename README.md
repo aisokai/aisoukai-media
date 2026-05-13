@@ -175,6 +175,7 @@ tags:
 | `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
 | `npm run ops:mwf` | 月水金 定期運用チェックを一括実行（status→fetch→list→通知×3）。月水金以外は警告。`--force` で強制実行 |
+| `npm run image:import-inbox` | `public/images/library/inbox/` を再帰走査して画像を自動分類・コピー・JSON 登録する（デフォルト dry-run / `--apply` で実行 / `--apply --move` で移動） |
 | `npm run image:suggest -- <slug>` | 記事に合う画像を `data/image-library.json` から候補提示する（読み取り専用） |
 | `npm run image:assign -- <slug> --image <image-id>` | 画像 ID を記事 frontmatter に割り当てる（`image` / `image_alt` を更新。`reviewed` は変更しない） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
@@ -414,10 +415,42 @@ public/images/library/
 }
 ```
 
+### inbox から画像を一括インポートする（`image:import-inbox`）
+
+Pixta など有料素材サイトからまとめてダウンロードした画像を `public/images/library/inbox/` に置き、以下のコマンドで自動分類・ライブラリ登録できる。
+
+```bash
+# 1. ダウンロードした画像を inbox に配置（サブフォルダごとでも可）
+#    public/images/library/inbox/
+#      20260513_photo/
+#        34130816_s.jpg   ← Pixta の場合は数値ID + _s/_m/_l サフィックス
+
+# 2. dry-run で分類結果を確認（ファイル変更なし）
+npm run image:import-inbox
+
+# 3. 問題なければ実行（public/images/library/<category>/ にコピー + JSON 更新）
+npm run image:import-inbox -- --apply
+
+# または元ファイルを削除して移動
+npm run image:import-inbox -- --apply --move
+```
+
+**自動分類ルール:**
+- ファイル名・親フォルダ名にキーワードが含まれていれば対応カテゴリへ分類
+- Pixta の数値 ID ファイルはキーワードがないため `general` に分類される（手動で category を修正すること）
+- `_s` / `_m` / `_l` サフィックスを除去して ID を正規化（例: `34130816_s.jpg` → `general-34130816.jpg`）
+
+**インポート後の作業:**
+1. `data/image-library.json` を開き、`general` の画像を適切な category に修正する
+2. `alt` テキストを実際の画像内容に合わせて書き直す
+3. `license_note` に Pixta 購入 ID・購入日などを記入する
+4. `npm run validate:posts` — image パス整合性を確認
+5. `npm run image:suggest -- <slug>` で記事への割当候補を確認する
+
 ### 画像の追加から記事への割当まで
 
 ```bash
-# 1. 素材を購入して public/images/library/<category>/ に配置
+# 1. 素材を購入して public/images/library/<category>/ に配置（または image:import-inbox を使う）
 # 2. data/image-library.json にメタデータを追記
 # 3. 記事に合う候補を確認
 npm run image:suggest -- <slug>
