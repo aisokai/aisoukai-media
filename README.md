@@ -222,6 +222,49 @@ tags:
 
 スケジュール公開の判定は共通ルールと workflow docs に従う。実装の詳細は各 workflow を参照する。
 
+## 日常運用フロー
+
+### 毎朝の確認（所要 1〜2 分）
+
+```bash
+npm run status:content         # 公開中/予定/待ちの全体像
+npm run notify:pending-review  # Telegram にサマリーを送信（任意）
+```
+
+### 記事を1件生成→公開するまでの流れ
+
+```bash
+# 1. 下書き生成
+npm run article:manual -- --title "テーマ" --category "カテゴリ" --date YYYY-MM-DD
+# または
+npm run generate:draft -- TOPIC-XXXX
+
+# 2. 本文確認（ブラウザ or CLI）
+npm run list:pending-review
+# → http://localhost:3000/admin/pending-review でも確認可
+
+# 3. 承認 または 差し戻し（Human が実行）
+npm run approve:post -- <slug> --reviewed-by "氏名"
+# npm run reject:post -- <slug>
+
+# 4. build確認
+npm run validate:publish-ready   # publish-ready 件数確認
+npm run build                     # エラーがないか確認
+
+# 5. push / deploy（Human が手動実行）
+git push origin main
+# → Vercel が自動デプロイ
+```
+
+### Telegram digest 確認
+
+```bash
+npm run notify:pending-review
+```
+
+通知には 公開中・公開予定・review待ち・差し戻し済みの全件数を含む。  
+**通知から直接 approve / publish を行わないこと（AGENTS.md 絶対禁止）。**
+
 ## generate:draft の使い方
 
 AI（Claude）が記事本文を自動生成します。生成した記事は必ず `reviewed: false` のドラフト扱いです。
@@ -329,3 +372,34 @@ npm run validate:posts
 - `title_candidate`・`target_keyword`・`patient_intent`・`publish_date` が空の場合はエラー終了します
 - 同一 topic_id が CSV に複数行ある場合はデータ不整合としてエラー終了します
 - 同名ファイルが既に存在する場合は上書きせずエラー終了します
+
+## AI への作業指示（短縮形）
+
+この repo の作業ルールは `CLAUDE.md` / `AGENTS.md` に集約されており、Claude Code はセッション開始時に自動参照する。  
+毎回の作業指示に公開条件・禁止事項・完了報告形式を書く必要はない。
+
+### 最小限の指示テンプレート
+
+```
+repo: ~/Desktop/aisoukai-media
+目的: <やりたいこと1〜2行>
+```
+
+必要に応じて追記する:
+
+```
+計画してから実装   → 実装前に方針確認を求める
+やること: ...      → 複数ステップがある場合に箇条書きで渡す
+```
+
+### よく使う短縮指示例
+
+| 意図 | 指示例 |
+|------|--------|
+| 状態確認 | `repo:... / status:content の結果を見せて` |
+| 記事を1件 approve | `repo:... / <slug> を approve --reviewed-by "三谷"` |
+| 記事生成（下書きのみ） | `repo:... / 「〇〇」について予防歯科カテゴリの記事を下書き生成` |
+| build 確認 | `repo:... / validate:posts → build して結果を報告` |
+| Telegram 送信 | `repo:... / notify:pending-review を実行` |
+
+AGENTS.md の禁止事項（自動approve・自動push 等）は明示しなくても常に適用される。
