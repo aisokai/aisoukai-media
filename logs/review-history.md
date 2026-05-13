@@ -124,3 +124,10 @@ slug: 2026-05-13-cadcam
 reviewed_by: 三谷
 date: 2026-05-13
 
+## 2026-05-14T07:31:48.481+09:00
+datetime: 2026-05-14T07:31:48.481+09:00
+action: approve
+slug: 2026-05-14-req-145026175
+reviewed_by: カエルス
+date: 2026-05-14
+
