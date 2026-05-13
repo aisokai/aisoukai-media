@@ -177,8 +177,13 @@ function appendReviewLog(entry) {
 
 function loadSessions() {
   if (!existsSync(SESSION_PATH)) return { sessions: {} }
-  try { return JSON.parse(readFileSync(SESSION_PATH, 'utf8')) }
-  catch { return { sessions: {} } }
+  try {
+    const parsed = JSON.parse(readFileSync(SESSION_PATH, 'utf8'))
+    if (!parsed || typeof parsed.sessions !== 'object' || parsed.sessions === null) {
+      return { sessions: {} }
+    }
+    return parsed
+  } catch { return { sessions: {} } }
 }
 
 function saveSessions(data) {
@@ -194,7 +199,10 @@ function getPendingItems(chatId) {
 // draft 生成後に呼ぶ: 同一 slug があれば更新、なければ末尾に追加
 function addSessionPending(chatId, slug, title) {
   const data = loadSessions()
-  if (!data.sessions[chatId]) data.sessions[chatId] = { items: [] }
+  // chatId 未存在 OR 旧形式（items が配列でない）→ 新形式で初期化
+  if (!data.sessions[chatId] || !Array.isArray(data.sessions[chatId].items)) {
+    data.sessions[chatId] = { items: [] }
+  }
   const items = data.sessions[chatId].items
   const existing = items.find((i) => i.slug === slug)
   if (existing) {
@@ -1012,48 +1020,58 @@ async function main() {
         continue
       }
 
-      const result = await generateDraft(parsed.text, upd.update_id, fromUser)
-      console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}`)
+      try {
+        const result = await generateDraft(parsed.text, upd.update_id, fromUser)
+        console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}`)
 
-      // chat_id ごとに pending slug をリストに追加（日本語承認コマンドで参照）
-      const draftChatId = msgChatId || defaultChatId || ''
-      addSessionPending(draftChatId, result.slug, result.title)
+        // chat_id ごとに pending slug をリストに追加（日本語承認コマンドで参照）
+        const draftChatId = msgChatId || defaultChatId || ''
+        addSessionPending(draftChatId, result.slug, result.title)
 
-      // 承認待ち一覧（追加後に取得）
-      const pendingNow  = getPendingItems(draftChatId)
-      const pendingNote = pendingNow.length > 0
-        ? `<b>現在の承認待ち</b>: ${pendingNow.map((p) => `<code>${escHtml(p.slug)}</code>`).join(', ')}`
-        : ''
+        // 承認待ち一覧（追加後に取得）
+        const pendingNow  = getPendingItems(draftChatId)
+        const pendingNote = pendingNow.length > 0
+          ? `<b>現在の承認待ち</b>: ${pendingNow.map((p) => `<code>${escHtml(p.slug)}</code>`).join(', ')}`
+          : ''
 
-      // 下書き確認 URL（SITE_URL / NEXT_PUBLIC_SITE_URL / VERCEL_URL から生成）
-      const siteUrl   = getSiteUrl()
-      const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
+        // 下書き確認 URL（SITE_URL / NEXT_PUBLIC_SITE_URL / VERCEL_URL から生成）
+        const siteUrl   = getSiteUrl()
+        const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
 
-      // HTML parse_mode でリンクをタップ可能にする
-      const linkHtml = reviewUrl
-        ? `<a href="${escHtml(reviewUrl)}">下書きを確認する</a>`
-        : `管理画面: /admin/pending-review`
+        // HTML parse_mode でリンクをタップ可能にする
+        const linkHtml = reviewUrl
+          ? `<a href="${escHtml(reviewUrl)}">下書きを確認する</a>`
+          : `管理画面: /admin/pending-review`
 
-      const replyLines = [
-        `📝 下書きを生成しました${result.aiUsed ? '（AI）' : '（要手動入力）'}`,
-        ``,
-        `<b>タイトル</b>: ${escHtml(result.title)}`,
-        `<b>スラグ</b>: <code>${escHtml(result.slug)}</code>`,
-        `<b>カテゴリ</b>: ${escHtml(result.category)}`,
-        `<b>要約</b>: ${escHtml(result.excerpt)}`,
-        pendingNote,
-        ``,
-        linkHtml,
-        ``,
-        `問題なければ「承認」と返信してください。`,
-        `修正する場合は「差し戻し」と返信してください。`,
-      ].filter(Boolean)
-      const replyText = replyLines.join('\n')
+        const replyLines = [
+          `📝 下書きを生成しました${result.aiUsed ? '（AI）' : '（要手動入力）'}`,
+          ``,
+          `<b>タイトル</b>: ${escHtml(result.title)}`,
+          `<b>スラグ</b>: <code>${escHtml(result.slug)}</code>`,
+          `<b>カテゴリ</b>: ${escHtml(result.category)}`,
+          `<b>要約</b>: ${escHtml(result.excerpt)}`,
+          pendingNote,
+          ``,
+          linkHtml,
+          ``,
+          `問題なければ「承認」と返信してください。`,
+          `修正する場合は「差し戻し」と返信してください。`,
+        ].filter(Boolean)
+        const replyText = replyLines.join('\n')
 
-      if (defaultChatId || msgChatId) {
-        await sendTelegram(botToken, msgChatId || defaultChatId, replyText, 'HTML').catch((e) => {
-          console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
-        })
+        if (defaultChatId || msgChatId) {
+          await sendTelegram(botToken, msgChatId || defaultChatId, replyText, 'HTML').catch((e) => {
+            console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+          })
+        }
+      } catch (err) {
+        console.error(`    ❌ 下書き生成エラー: ${err.message}`)
+        if (defaultChatId || msgChatId) {
+          await sendTelegram(
+            botToken, msgChatId || defaultChatId,
+            `❌ 下書き生成に失敗しました。\n${err.message.slice(0, 200)}`,
+          ).catch(() => {})
+        }
       }
     }
   } // end for updates
