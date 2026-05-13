@@ -80,16 +80,37 @@ async function fetchUpdates(botToken, offset) {
   return json.result ?? []
 }
 
-async function sendTelegram(botToken, chatId, text) {
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`
+// parseMode: null（プレーンテキスト）または 'HTML'
+async function sendTelegram(botToken, chatId, text, parseMode = null) {
+  const url  = `https://api.telegram.org/bot${botToken}/sendMessage`
+  const body = { chat_id: chatId, text, disable_web_page_preview: true }
+  if (parseMode) body.parse_mode = parseMode
   const res  = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ chat_id: chatId, text }),
+    body:    JSON.stringify(body),
   })
   const json = await res.json()
   if (!json.ok) throw new Error(`sendMessage エラー: ${json.description ?? JSON.stringify(json)}`)
   return json
+}
+
+// ── ユーティリティ ────────────────────────────────────────────────────────
+
+// Telegram HTML parse_mode 用エスケープ（& < > のみ）
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// サイト URL を env から取得。VERCEL_URL は scheme なしなので補完する
+function getSiteUrl() {
+  const raw = process.env.SITE_URL
+    ?? process.env.NEXT_PUBLIC_SITE_URL
+    ?? process.env.VERCEL_URL
+    ?? ''
+  if (!raw) return null
+  const cleaned = raw.replace(/\/$/, '')
+  return /^https?:\/\//.test(cleaned) ? cleaned : `https://${cleaned}`
 }
 
 // ── ファイルユーティリティ ────────────────────────────────────────────────
@@ -932,39 +953,33 @@ async function main() {
       // chat_id ごとに直近 pending slug を記録（日本語承認コマンドで参照）
       setSessionPending(msgChatId || defaultChatId || '', result.slug, result.title)
 
-      // 本文冒頭プレビュー（HTMLコメントを除去して最初の250文字）
-      const bodyPreview = result.bodyContent
-        ? result.bodyContent.replace(/<!--[\s\S]*?-->/g, '').trim().slice(0, 250)
-        : ''
+      // 下書き確認 URL（SITE_URL / NEXT_PUBLIC_SITE_URL / VERCEL_URL から生成）
+      const siteUrl   = getSiteUrl()
+      const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
+
+      // HTML parse_mode でリンクをタップ可能にする
+      const linkHtml = reviewUrl
+        ? `<a href="${escHtml(reviewUrl)}">下書きを確認する</a>`
+        : `管理画面: /admin/pending-review`
 
       const replyLines = [
         `📝 下書きを生成しました${result.aiUsed ? '（AI）' : '（要手動入力）'}`,
         ``,
-        `タイトル : ${result.title}`,
-        `スラグ   : ${result.slug}`,
-        `カテゴリ : ${result.category}`,
+        `<b>タイトル</b>: ${escHtml(result.title)}`,
+        `<b>スラグ</b>: <code>${escHtml(result.slug)}</code>`,
+        `<b>カテゴリ</b>: ${escHtml(result.category)}`,
         ``,
-      ]
-      if (bodyPreview) {
-        replyLines.push(
-          `── 本文冒頭 ──────────────────`,
-          bodyPreview,
-          `──────────────────────────────`,
-          ``,
-        )
-      }
-      replyLines.push(
-        `管理画面: /admin/pending-review`,
+        `<b>要約</b>: ${escHtml(result.excerpt)}`,
+        ``,
+        linkHtml,
         ``,
         `問題なければ「承認」と返信してください。`,
         `修正する場合は「差し戻し」と返信してください。`,
-        ``,
-        `（画像割当: npm run image:suggest -- ${result.slug}）`,
-      )
+      ]
       const replyText = replyLines.join('\n')
 
       if (defaultChatId || msgChatId) {
-        await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
+        await sendTelegram(botToken, msgChatId || defaultChatId, replyText, 'HTML').catch((e) => {
           console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
         })
       }
