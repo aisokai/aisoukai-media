@@ -8,8 +8,11 @@ tags:
   - 歯ぐき
   - 予防
 author: 藍想会メディア編集部
-reviewed: false
+reviewed: true
 image: ''
+draft: false
+reviewed_at: '2026-05-13'
+reviewed_by: 氏名
 ---
 
 ## 歯周病とはどのような病気か

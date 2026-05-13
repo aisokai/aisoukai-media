@@ -8,8 +8,11 @@ tags:
   - 神経
   - 歯の保存
 author: 藍想会メディア編集部
-reviewed: false
+reviewed: true
 image: ''
+draft: false
+reviewed_at: '2026-05-13'
+reviewed_by: 氏名
 ---
 
 ## 根管治療とはどんな処置か

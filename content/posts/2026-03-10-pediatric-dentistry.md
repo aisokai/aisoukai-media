@@ -8,8 +8,11 @@ tags:
   - 乳歯
   - 子ども
 author: 藍想会メディア編集部
-reviewed: false
+reviewed: true
 image: ''
+draft: false
+reviewed_at: '2026-05-13'
+reviewed_by: 氏名
 ---
 
 ## 乳歯の役割

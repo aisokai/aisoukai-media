@@ -53,3 +53,67 @@ reviewed_by: 三谷
 reason: 実運用開始のため再評価・本文問題なし
 date: 2026-03-20
 
+## 2026-05-13T12:26:56.961+09:00
+datetime: 2026-05-13T12:26:56.961+09:00
+action: approve
+slug: 2026-05-24-topic-20260511-002
+reviewed_by: 氏名
+date: 2026-05-24
+publish_at: 2026-05-24
+
+## 2026-05-13T12:27:13.746+09:00
+datetime: 2026-05-13T12:27:13.746+09:00
+action: approve
+slug: 2026-05-22-topic-20260511-007
+reviewed_by: 氏名
+date: 2026-05-22
+
+## 2026-05-13T12:31:52.310+09:00
+datetime: 2026-05-13T12:31:52.310+09:00
+action: approve
+slug: 2026-05-22-topic-20260511-007
+reviewed_by: 氏名
+date: 2026-05-22
+
+## 2026-05-13T12:31:56.541+09:00
+datetime: 2026-05-13T12:31:56.541+09:00
+action: approve
+slug: 2026-03-20-wisdom-tooth
+reviewed_by: 氏名
+date: 2026-03-20
+
+## 2026-05-13T12:32:00.997+09:00
+datetime: 2026-05-13T12:32:00.997+09:00
+action: approve
+slug: 2026-03-10-pediatric-dentistry
+reviewed_by: 氏名
+date: 2026-03-10
+
+## 2026-05-13T12:32:04.730+09:00
+datetime: 2026-05-13T12:32:04.730+09:00
+action: approve
+slug: 2026-03-01-preventive-dentistry
+reviewed_by: 氏名
+date: 2026-03-01
+
+## 2026-05-13T12:32:09.252+09:00
+datetime: 2026-05-13T12:32:09.252+09:00
+action: approve
+slug: 2026-02-15-periodontal-disease
+reviewed_by: 氏名
+date: 2026-02-15
+
+## 2026-05-13T12:32:13.102+09:00
+datetime: 2026-05-13T12:32:13.102+09:00
+action: approve
+slug: 2026-02-05-root-canal
+reviewed_by: 氏名
+date: 2026-02-05
+
+## 2026-05-13T12:32:17.611+09:00
+datetime: 2026-05-13T12:32:17.611+09:00
+action: approve
+slug: 2026-01-20-cavity-treatment
+reviewed_by: 氏名
+date: 2026-01-20
+

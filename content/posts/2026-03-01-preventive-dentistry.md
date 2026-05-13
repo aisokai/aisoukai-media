@@ -8,8 +8,11 @@ tags:
   - 定期検診
   - クリーニング
 author: 藍想会メディア編集部
-reviewed: false
+reviewed: true
 image: ''
+draft: false
+reviewed_at: '2026-05-13'
+reviewed_by: 氏名
 ---
 
 ## 予防歯科とは
