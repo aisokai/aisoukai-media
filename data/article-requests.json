@@ -1,5 +1,5 @@
 {
-  "last_update_id": 145026172,
+  "last_update_id": 145026174,
   "requests": [
     {
       "update_id": 145026172,
@@ -24,6 +24,46 @@
         {
           "action": "archived",
           "at": "2026-05-13T23:50:10.667+09:00"
+        }
+      ]
+    },
+    {
+      "update_id": 145026173,
+      "from": "カエルス",
+      "text": "CAD/CAM冠のメリットと注意点について、患者さん向けの記事を作って",
+      "received_at": "2026-05-14T00:20:00.809+09:00",
+      "status": "drafted",
+      "status_updated_at": "2026-05-14T00:20:00.809+09:00",
+      "draft_slug": "2026-05-14-cadcam",
+      "history": [
+        {
+          "action": "received",
+          "at": "2026-05-14T00:20:00.809+09:00"
+        },
+        {
+          "action": "drafted",
+          "at": "2026-05-14T00:20:00.809+09:00",
+          "draft_slug": "2026-05-14-cadcam"
+        }
+      ]
+    },
+    {
+      "update_id": 145026174,
+      "from": "カエルス",
+      "text": "approve 2026-05-14-CAD/CAM by三谷",
+      "received_at": "2026-05-14T00:21:21.594+09:00",
+      "status": "ignored",
+      "status_updated_at": "2026-05-14T00:21:21.594+09:00",
+      "ignore_reason": "approve コマンドの regex バグにより誤ってリクエスト扱いになったため修正。生成ファイルは削除済み。",
+      "history": [
+        {
+          "action": "received",
+          "at": "2026-05-14T00:21:21.594+09:00"
+        },
+        {
+          "action": "ignored",
+          "at": "2026-05-14T00:21:21.594+09:00",
+          "reason": "approve regex バグ修正に伴い削除"
         }
       ]
     }

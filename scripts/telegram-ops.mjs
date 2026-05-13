@@ -225,11 +225,14 @@ function makeSlug(text) {
 function parseMessage(text) {
   const t = text.trim()
 
-  const approveM = t.match(/^approve\s+(\S+)(?:\s+by\s+(.+))?$/i)
+  const approveM = t.match(/^approve\s+(\S+)(?:\s+by\s*(.+))?$/i)
   if (approveM) return { type: 'approve', slug: approveM[1].trim(), reviewedBy: approveM[2]?.trim() ?? '' }
+  // "approve " で始まるが形式不正なメッセージはスキップ（リクエスト扱いしない）
+  if (/^approve\s/i.test(t)) return { type: 'skip', reason: 'approve 形式不正（書式: approve <slug> by <名前>）' }
 
   const rejectM = t.match(/^reject\s+(\S+)(?:\s+(.+))?$/i)
   if (rejectM) return { type: 'reject', slug: rejectM[1].trim(), reason: rejectM[2]?.trim() ?? '' }
+  if (/^reject\s/i.test(t)) return { type: 'skip', reason: 'reject 形式不正（書式: reject <slug> <理由>）' }
 
   // 日本語ショートカット（length 制限より前に評価する）
   if (/^(承認|OK|投稿|公開|これで|これでOK)\s*$/i.test(t)) return { type: 'jp_approve' }
