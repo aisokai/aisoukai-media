@@ -166,6 +166,9 @@ tags:
 | `npm run list:pending-review` | Human review 待ちの記事一覧を表示する |
 | `npm run request:article -- --title "..." --category "..." --date YYYY-MM-DD` | テーマを手動指定して記事ネタ CSV に追加する（generate:draft の前段） |
 | `npm run notify:pending-review` | pending review 記事の一覧を console 出力し、Telegram Bot に通知する（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
+| `npm run notify:posting-reminder` | 月・水・金にコンテンツ状態サマリーを Telegram に送る投稿確認リマインド。`--force` で曜日に関係なく送信 |
+| `npm run telegram:requests` | Telegram 受信メッセージから記事リクエストを取得（デフォルト dry-run / `--apply` で保存） |
+| `npm run request:list` | `data/article-requests.json` の記事リクエスト一覧を表示（読み取り専用） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
@@ -265,6 +268,29 @@ npm run notify:pending-review
 
 通知には 公開中・公開予定・review待ち・差し戻し済みの全件数を含む。  
 **通知から直接 approve / publish を行わないこと（AGENTS.md 絶対禁止）。**
+
+### 月水金の投稿確認リマインド
+
+```bash
+npm run notify:posting-reminder        # 月・水・金のみ送信
+npm run notify:posting-reminder -- --force  # 曜日に関係なく送信
+```
+
+通知内容: 公開中/予定/review待ちのサマリー + 管理画面URL。cron 化は未実装（手動実行）。
+
+### Telegram 記事リクエスト受信
+
+Telegram に記事テーマをメッセージすると、以下のコマンドで受信できる。
+
+```bash
+npm run telegram:requests              # dry-run（確認のみ）
+npm run telegram:requests -- --apply   # data/article-requests.json に保存
+npm run request:list                   # リクエスト一覧を表示
+```
+
+- approve / publish / push 系メッセージは自動的に無視される
+- 受信した記事リクエストから直接 approve / publish はしない
+- cron 化は未実装。手動で定期的に実行する
 
 ### 差し戻し済み記事の再提出
 
