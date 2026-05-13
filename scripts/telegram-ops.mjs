@@ -12,9 +12,10 @@
 //   publish / push / deploy 等     → スキップ
 //
 // フラグ:
-//   --dry-run  : コンソール表示のみ。書き込み・Git 操作・Telegram 返信なし（--apply がなければ暗黙 dry-run）
-//   --apply    : ファイル書き込み + Telegram 返信（build/git なし）
-//   --apply --build : approve → validate → build → git add → commit → push → Telegram 返信
+//   --dry-run         : コンソール表示のみ。書き込み・Git 操作・Telegram 返信なし（--apply がなければ暗黙 dry-run）
+//   --apply           : ファイル書き込み + Telegram 返信（build/git なし）
+//   --apply --build   : approve → validate → build → git add → commit → push → Telegram 返信
+//   --verbose         : 成功時も各ステップの詳細を Telegram に含める（デフォルトは要約のみ）
 //
 // セッション管理:
 //   data/telegram-session.json に chat_id 別の直近 pending slug を保存
@@ -643,14 +644,20 @@ async function runApprovePipeline({ slug, by, build, botToken, replyId }) {
 }
 
 // ── パイプライン結果を Telegram 返信テキストに変換 ────────────────────────
+// opts.verbose: true のとき全ステップを表示（デフォルト: 成功時は要約のみ）
+// opts.siteUrl: push 成功時の公開URL生成に使用
 
-function formatPipelineReply(result) {
-  const stepLines = result.steps.map((s) => {
-    const icon = s.ok ? '✅' : '❌'
-    return `${icon} ${s.name}`
-  })
+function formatPipelineReply(result, opts = {}) {
+  const { verbose = false, siteUrl = null } = opts
 
   if (result.ok) {
+    // push 成功 + 非 verbose → 最短通知
+    if (result.pushed && !verbose) {
+      const blogUrl = siteUrl ? `${siteUrl}/blog/${result.slug}` : result.slug
+      return `✅ 投稿完了\n🔗 ${blogUrl}`
+    }
+    // push なし or verbose → 詳細表示
+    const stepLines = result.steps.map((s) => `${s.ok ? '✅' : '❌'} ${s.name}`)
     const lines = [
       result.pushed
         ? `✅ 承認 → build → push 完了`
@@ -660,12 +667,14 @@ function formatPipelineReply(result) {
       ``,
       ...stepLines,
     ]
-    if (result.pushed) {
-      lines.push(``, `🌐 デプロイ対象に追加済み（Vercel 等の CI/CD が自動検知します）`)
+    if (result.pushed && siteUrl) {
+      lines.push(``, `🔗 ${siteUrl}/blog/${result.slug}`)
     }
     return lines.join('\n')
   }
 
+  // 失敗: 常に詳細表示
+  const stepLines = result.steps.map((s) => `${s.ok ? '✅' : '❌'} ${s.name}`)
   const lines = [
     `❌ パイプライン失敗（${result.failedAt} で停止）`,
     `スラグ: ${result.slug ?? '(不明)'}`,
@@ -685,21 +694,29 @@ function formatPipelineReply(result) {
   return lines.join('\n')
 }
 
-// 日本語承認フロー用の返信テキスト（既存 formatPipelineReply と分離）
-function formatJpApproveReply(result) {
-  if (!result.ok) return formatPipelineReply(result)
+// 日本語承認フロー用（formatPipelineReply と同じ opts インタフェース）
+function formatJpApproveReply(result, opts = {}) {
+  const { verbose = false, siteUrl = null } = opts
+  if (!result.ok) return formatPipelineReply(result, opts)
+
+  // push 成功 + 非 verbose → 最短通知
+  if (result.pushed && !verbose) {
+    const blogUrl = siteUrl ? `${siteUrl}/blog/${result.slug}` : result.slug
+    return `✅ 投稿完了\n🔗 ${blogUrl}`
+  }
 
   const stepLines = result.steps.map((s) => `${s.ok ? '✅' : '❌'} ${s.name}`)
 
   if (result.pushed) {
-    return [
+    const lines = [
       `✅ 承認・build・push が完了しました。`,
-      `Vercel 反映後に公開されます。`,
       ``,
       `スラグ: ${result.slug}`,
       ``,
       ...stepLines,
-    ].join('\n')
+    ]
+    if (siteUrl) lines.push(``, `🔗 ${siteUrl}/blog/${result.slug}`)
+    return lines.join('\n')
   }
 
   return [
@@ -717,18 +734,22 @@ function formatJpApproveReply(result) {
 async function main() {
   loadEnv()
 
-  const argv   = process.argv.slice(2)
-  const dryRun = argv.includes('--dry-run') || !argv.includes('--apply')
-  const build  = argv.includes('--build')
-  const BAR    = '━'.repeat(56)
+  const argv    = process.argv.slice(2)
+  const dryRun  = argv.includes('--dry-run') || !argv.includes('--apply')
+  const build   = argv.includes('--build')
+  const verbose = argv.includes('--verbose')
+  const BAR     = '━'.repeat(56)
 
   const modeLabel = dryRun
     ? '[dry-run]'
     : build ? '--apply --build' : '--apply'
 
   console.log(BAR)
-  console.log(`telegram:ops ${modeLabel}`)
+  console.log(`telegram:ops ${modeLabel}${verbose ? ' --verbose' : ''}`)
   console.log(BAR)
+
+  const siteUrl       = getSiteUrl()
+  const replyOpts     = { verbose, siteUrl }
 
   const botToken      = process.env.TELEGRAM_BOT_TOKEN
   const defaultChatId = process.env.TELEGRAM_CHAT_ID
@@ -859,7 +880,7 @@ async function main() {
           updateSlugStatus(msgChatId, target.slug, result.pushed ? 'cleared' : 'approved')
         }
 
-        const replyText = formatJpApproveReply(result)
+        const replyText = formatJpApproveReply(result, replyOpts)
         await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
           console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
         })
@@ -957,7 +978,7 @@ async function main() {
         }
 
         // Telegram 返信
-        const replyText = formatPipelineReply(result)
+        const replyText = formatPipelineReply(result, replyOpts)
         if (defaultChatId || msgChatId) {
           await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
             console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
@@ -1028,35 +1049,20 @@ async function main() {
         const draftChatId = msgChatId || defaultChatId || ''
         addSessionPending(draftChatId, result.slug, result.title)
 
-        // 承認待ち一覧（追加後に取得）
-        const pendingNow  = getPendingItems(draftChatId)
-        const pendingNote = pendingNow.length > 0
-          ? `<b>現在の承認待ち</b>: ${pendingNow.map((p) => `<code>${escHtml(p.slug)}</code>`).join(', ')}`
-          : ''
-
-        // 下書き確認 URL（SITE_URL / NEXT_PUBLIC_SITE_URL / VERCEL_URL から生成）
-        const siteUrl   = getSiteUrl()
+        // 下書き確認 URL（siteUrl は main スコープで取得済み）
         const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
-
-        // HTML parse_mode でリンクをタップ可能にする
-        const linkHtml = reviewUrl
+        const linkHtml  = reviewUrl
           ? `<a href="${escHtml(reviewUrl)}">下書きを確認する</a>`
-          : `管理画面: /admin/pending-review`
+          : `/admin/pending-review`
 
         const replyLines = [
-          `📝 下書きを生成しました${result.aiUsed ? '（AI）' : '（要手動入力）'}`,
-          ``,
-          `<b>タイトル</b>: ${escHtml(result.title)}`,
-          `<b>スラグ</b>: <code>${escHtml(result.slug)}</code>`,
-          `<b>カテゴリ</b>: ${escHtml(result.category)}`,
-          `<b>要約</b>: ${escHtml(result.excerpt)}`,
-          pendingNote,
+          `📝 <b>${escHtml(result.title)}</b>`,
+          `<code>${escHtml(result.slug)}</code>`,
           ``,
           linkHtml,
           ``,
-          `問題なければ「承認」と返信してください。`,
-          `修正する場合は「差し戻し」と返信してください。`,
-        ].filter(Boolean)
+          `「承認」で投稿 / 「差し戻し」で修正`,
+        ]
         const replyText = replyLines.join('\n')
 
         if (defaultChatId || msgChatId) {
