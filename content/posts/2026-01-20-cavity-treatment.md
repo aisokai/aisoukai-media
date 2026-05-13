@@ -9,10 +9,11 @@ tags:
   - 麻酔
 author: 藍想会メディア編集部
 reviewed: true
-image: ''
+image: /images/library/cavity/cavity-3291061.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
+image_alt: 頬を押さえて歯の痛みに顔をしかめる女性
 ---
 
 ## 虫歯治療の基本的な流れ

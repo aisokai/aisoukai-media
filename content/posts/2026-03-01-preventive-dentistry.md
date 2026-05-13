@@ -9,10 +9,11 @@ tags:
   - クリーニング
 author: 藍想会メディア編集部
 reviewed: true
-image: ''
+image: /images/library/preventive/preventive-4007710.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
+image_alt: 虫眼鏡で歯型を覗き込む「歯科検診」の文字入り画像
 ---
 
 ## 予防歯科とは

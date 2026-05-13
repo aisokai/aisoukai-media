@@ -8,12 +8,13 @@ tags:
   - 定期検診
   - 口腔ケア
 author: 藍想会メディア編集部
-image: ''
+image: /images/library/preventive/preventive-3986826.jpg
 reviewed: true
 draft: false
 ai_generated: false
 reviewed_at: '2026-05-12'
 reviewed_by: 三谷
+image_alt: 歯科衛生士がX線モニターを指しながら患者に説明するイメージ
 ---
 
 ## はじめに

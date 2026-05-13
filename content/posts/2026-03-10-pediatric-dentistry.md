@@ -9,10 +9,11 @@ tags:
   - 子ども
 author: 藍想会メディア編集部
 reviewed: true
-image: ''
+image: /images/library/pediatric/pediatric-34707854.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
+image_alt: 歯科スタッフが母と子に絵本を使って説明しているイメージ
 ---
 
 ## 乳歯の役割
