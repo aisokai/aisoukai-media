@@ -176,6 +176,9 @@ tags:
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
 | `npm run ops:mwf` | 月水金 定期運用チェックを一括実行（status→fetch→list→通知×3）。月水金以外は警告。`--force` で強制実行 |
 | `npm run image:import-inbox` | `public/images/library/inbox/` を再帰走査して画像を自動分類・コピー・JSON 登録する（デフォルト dry-run / `--apply` で実行 / `--apply --move` で移動） |
+| `npm run image:list` | 画像ライブラリのサマリーを表示する（カテゴリ別件数 / alt未カスタマイズ / license未更新 / 未使用画像。`--all` で全件表示） |
+| `npm run image:check` | `data/image-library.json` の整合性を検証する（path実在 / id重複 / category妥当性 / alt・license確認 / 記事参照整合） |
+| `npm run image:reclassify -- <image-id> --category <category>` | 画像のカテゴリを変更してファイルを移動し、JSON と記事 frontmatter を更新する（デフォルト dry-run / `--apply` で実行 / `--alt "..."` で alt を上書き） |
 | `npm run image:suggest -- <slug>` | 記事に合う画像を `data/image-library.json` から候補提示する（読み取り専用） |
 | `npm run image:assign -- <slug> --image <image-id>` | 画像 ID を記事 frontmatter に割り当てる（`image` / `image_alt` を更新。`reviewed` は変更しない） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
