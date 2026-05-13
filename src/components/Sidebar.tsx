@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { Search, TrendingUp, FolderOpen, User, ChevronRight } from 'lucide-react'
 import { getAllPosts } from '@/lib/posts'
 
@@ -115,12 +116,23 @@ export function Sidebar() {
                 >
                   {rank}
                 </div>
-                {/* カテゴリカラーのサムネイル（外部画像の代替） */}
-                <div
-                  className="h-14 w-14 shrink-0 rounded"
-                  style={{ backgroundColor: color }}
-                  aria-hidden="true"
-                />
+                {/* サムネイル: image があれば実画像、なければカテゴリカラー */}
+                {post.image ? (
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded">
+                    <Image
+                      src={post.image}
+                      alt={post.imageAlt ?? post.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="h-14 w-14 shrink-0 rounded"
+                    style={{ backgroundColor: color }}
+                    aria-hidden="true"
+                  />
+                )}
                 {/* タイトル */}
                 <p className="flex-1 text-[13px] leading-snug text-gray-700 group-hover:text-[#1e3a5f]">
                   {post.title}

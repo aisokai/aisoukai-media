@@ -27,6 +27,8 @@
     "request:archive": "node scripts/request-archive.mjs",
     "notify:requests": "node scripts/notify-requests.mjs",
     "ops:mwf": "node scripts/ops-mwf.mjs",
+    "image:suggest": "node scripts/image-suggest.mjs",
+    "image:assign": "node scripts/image-assign.mjs",
     "test:telegram": "node scripts/test-telegram-notify.mjs",
     "article:manual": "node scripts/manual-article-flow.mjs",
     "article:scheduled": "node scripts/scheduled-article-flow.mjs",

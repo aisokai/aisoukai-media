@@ -31,7 +31,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   "矯正歯科": Smile,
 }
 
-export function ArticleCard({ slug, title, excerpt, category, date, image, reviewed }: PostMeta) {
+export function ArticleCard({ slug, title, excerpt, category, date, image, imageAlt, reviewed }: PostMeta) {
   const color = CATEGORY_COLORS[category] ?? '#6b7280'
   const Icon = CATEGORY_ICONS[category] ?? HelpCircle
 
@@ -45,7 +45,7 @@ export function ArticleCard({ slug, title, excerpt, category, date, image, revie
         {image ? (
           <Image
             src={image}
-            alt={title}
+            alt={imageAlt ?? title}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"
           />

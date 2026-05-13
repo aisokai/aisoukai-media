@@ -175,6 +175,8 @@ tags:
 | `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
 | `npm run ops:mwf` | 月水金 定期運用チェックを一括実行（status→fetch→list→通知×3）。月水金以外は警告。`--force` で強制実行 |
+| `npm run image:suggest -- <slug>` | 記事に合う画像を `data/image-library.json` から候補提示する（読み取り専用） |
+| `npm run image:assign -- <slug> --image <image-id>` | 画像 ID を記事 frontmatter に割り当てる（`image` / `image_alt` を更新。`reviewed` は変更しない） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
@@ -371,6 +373,77 @@ npm run request:archive -- <update_id>  # または --all-done で drafted/ignor
 npm run request:ignore -- <update_id> --reason "当院の診療範囲外のため"
 npm run request:archive -- --all-done  # drafted/ignored を一括 archived
 ```
+
+---
+
+## 画像運用
+
+### 素材を入れる場所
+
+```
+public/images/library/
+  cavity/          虫歯治療
+  root-canal/      根管治療
+  periodontal/     歯周病治療
+  preventive/      予防歯科
+  pediatric/       小児歯科
+  wisdom-tooth/    親知らず
+  implant/         インプラント
+  announcement/    お知らせ
+  general/         汎用・その他
+```
+
+ファイル名規則: `<category>-<連番>.jpg`（例: `cavity-01.jpg`）
+
+### image-library.json の書き方
+
+```jsonc
+// data/image-library.json
+{
+  "images": [
+    {
+      "id": "cavity-01",                          // 一意 ID（英数字・ハイフン）
+      "path": "/images/library/cavity/cavity-01.jpg",  // public/ 配下のパス
+      "category": "cavity",                       // フォルダ名と合わせる
+      "tags": ["虫歯", "治療", "麻酔", "痛み"],  // 記事マッチングに使うキーワード
+      "alt": "歯科医師が虫歯の治療を行っているイメージ", // 必須
+      "license_source": "Pixta",                  // 素材サイト名
+      "license_note": "ID: 123456789 購入済み"   // ライセンス番号・購入情報
+    }
+  ]
+}
+```
+
+### 画像の追加から記事への割当まで
+
+```bash
+# 1. 素材を購入して public/images/library/<category>/ に配置
+# 2. data/image-library.json にメタデータを追記
+# 3. 記事に合う候補を確認
+npm run image:suggest -- <slug>
+
+# 4. 割り当て（reviewed / draft は変更しない）
+npm run image:assign -- <slug> --image <image-id>
+
+# 5. 検証
+npm run validate:posts        # image ファイルの存在と image_alt を確認
+npm run build                 # 表示崩れがないか確認
+
+# 6. commit（push は Human が手動実行）
+git add content/posts/<slug>.md data/image-library.json
+git commit -m "chore: assign image to <slug>"
+```
+
+### 画像運用ルール
+
+| ルール | 詳細 |
+|--------|------|
+| 口腔内のリアル写真 | 患者が不快に感じる可能性があるため慎重に扱う |
+| before/after 風画像 | 禁止（医療広告ガイドライン違反の恐れ） |
+| 治療効果を保証する画像 | 禁止（例：完治した歯の比較写真） |
+| `image_alt` | 必須。`image:assign` で自動設定されるが、内容を確認すること |
+| ライセンス情報 | `image-library.json` の `license_source` / `license_note` に必ず記載 |
+| AI 画像生成 | 補助扱い。医療情報の補足イラスト程度に留め、誤解を招く写実的な医療行為の描写は使わない |
 
 ---
 

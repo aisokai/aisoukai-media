@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
@@ -23,7 +23,8 @@ function toDateStr(val) {
 }
 
 function validatePost(filename) {
-  const errors = []
+  const errors   = []
+  const warnings = []
   const filePath = join(POSTS_DIR, filename)
 
   if (!FILENAME_RE.test(filename)) {
@@ -64,8 +65,20 @@ function validatePost(filename) {
     errors.push('author が空です')
   }
 
-  if (typeof data.image === 'string' && data.image.trim() !== '' && !data.image.startsWith('/')) {
-    errors.push(`image のパスが "/" で始まっていません: "${data.image}"`)
+  if (typeof data.image === 'string' && data.image.trim() !== '') {
+    if (!data.image.startsWith('/')) {
+      errors.push(`image のパスが "/" で始まっていません: "${data.image}"`)
+    } else {
+      // image が指定されている場合、public/ 配下に実ファイルが存在するか確認する
+      const imageDiskPath = join(ROOT, 'public', data.image)
+      if (!existsSync(imageDiskPath)) {
+        errors.push(`image ファイルが public/ に存在しません: "${data.image}"`)
+      }
+    }
+    // image が設定されているのに image_alt が空の場合は警告（エラーにしない）
+    if (!data.image_alt || String(data.image_alt).trim() === '') {
+      warnings.push('image_alt が設定されていません（アクセシビリティのために image_alt の設定を推奨します）')
+    }
   }
 
   if (data.category !== undefined && !VALID_CATEGORIES.includes(data.category)) {
@@ -96,7 +109,7 @@ function validatePost(filename) {
     errors.push('本文が空です')
   }
 
-  return errors
+  return { errors, warnings }
 }
 
 let files
@@ -112,26 +125,40 @@ if (files.length === 0) {
   process.exit(0)
 }
 
-let hasErrors = false
-const report = []
+let hasErrors   = false
+let hasWarnings = false
+const report    = []
 
 for (const file of files) {
-  const errors = validatePost(file)
-  report.push({ file, errors })
-  if (errors.length > 0) hasErrors = true
+  const { errors, warnings } = validatePost(file)
+  report.push({ file, errors, warnings })
+  if (errors.length   > 0) hasErrors   = true
+  if (warnings.length > 0) hasWarnings = true
 }
 
 if (!hasErrors) {
+  if (hasWarnings) {
+    console.log(`✅ All posts valid (${files.length} 件) — 警告あり`)
+    for (const { file, warnings } of report) {
+      if (warnings.length > 0) {
+        console.warn(`⚠️  ${file}`)
+        for (const w of warnings) console.warn(`   ⚠ ${w}`)
+      }
+    }
+    process.exit(0)
+  }
   console.log(`✅ All posts valid (${files.length} 件)`)
   process.exit(0)
 }
 
-for (const { file, errors } of report) {
+for (const { file, errors, warnings } of report) {
   if (errors.length > 0) {
     console.error(`❌ ${file}`)
-    for (const err of errors) {
-      console.error(`   - ${err}`)
-    }
+    for (const err of errors) console.error(`   - ${err}`)
+  }
+  if (warnings.length > 0) {
+    console.warn(`⚠️  ${file}`)
+    for (const w of warnings) console.warn(`   ⚠ ${w}`)
   }
 }
 process.exit(1)

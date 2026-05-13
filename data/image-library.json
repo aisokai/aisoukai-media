@@ -1,0 +1,13 @@
+{
+  "images": [
+    {
+      "id": "cavity-01",
+      "path": "/images/library/cavity/cavity-01.jpg",
+      "category": "cavity",
+      "tags": ["虫歯", "治療", "麻酔", "痛み", "歯科", "歯"],
+      "alt": "歯科医師が虫歯の治療を行っているイメージ",
+      "license_source": "未購入",
+      "license_note": "サンプルエントリ。素材購入後に path / license_source / license_note を更新すること。"
+    }
+  ]
+}

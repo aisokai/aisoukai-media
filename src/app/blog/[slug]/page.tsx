@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Home, ChevronRight, Clock, Tag } from 'lucide-react'
 import { getAllPosts, getPostBySlug } from '@/lib/posts'
 import { buildArticleMetadata, buildBlogPostingJsonLd } from '@/lib/seo'
@@ -104,6 +105,19 @@ export default async function ArticlePage({
                 <h1 className="mb-4 text-[22px] font-bold leading-snug text-gray-900 md:text-[26px]">
                   {post.title}
                 </h1>
+
+                {/* Hero image — image がある場合のみ表示。ない場合はカテゴリfallback（カラーバー）を維持 */}
+                {post.image && (
+                  <div className="relative mb-6 aspect-[16/9] overflow-hidden rounded-lg bg-gray-100">
+                    <Image
+                      src={post.image}
+                      alt={post.imageAlt ?? post.title}
+                      fill
+                      className="object-cover"
+                      priority
+                    />
+                  </div>
+                )}
 
                 {/* Description */}
                 <div className="mb-6 border-l-4 border-[#1e3a5f] bg-blue-50 p-4">

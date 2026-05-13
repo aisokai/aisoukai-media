@@ -39,6 +39,7 @@ export type PostMeta = {
   tags: string[];
   reviewed: boolean;
   image?: string;
+  imageAlt?: string;         // image の alt テキスト（image_alt frontmatter フィールドから取得）
   publishAt?: string;        // スケジュール公開日（省略時は date を公開日とする）
   reviewedAt?: string;       // Human approval 日
   reviewedBy?: string;       // 承認者名
@@ -74,7 +75,8 @@ export function getAllPosts(): PostMeta[] {
         category: data.category as string,
         tags: (data.tags as string[]) ?? [],
         reviewed: true,
-        image: data.image as string | undefined,
+        image:    (data.image as string) || undefined,
+        imageAlt: (data.image_alt as string) || undefined,
         publishAt: data.publish_at as string | undefined,
         reviewedAt: data.reviewed_at as string | undefined,
         reviewedBy: data.reviewed_by as string | undefined,
@@ -154,7 +156,8 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
     category: data.category as string,
     tags: (data.tags as string[]) ?? [],
     reviewed: data.reviewed === true,
-    image: data.image as string | undefined,
+    image:    (data.image as string) || undefined,
+    imageAlt: (data.image_alt as string) || undefined,
     contentHtml,
   };
 }
