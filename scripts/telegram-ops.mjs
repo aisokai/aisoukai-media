@@ -4,9 +4,11 @@
 // Human がトリガーする。AI が自動実行してはならない。
 //
 // メッセージ種別:
-//   "approve <slug> [by <名前>]"  → 承認フロー（TELEGRAM_ALLOWED_CHAT_IDS のみ有効）
-//   "reject <slug> <理由>"        → 差し戻しフロー（TELEGRAM_ALLOWED_CHAT_IDS のみ有効）
-//   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成
+//   "承認" / "OK" / "投稿" 等     → 直近 pending slug を承認（TELEGRAM_ALLOWED_CHAT_IDS のみ有効）
+//   "差し戻し" / "修正" / "NG" 等 → 直近 pending slug を差し戻し（同上）
+//   "approve <slug> [by <名前>]"  → 明示スラグ承認（互換維持）
+//   "reject <slug> <理由>"        → 明示スラグ差し戻し（互換維持）
+//   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成 + pending_slug 保存
 //   publish / push / deploy 等     → スキップ
 //
 // フラグ:
@@ -14,13 +16,19 @@
 //   --apply    : ファイル書き込み + Telegram 返信（build/git なし）
 //   --apply --build : approve → validate → build → git add → commit → push → Telegram 返信
 //
+// セッション管理:
+//   data/telegram-session.json に chat_id 別の直近 pending slug を保存
+//   draft 生成 → status: pending_approval
+//   承認 / 差し戻し後 → status: approved / rejected
+//
 // 安全条件:
-//   - TELEGRAM_ALLOWED_CHAT_IDS に含まれる chat_id/from_id のみ approve/reject を受け付ける
-//   - build 失敗時は commit/push しない（approve は済んでいるため手動 push に切り替える）
+//   - TELEGRAM_ALLOWED_CHAT_IDS に含まれる chat_id/from_id のみ承認/差し戻し操作可
+//   - pending slug なしで「承認」が来たら対象不明として何もしない
+//   - build 失敗時は commit/push しない
 //   - staged ファイルに機密ファイルが混入した場合は push しない
 //   - 機密パターン（.env / .key 等）の未追跡ファイルがある場合は push しない
 //   - .env.local は絶対に git add しない
-//   - reject 時は git 操作しない
+//   - 差し戻し時は git 操作しない
 //   - publish コマンドは存在しない
 
 import {
@@ -31,12 +39,13 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import matter from 'gray-matter'
 
-const __dirname     = dirname(fileURLToPath(import.meta.url))
-const ROOT          = join(__dirname, '..')
-const POSTS_DIR     = join(ROOT, 'content', 'posts')
-const REQUESTS_PATH = join(ROOT, 'data', 'article-requests.json')
-const LOGS_DIR      = join(ROOT, 'logs')
-const LOG_PATH      = join(LOGS_DIR, 'review-history.md')
+const __dirname      = dirname(fileURLToPath(import.meta.url))
+const ROOT           = join(__dirname, '..')
+const POSTS_DIR      = join(ROOT, 'content', 'posts')
+const REQUESTS_PATH  = join(ROOT, 'data', 'article-requests.json')
+const SESSION_PATH   = join(ROOT, 'data', 'telegram-session.json')
+const LOGS_DIR       = join(ROOT, 'logs')
+const LOG_PATH       = join(LOGS_DIR, 'review-history.md')
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
 
@@ -132,6 +141,51 @@ function appendReviewLog(entry) {
   appendFileSync(LOG_PATH, lines.join('\n') + '\n', 'utf8')
 }
 
+// ── チャット別セッション管理（直近 pending slug の追跡） ─────────────────
+// data/telegram-session.json スキーマ:
+//   { sessions: { "<chat_id>": { slug, title, created_at, status } } }
+// status: "pending_approval" | "approved" | "rejected" | "cleared"
+
+function loadSessions() {
+  if (!existsSync(SESSION_PATH)) return { sessions: {} }
+  try { return JSON.parse(readFileSync(SESSION_PATH, 'utf8')) }
+  catch { return { sessions: {} } }
+}
+
+function saveSessions(data) {
+  writeFileSync(SESSION_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8')
+}
+
+// chat_id の直近 pending slug を返す（pending_approval でなければ null）
+function getPendingSession(chatId) {
+  const { sessions } = loadSessions()
+  const s = sessions[chatId]
+  if (!s || s.status !== 'pending_approval') return null
+  return { slug: s.slug, title: s.title }
+}
+
+// draft 生成後に呼ぶ: pending_approval として登録
+function setSessionPending(chatId, slug, title) {
+  const data = loadSessions()
+  data.sessions[chatId] = {
+    slug,
+    title,
+    created_at: getJstTimestamp(),
+    status: 'pending_approval',
+  }
+  saveSessions(data)
+}
+
+// 承認/差し戻し/クリア後に呼ぶ
+function updateSessionStatus(chatId, status) {
+  const data = loadSessions()
+  if (data.sessions[chatId]) {
+    data.sessions[chatId].status     = status
+    data.sessions[chatId].updated_at = getJstTimestamp()
+    saveSessions(data)
+  }
+}
+
 // ── カテゴリ自動検出 ──────────────────────────────────────────────────────
 
 const CATEGORY_RULES = [
@@ -176,6 +230,10 @@ function parseMessage(text) {
 
   const rejectM = t.match(/^reject\s+(\S+)(?:\s+(.+))?$/i)
   if (rejectM) return { type: 'reject', slug: rejectM[1].trim(), reason: rejectM[2]?.trim() ?? '' }
+
+  // 日本語ショートカット（length 制限より前に評価する）
+  if (/^(承認|OK|投稿|公開|これで|これでOK)\s*$/i.test(t)) return { type: 'jp_approve' }
+  if (/^(差し戻し|修正|NG|やり直し)\s*$/i.test(t))         return { type: 'jp_reject'  }
 
   if (/^publish/i.test(t)) return { type: 'skip', reason: 'publish コマンドは Telegram から禁止' }
   if (/^push/i.test(t))    return { type: 'skip', reason: 'push コマンドは Telegram から禁止' }
@@ -513,6 +571,33 @@ function formatPipelineReply(result) {
   return lines.join('\n')
 }
 
+// 日本語承認フロー用の返信テキスト（既存 formatPipelineReply と分離）
+function formatJpApproveReply(result) {
+  if (!result.ok) return formatPipelineReply(result)
+
+  const stepLines = result.steps.map((s) => `${s.ok ? '✅' : '❌'} ${s.name}`)
+
+  if (result.pushed) {
+    return [
+      `✅ 承認・build・push が完了しました。`,
+      `Vercel 反映後に公開されます。`,
+      ``,
+      `スラグ: ${result.slug}`,
+      ``,
+      ...stepLines,
+    ].join('\n')
+  }
+
+  return [
+    `✅ 承認・validate が完了しました。`,
+    `（build/push は --build フラグで有効化されます）`,
+    ``,
+    `スラグ: ${result.slug}`,
+    ``,
+    ...stepLines,
+  ].join('\n')
+}
+
 // ── メイン ────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -592,7 +677,7 @@ async function main() {
 
     // ── approve / reject ────────────────────────────────────────────────
 
-    if (parsed.type === 'approve' || parsed.type === 'reject') {
+    if (['approve', 'reject', 'jp_approve', 'jp_reject'].includes(parsed.type)) {
       const authorized = allowedChatIds.has(msgChatId) || allowedChatIds.has(msgFromId)
 
       if (!authorized) {
@@ -606,7 +691,85 @@ async function main() {
         continue
       }
 
-      // ── approve ─────────────────────────────────────────────────────
+      // ── 日本語承認 ──────────────────────────────────────────────────
+
+      if (parsed.type === 'jp_approve') {
+        const session = getPendingSession(msgChatId)
+        console.log(`    → 日本語承認: pending="${session?.slug ?? '（なし）'}"  by: ${fromUser}`)
+
+        if (!session) {
+          console.log(`    ⚠️ 承認対象の pending slug なし`)
+          if (!dryRun) {
+            await sendTelegram(
+              botToken, msgChatId || defaultChatId,
+              `⚠️ 承認対象の下書きが見つかりません。\n「approve <スラグ> by <名前>」で明示指定してください。`,
+            ).catch(() => {})
+          }
+          continue
+        }
+
+        if (dryRun) {
+          console.log(`    [dry-run] パイプラインをスキップ`)
+          continue
+        }
+
+        const result = await runApprovePipeline({ slug: session.slug, by: fromUser, build })
+        for (const s of result.steps) {
+          console.log(`    ${s.ok ? '✅' : '❌'} ${s.name}: ${s.output ? s.output.slice(0, 80) : ''}`)
+        }
+
+        updateSessionStatus(msgChatId, result.ok ? 'approved' : 'failed')
+
+        const replyText = formatJpApproveReply(result)
+        await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
+          console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+        })
+        continue
+      }
+
+      // ── 日本語差し戻し ───────────────────────────────────────────────
+
+      if (parsed.type === 'jp_reject') {
+        const session = getPendingSession(msgChatId)
+        console.log(`    → 日本語差し戻し: pending="${session?.slug ?? '（なし）'}"`)
+
+        if (!session) {
+          console.log(`    ⚠️ 差し戻し対象の pending slug なし`)
+          if (!dryRun) {
+            await sendTelegram(
+              botToken, msgChatId || defaultChatId,
+              `⚠️ 差し戻し対象の下書きが見つかりません。\n「reject <スラグ> <理由>」で明示指定してください。`,
+            ).catch(() => {})
+          }
+          continue
+        }
+
+        if (dryRun) {
+          console.log(`    [dry-run] 差し戻しをスキップ`)
+          continue
+        }
+
+        const result = rejectPost(session.slug, 'Telegramから差し戻し')
+        updateSessionStatus(msgChatId, 'rejected')
+
+        if (!result.ok) {
+          console.log(`    ❌ 差し戻しエラー: ${result.error}`)
+          await sendTelegram(
+            botToken, msgChatId || defaultChatId,
+            `❌ 差し戻しエラー: ${result.error}`,
+          ).catch(() => {})
+          continue
+        }
+
+        console.log(`    ↩️  差し戻し完了: ${result.slug}`)
+        await sendTelegram(
+          botToken, msgChatId || defaultChatId,
+          `↩️ 差し戻しました。\n\nスラグ: ${result.slug}\n\n本文を修正後、「承認」と返信してください。`,
+        ).catch((e) => { console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`) })
+        continue
+      }
+
+      // ── 明示 approve ─────────────────────────────────────────────────
 
       if (parsed.type === 'approve') {
         const by = parsed.reviewedBy || fromUser
@@ -632,8 +795,10 @@ async function main() {
         }
         if (!result.ok) {
           console.log(`    ❌ 失敗: ${result.failedAt} — ${result.error?.slice(0, 100)}`)
-        } else if (result.pushed) {
-          console.log(`    🚀 push 完了`)
+        } else {
+          if (result.pushed) console.log(`    🚀 push 完了`)
+          // 明示承認でも pending セッションをクリア
+          updateSessionStatus(msgChatId || defaultChatId || '', result.ok ? 'approved' : 'failed')
         }
 
         // Telegram 返信
@@ -646,7 +811,7 @@ async function main() {
         continue
       }
 
-      // ── reject ──────────────────────────────────────────────────────
+      // ── 明示 reject ─────────────────────────────────────────────────
 
       if (parsed.type === 'reject') {
         console.log(`    → 差し戻し: ${parsed.slug}  reason: "${parsed.reason || '（理由なし）'}"`)
@@ -666,6 +831,7 @@ async function main() {
           continue
         }
         console.log(`    ↩️  差し戻し完了: ${result.slug}`)
+        updateSessionStatus(msgChatId || defaultChatId || '', 'rejected')
 
         const replyText = [
           `↩️ 差し戻し: ${result.slug}`,
@@ -702,23 +868,20 @@ async function main() {
       const result = generateDraft(parsed.text, upd.update_id, fromUser)
       console.log(`    ✅ 下書き生成: ${result.slug}`)
 
+      // chat_id ごとに直近 pending slug を記録（日本語承認コマンドで参照）
+      setSessionPending(msgChatId || defaultChatId || '', result.slug, parsed.text.slice(0, 60))
+
       const replyText = [
-        `📝 記事リクエスト受信 → 下書き生成完了`,
-        `━━━━━━━━━━━━━━━━━━`,
+        `📝 下書きを作成しました。`,
+        ``,
         `タイトル : ${parsed.text.slice(0, 50)}`,
         `スラグ   : ${result.slug}`,
         `カテゴリ : ${result.category}`,
-        `ファイル : content/posts/${result.filename}`,
         ``,
-        `▼ 承認（このチャットに送信）:`,
-        `approve ${result.slug} by <名前>`,
+        `本文を確認して、問題なければ「承認」と返信してください。`,
+        `修正する場合は「差し戻し」と返信してください。`,
         ``,
-        `▼ 差し戻し:`,
-        `reject ${result.slug} <理由>`,
-        ``,
-        `▼ 画像割当（ローカルで実行）:`,
-        `npm run image:suggest -- ${result.slug}`,
-        `npm run image:assign -- ${result.slug} --image <id> --apply`,
+        `（画像割当はローカルで: npm run image:suggest -- ${result.slug}）`,
       ].join('\n')
 
       if (defaultChatId || msgChatId) {
