@@ -169,6 +169,11 @@ tags:
 | `npm run notify:posting-reminder` | 月・水・金にコンテンツ状態サマリーを Telegram に送る投稿確認リマインド。`--force` で曜日に関係なく送信 |
 | `npm run telegram:requests` | Telegram 受信メッセージから記事リクエストを取得（デフォルト dry-run / `--apply` で保存） |
 | `npm run request:list` | `data/article-requests.json` の記事リクエスト一覧を表示（読み取り専用） |
+| `npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD` | リクエストから frontmatter のみの下書き記事を生成し、pending-review に追加する（Human がトリガー） |
+| `npm run request:ignore -- <update_id> --reason "理由"` | リクエストを見送り（ignored）にする。元メッセージは削除しない |
+| `npm run request:archive -- <update_id>` | リクエストを archived にする（最終状態。一覧から省略表示） |
+| `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
+| `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
@@ -291,6 +296,91 @@ npm run request:list                   # リクエスト一覧を表示
 - approve / publish / push 系メッセージは自動的に無視される
 - 受信した記事リクエストから直接 approve / publish はしない
 - cron 化は未実装。手動で定期的に実行する
+
+### Telegram リクエスト → 下書きライフサイクル
+
+Telegram から受信した記事リクエストを下書き記事に変換するフロー。
+
+```
+Telegram メッセージ
+   ↓
+npm run telegram:requests -- --apply   # data/article-requests.json に保存 (status: requested)
+   ↓
+npm run request:list                   # 未処理リクエストを確認
+npm run notify:requests                # Telegram にサマリーを送信（任意）
+   ↓ 採用する場合
+npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD
+   → content/posts/<date>-<slug>.md を生成（reviewed:false, draft:false）
+   → status が "drafted" に更新される
+   → http://localhost:3000/admin/pending-review に出現
+   ↓
+（通常の approve フローへ: 本文記入 → approve:post）
+   ↓ 下書き完了後
+npm run request:archive -- <update_id>  # または --all-done で drafted/ignored を一括 archived
+```
+
+#### status の意味
+
+| status | 説明 | 次のアクション |
+|--------|------|--------------|
+| `requested` | 受信済み・未処理 | `request:draft` または `request:ignore` |
+| `drafted` | 下書き生成済み | 本文記入 → `approve:post` |
+| `ignored` | 見送り済み | 必要なら `request:archive` |
+| `archived` | 最終状態。一覧から省略表示 | なし（データは保持） |
+
+#### 見送りの場合
+
+```bash
+npm run request:ignore -- <update_id> --reason "当院の診療範囲外のため"
+npm run request:archive -- --all-done  # drafted/ignored を一括 archived
+```
+
+---
+
+## cron 設計（5G）— 設計案のみ・未実装
+
+現段階では cron は実装しない（AGENTS.md 禁止）。将来 GitHub Actions で自動化する場合の設計案を記録する。
+
+### 自動化候補コマンド
+
+| コマンド | 推奨スケジュール | 用途 |
+|---------|-----------------|------|
+| `telegram:requests -- --apply` | 毎時 or 15分ごと | 新着リクエストを自動取得 |
+| `notify:posting-reminder` | 月水金 9:00 JST | コンテンツ投稿確認リマインド |
+| `notify:requests` | 毎日朝 8:30 JST | リクエスト状態サマリーを毎朝確認 |
+| `notify:pending-review` | 毎日朝 8:30 JST | review待ち記事を毎朝確認 |
+| `status:content` | 週1回（月曜） | 全体健康診断 |
+
+### GitHub Actions 設定例（参考）
+
+```yaml
+# .github/workflows/telegram-requests.yml（未実装）
+name: Fetch Telegram Requests
+on:
+  schedule:
+    - cron: '0 * * * *'   # 毎時 (UTC)
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci
+      - run: npm run telegram:requests -- --apply
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: fetch telegram requests"
+          file_pattern: data/article-requests.json
+```
+
+**注意:** cron 自動化を有効にする前に、以下を確認する:
+- `git push` 権限の scope を明示的に制限する
+- `approve` / `publish` の自動実行が混入しないこと
+- AGENTS.md の禁止事項を CI 側でも周知する
+
+---
 
 ### 差し戻し済み記事の再提出
 
