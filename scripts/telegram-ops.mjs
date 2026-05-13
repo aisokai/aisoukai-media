@@ -244,29 +244,44 @@ function makeSlug(text) {
 }
 
 // ── メッセージ解析 ────────────────────────────────────────────────────────
+// 評価順の保証:
+//   1. approve / reject  — \b で単語境界を確認し、後続文字に依らず必ず先に評価
+//   2. 日本語コマンド    — 長さ制限より前に評価
+//   3. 禁止コマンド
+//   4. 記事リクエスト   — 上記に該当しなかったものだけがここに到達する
 
 function parseMessage(text) {
   const t = text.trim()
 
-  const approveM = t.match(/^approve\s+(\S+)(?:\s+by\s*(.+))?$/i)
-  if (approveM) return { type: 'approve', slug: approveM[1].trim(), reviewedBy: approveM[2]?.trim() ?? '' }
-  // "approve " で始まるが形式不正なメッセージはスキップ（リクエスト扱いしない）
-  if (/^approve\s/i.test(t)) return { type: 'skip', reason: 'approve 形式不正（書式: approve <slug> by <名前>）' }
+  // ─ approve / reject ──────────────────────────────────────────────────────
+  // /^approve\b/i: "approve" が単語として完結しているメッセージを漏れなく捕捉する。
+  // スペース区切りに限らず、後続文字（改行・カンマ等）があっても
+  // request ハンドラーには絶対に到達しない。
+  if (/^approve\b/i.test(t)) {
+    const m = t.match(/^approve\s+(\S+)(?:\s+by\s*(.+))?$/i)
+    if (m) return { type: 'approve', slug: m[1].trim(), reviewedBy: m[2]?.trim() ?? '' }
+    return { type: 'skip', reason: 'approve 形式不正（書式: approve <slug> [by <名前>]）' }
+  }
 
-  const rejectM = t.match(/^reject\s+(\S+)(?:\s+(.+))?$/i)
-  if (rejectM) return { type: 'reject', slug: rejectM[1].trim(), reason: rejectM[2]?.trim() ?? '' }
-  if (/^reject\s/i.test(t)) return { type: 'skip', reason: 'reject 形式不正（書式: reject <slug> <理由>）' }
+  if (/^reject\b/i.test(t)) {
+    const m = t.match(/^reject\s+(\S+)(?:\s+(.+))?$/i)
+    if (m) return { type: 'reject', slug: m[1].trim(), reason: m[2]?.trim() ?? '' }
+    return { type: 'skip', reason: 'reject 形式不正（書式: reject <slug> [<理由>]）' }
+  }
 
-  // 日本語ショートカット（length 制限より前に評価する）
+  // ─ 日本語コマンド（length 制限より前に評価する）────────────────────────
   if (/^(承認|OK|投稿|公開|これで|これでOK)\s*$/i.test(t)) return { type: 'jp_approve' }
   if (/^(差し戻し|修正|NG|やり直し)\s*$/i.test(t))         return { type: 'jp_reject'  }
 
-  if (/^publish/i.test(t)) return { type: 'skip', reason: 'publish コマンドは Telegram から禁止' }
-  if (/^push/i.test(t))    return { type: 'skip', reason: 'push コマンドは Telegram から禁止' }
-  if (/^deploy/i.test(t))  return { type: 'skip', reason: 'deploy コマンドは禁止' }
-  if (/^\/[a-z]/i.test(t)) return { type: 'skip', reason: 'Bot コマンド（/ 始まり）' }
-  if (/npm run/i.test(t))  return { type: 'skip', reason: 'npm run コマンド' }
-  if (t.length < 8)        return { type: 'skip', reason: '短すぎます（8文字未満）' }
+  // ─ 禁止コマンド ──────────────────────────────────────────────────────────
+  if (/^publish\b/i.test(t)) return { type: 'skip', reason: 'publish コマンドは Telegram から禁止' }
+  if (/^push\b/i.test(t))    return { type: 'skip', reason: 'push コマンドは Telegram から禁止' }
+  if (/^deploy\b/i.test(t))  return { type: 'skip', reason: 'deploy コマンドは禁止' }
+  if (/^\/[a-z]/i.test(t))   return { type: 'skip', reason: 'Bot コマンド（/ 始まり）' }
+  if (/npm run/i.test(t))    return { type: 'skip', reason: 'npm run コマンド' }
+
+  // ─ 記事リクエスト ─────────────────────────────────────────────────────────
+  if (t.length < 8) return { type: 'skip', reason: '短すぎます（8文字未満）' }
 
   return { type: 'request', text: t }
 }
