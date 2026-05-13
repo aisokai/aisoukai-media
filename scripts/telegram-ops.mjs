@@ -164,10 +164,16 @@ function appendReviewLog(entry) {
   appendFileSync(LOG_PATH, lines.join('\n') + '\n', 'utf8')
 }
 
-// ── チャット別セッション管理（直近 pending slug の追跡） ─────────────────
+// ── チャット別セッション管理（承認待ちスラグのリスト） ──────────────────
 // data/telegram-session.json スキーマ:
-//   { sessions: { "<chat_id>": { slug, title, created_at, status } } }
-// status: "pending_approval" | "approved" | "rejected" | "cleared"
+//   { sessions: { "<chat_id>": { items: [{ slug, title, created_at, status }] } } }
+// status: "pending_approval" | "approved" | "cleared" | "rejected"
+//
+// 状態遷移:
+//   draft生成      → pending_approval
+//   approve成功     → approved（push なし）/ cleared（push あり）
+//   pipeline失敗    → pending_approval のまま保持（再試行可）
+//   差し戻し       → rejected
 
 function loadSessions() {
   if (!existsSync(SESSION_PATH)) return { sessions: {} }
@@ -179,32 +185,35 @@ function saveSessions(data) {
   writeFileSync(SESSION_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8')
 }
 
-// chat_id の直近 pending slug を返す（pending_approval でなければ null）
-function getPendingSession(chatId) {
+// chat_id の pending_approval アイテム一覧を返す
+function getPendingItems(chatId) {
   const { sessions } = loadSessions()
-  const s = sessions[chatId]
-  if (!s || s.status !== 'pending_approval') return null
-  return { slug: s.slug, title: s.title }
+  return (sessions[chatId]?.items ?? []).filter((i) => i.status === 'pending_approval')
 }
 
-// draft 生成後に呼ぶ: pending_approval として登録
-function setSessionPending(chatId, slug, title) {
+// draft 生成後に呼ぶ: 同一 slug があれば更新、なければ末尾に追加
+function addSessionPending(chatId, slug, title) {
   const data = loadSessions()
-  data.sessions[chatId] = {
-    slug,
-    title,
-    created_at: getJstTimestamp(),
-    status: 'pending_approval',
+  if (!data.sessions[chatId]) data.sessions[chatId] = { items: [] }
+  const items = data.sessions[chatId].items
+  const existing = items.find((i) => i.slug === slug)
+  if (existing) {
+    existing.status     = 'pending_approval'
+    existing.updated_at = getJstTimestamp()
+  } else {
+    items.push({ slug, title, created_at: getJstTimestamp(), status: 'pending_approval' })
   }
   saveSessions(data)
 }
 
-// 承認/差し戻し/クリア後に呼ぶ
-function updateSessionStatus(chatId, status) {
+// 特定 slug のステータスを更新
+function updateSlugStatus(chatId, slug, status) {
   const data = loadSessions()
-  if (data.sessions[chatId]) {
-    data.sessions[chatId].status     = status
-    data.sessions[chatId].updated_at = getJstTimestamp()
+  const items = data.sessions[chatId]?.items ?? []
+  const entry = items.find((i) => i.slug === slug)
+  if (entry) {
+    entry.status     = status
+    entry.updated_at = getJstTimestamp()
     saveSessions(data)
   }
 }
@@ -791,31 +800,56 @@ async function main() {
       // ── 日本語承認 ──────────────────────────────────────────────────
 
       if (parsed.type === 'jp_approve') {
-        const session = getPendingSession(msgChatId)
-        console.log(`    → 日本語承認: pending="${session?.slug ?? '（なし）'}"  by: ${fromUser}`)
+        const pendingItems = getPendingItems(msgChatId)
+        console.log(`    → 日本語承認: pending=${pendingItems.length}件  by: ${fromUser}`)
 
-        if (!session) {
-          console.log(`    ⚠️ 承認対象の pending slug なし`)
+        // 0件: 対象なし
+        if (pendingItems.length === 0) {
+          console.log(`    ⚠️ 承認対象の pending なし`)
           if (!dryRun) {
             await sendTelegram(
               botToken, msgChatId || defaultChatId,
-              `⚠️ 承認対象の下書きが見つかりません。\n「approve <スラグ> by <名前>」で明示指定してください。`,
+              `⚠️ 承認待ちの下書きが見つかりません。\n「approve <スラグ> by <名前>」で明示指定してください。`,
             ).catch(() => {})
           }
           continue
         }
+
+        // 複数件: 一覧を返信して終了
+        if (pendingItems.length > 1) {
+          console.log(`    ⚠️ 承認待ち複数: ${pendingItems.map((p) => p.slug).join(', ')}`)
+          if (!dryRun) {
+            const list = pendingItems
+              .map((p, i) => `${i + 1}. <code>${escHtml(p.slug)}</code>\n   ${escHtml(p.title)}`)
+              .join('\n\n')
+            await sendTelegram(
+              botToken, msgChatId || defaultChatId,
+              `⚠️ 承認待ちの下書きが ${pendingItems.length} 件あります:\n\n${list}\n\n「approve &lt;スラグ&gt; by &lt;名前&gt;」で指定してください。`,
+              'HTML',
+            ).catch(() => {})
+          }
+          continue
+        }
+
+        // 1件: 自動採用
+        const target = pendingItems[0]
+        console.log(`    → 自動採用: ${target.slug}`)
 
         if (dryRun) {
           console.log(`    [dry-run] パイプラインをスキップ`)
           continue
         }
 
-        const result = await runApprovePipeline({ slug: session.slug, by: fromUser, build })
+        const result = await runApprovePipeline({ slug: target.slug, by: fromUser, build })
         for (const s of result.steps) {
           console.log(`    ${s.ok ? '✅' : '❌'} ${s.name}: ${s.output ? s.output.slice(0, 80) : ''}`)
         }
 
-        updateSessionStatus(msgChatId, result.ok ? 'approved' : 'failed')
+        if (result.ok) {
+          // push済み → cleared、ローカル承認のみ → approved
+          // 失敗時は pending_approval のまま保持して再試行可能にする
+          updateSlugStatus(msgChatId, target.slug, result.pushed ? 'cleared' : 'approved')
+        }
 
         const replyText = formatJpApproveReply(result)
         await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
@@ -827,11 +861,11 @@ async function main() {
       // ── 日本語差し戻し ───────────────────────────────────────────────
 
       if (parsed.type === 'jp_reject') {
-        const session = getPendingSession(msgChatId)
-        console.log(`    → 日本語差し戻し: pending="${session?.slug ?? '（なし）'}"`)
+        const pendingItems = getPendingItems(msgChatId)
+        console.log(`    → 日本語差し戻し: pending=${pendingItems.length}件`)
 
-        if (!session) {
-          console.log(`    ⚠️ 差し戻し対象の pending slug なし`)
+        if (pendingItems.length === 0) {
+          console.log(`    ⚠️ 差し戻し対象の pending なし`)
           if (!dryRun) {
             await sendTelegram(
               botToken, msgChatId || defaultChatId,
@@ -841,13 +875,30 @@ async function main() {
           continue
         }
 
+        if (pendingItems.length > 1) {
+          console.log(`    ⚠️ 差し戻し対象複数: ${pendingItems.map((p) => p.slug).join(', ')}`)
+          if (!dryRun) {
+            const list = pendingItems
+              .map((p, i) => `${i + 1}. <code>${escHtml(p.slug)}</code>`)
+              .join('\n')
+            await sendTelegram(
+              botToken, msgChatId || defaultChatId,
+              `⚠️ 対象が複数あります:\n\n${list}\n\n「reject &lt;スラグ&gt; &lt;理由&gt;」で指定してください。`,
+              'HTML',
+            ).catch(() => {})
+          }
+          continue
+        }
+
+        const target = pendingItems[0]
+
         if (dryRun) {
           console.log(`    [dry-run] 差し戻しをスキップ`)
           continue
         }
 
-        const result = rejectPost(session.slug, 'Telegramから差し戻し')
-        updateSessionStatus(msgChatId, 'rejected')
+        const result = rejectPost(target.slug, 'Telegramから差し戻し')
+        updateSlugStatus(msgChatId, target.slug, 'rejected')
 
         if (!result.ok) {
           console.log(`    ❌ 差し戻しエラー: ${result.error}`)
@@ -894,8 +945,7 @@ async function main() {
           console.log(`    ❌ 失敗: ${result.failedAt} — ${result.error?.slice(0, 100)}`)
         } else {
           if (result.pushed) console.log(`    🚀 push 完了`)
-          // 明示承認でも pending セッションをクリア
-          updateSessionStatus(msgChatId || defaultChatId || '', result.ok ? 'approved' : 'failed')
+          updateSlugStatus(msgChatId || defaultChatId || '', parsed.slug, result.pushed ? 'cleared' : 'approved')
         }
 
         // Telegram 返信
@@ -928,7 +978,7 @@ async function main() {
           continue
         }
         console.log(`    ↩️  差し戻し完了: ${result.slug}`)
-        updateSessionStatus(msgChatId || defaultChatId || '', 'rejected')
+        updateSlugStatus(msgChatId || defaultChatId || '', parsed.slug, 'rejected')
 
         const replyText = [
           `↩️ 差し戻し: ${result.slug}`,
@@ -965,8 +1015,15 @@ async function main() {
       const result = await generateDraft(parsed.text, upd.update_id, fromUser)
       console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}`)
 
-      // chat_id ごとに直近 pending slug を記録（日本語承認コマンドで参照）
-      setSessionPending(msgChatId || defaultChatId || '', result.slug, result.title)
+      // chat_id ごとに pending slug をリストに追加（日本語承認コマンドで参照）
+      const draftChatId = msgChatId || defaultChatId || ''
+      addSessionPending(draftChatId, result.slug, result.title)
+
+      // 承認待ち一覧（追加後に取得）
+      const pendingNow  = getPendingItems(draftChatId)
+      const pendingNote = pendingNow.length > 0
+        ? `<b>現在の承認待ち</b>: ${pendingNow.map((p) => `<code>${escHtml(p.slug)}</code>`).join(', ')}`
+        : ''
 
       // 下書き確認 URL（SITE_URL / NEXT_PUBLIC_SITE_URL / VERCEL_URL から生成）
       const siteUrl   = getSiteUrl()
@@ -983,14 +1040,14 @@ async function main() {
         `<b>タイトル</b>: ${escHtml(result.title)}`,
         `<b>スラグ</b>: <code>${escHtml(result.slug)}</code>`,
         `<b>カテゴリ</b>: ${escHtml(result.category)}`,
-        ``,
         `<b>要約</b>: ${escHtml(result.excerpt)}`,
+        pendingNote,
         ``,
         linkHtml,
         ``,
         `問題なければ「承認」と返信してください。`,
         `修正する場合は「差し戻し」と返信してください。`,
-      ]
+      ].filter(Boolean)
       const replyText = replyLines.join('\n')
 
       if (defaultChatId || msgChatId) {
