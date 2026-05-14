@@ -19,6 +19,7 @@
     "list:pending-review": "node scripts/list-pending-review.mjs",
     "request:article": "node scripts/request-article.mjs",
     "notify:pending-review": "node scripts/notify-pending-review.mjs",
+    "notify:draft": "node scripts/notify-draft.mjs",
     "notify:posting-reminder": "node scripts/notify-posting-reminder.mjs",
     "telegram:requests": "node scripts/telegram-fetch-requests.mjs",
     "telegram:ops": "node scripts/telegram-ops.mjs",
