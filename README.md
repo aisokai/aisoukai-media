@@ -283,6 +283,21 @@ npm run request:archive -- --all-done
 
 > `approve / publish / request:draft` は `ops:mwf` が自動実行しない。Human 判断が必要。
 
+#### launchd による自動実行（macOS）
+
+Mac の launchd を使って月・水・金 08:30 に自動実行できる。
+
+```bash
+npm run ops:mwf:install    # launchd に登録（初回のみ）
+npm run ops:mwf:status     # 登録状態・次回実行を確認
+npm run ops:mwf:uninstall  # 解除
+```
+
+- plist: `~/Library/LaunchAgents/com.mitani.aisoukai-media-ops-mwf.plist`
+- ログ: `logs/ops-mwf.log` / `logs/ops-mwf-error.log`
+- 内部では `--force` フラグで `ops:mwf.mjs` を直接起動する
+- Mac がスリープ中は実行されない（起動後に次の実行時刻まで待機）
+
 ### 毎朝の確認（所要 1〜2 分）
 
 ```bash
@@ -331,7 +346,7 @@ npm run notify:posting-reminder        # 月・水・金のみ送信
 npm run notify:posting-reminder -- --force  # 曜日に関係なく送信
 ```
 
-通知内容: 公開中/予定/review待ちのサマリー + 管理画面URL。cron 化は未実装（手動実行）。
+通知内容: 公開中/予定/review待ちのサマリー + 管理画面URL。launchd による自動実行に対応（`npm run ops:mwf:install`）。
 
 ### Telegram 記事リクエスト受信
 
@@ -345,7 +360,7 @@ npm run request:list                   # リクエスト一覧を表示
 
 - approve / publish / push 系メッセージは自動的に無視される
 - 受信した記事リクエストから直接 approve / publish はしない
-- cron 化は未実装。手動で定期的に実行する
+- launchd 自動化対応: `npm run ops:mwf:install` で月水金 08:30 に自動実行できる
 
 ### Telegram リクエスト → 下書きライフサイクル
 
