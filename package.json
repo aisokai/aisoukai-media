@@ -44,7 +44,10 @@
     "article:scheduled": "node scripts/scheduled-article-flow.mjs",
     "resubmit:post": "node scripts/resubmit-post.mjs",
     "status:content": "node scripts/status-content.mjs",
-    "status:publish-ready": "node scripts/validate-publish-ready.mjs || true"
+    "status:publish-ready": "node scripts/validate-publish-ready.mjs || true",
+    "ops:mwf:install": "node scripts/setup-launchd-mwf.mjs --install",
+    "ops:mwf:uninstall": "node scripts/setup-launchd-mwf.mjs --uninstall",
+    "ops:mwf:status": "node scripts/setup-launchd-mwf.mjs --status"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
