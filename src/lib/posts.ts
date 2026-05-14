@@ -95,6 +95,7 @@ export type PendingReviewPost = {
   category: string;
   aiGenerated: boolean;
   excerpt: string;
+  contentHtml: string;
   rejectionReason?: string;
 };
 
@@ -103,33 +104,41 @@ function toDateString(val: unknown): string {
   return String(val ?? '');
 }
 
-/** reviewed !== true の記事をすべて返す（Human review 待ち一覧用）。本文は含まない。 */
-export function getPendingReviewPosts(): PendingReviewPost[] {
+/** reviewed !== true の記事をすべて返す（Human review 待ち一覧用）。本文 HTML を含む。 */
+export async function getPendingReviewPosts(): Promise<PendingReviewPost[]> {
   if (!fs.existsSync(POSTS_DIR)) return [];
 
-  return fs
-    .readdirSync(POSTS_DIR)
-    .filter((f) => f.endsWith('.md'))
-    .filter((fileName) => {
-      const { data } = matter(fs.readFileSync(path.join(POSTS_DIR, fileName), 'utf8'));
-      return data['reviewed'] !== true;
-    })
-    .map((fileName): PendingReviewPost => {
-      const slug = fileName.replace(/\.md$/, '');
-      const { data } = matter(fs.readFileSync(path.join(POSTS_DIR, fileName), 'utf8'));
+  const fileNames = fs.readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'));
+
+  const results = await Promise.all(
+    fileNames.map(async (fileName): Promise<PendingReviewPost | null> => {
+      const fullPath = path.join(POSTS_DIR, fileName);
+      const { data, content } = matter(fs.readFileSync(fullPath, 'utf8'));
+
+      if (data['reviewed'] === true) return null;
+
+      const processed = await remark()
+        .use(remarkHtml, { sanitize: true })
+        .process(content);
+
       const publishAtRaw = data['publish_at'];
       return {
-        slug,
+        slug:            fileName.replace(/\.md$/, ''),
         title:           String(data['title'] ?? '（タイトル未設定）'),
         date:            toDateString(data['date']),
         publishAt:       publishAtRaw ? toDateString(publishAtRaw) : undefined,
         category:        String(data['category'] ?? '未分類'),
         aiGenerated:     data['ai_generated'] === true,
         excerpt:         String(data['excerpt'] ?? data['description'] ?? ''),
+        contentHtml:     processed.toString(),
         rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
       };
-    })
-    .sort((a, b) => (a.date < b.date ? 1 : -1));
+    }),
+  );
+
+  return (results.filter(Boolean) as PendingReviewPost[]).sort((a, b) =>
+    a.date < b.date ? 1 : -1,
+  );
 }
 
 // contentHtml は remark-html(sanitize:true) で処理済みの信頼済みHTML。

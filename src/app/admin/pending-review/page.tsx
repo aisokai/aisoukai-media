@@ -3,6 +3,7 @@ import { getPendingReviewPosts } from '@/lib/posts'
 import { getRecentReviewLog } from '@/lib/reviewLog'
 import { NOINDEX_METADATA } from '@/lib/seo'
 import CopyButton from './CopyButton'
+import PostBodyPreview from './PostBodyPreview'
 
 export const metadata: Metadata = {
   title: 'Pending Review | Admin',
@@ -13,9 +14,9 @@ function formatLogDatetime(datetime: string) {
   return datetime.slice(0, 19).replace('T', ' ')
 }
 
-export default function PendingReviewPage() {
+export default async function PendingReviewPage() {
   const today = new Date().toISOString().slice(0, 10)
-  const allPosts = getPendingReviewPosts()
+  const allPosts = await getPendingReviewPosts()
   const pending = allPosts.filter((p) => !p.rejectionReason)
   const rejected = allPosts.filter((p) =>  p.rejectionReason)
   const recentLog = getRecentReviewLog(8)
@@ -123,6 +124,11 @@ export default function PendingReviewPage() {
                   {/* excerpt */}
                   {post.excerpt && (
                     <p className="mt-3 line-clamp-2 text-sm text-gray-500">{post.excerpt}</p>
+                  )}
+
+                  {/* 本文プレビュー */}
+                  {post.contentHtml && (
+                    <PostBodyPreview contentHtml={post.contentHtml} />
                   )}
 
                   {/* メタ情報 */}
