@@ -41,6 +41,7 @@ import { spawnSync } from 'node:child_process'
 import matter from 'gray-matter'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
+import { buildSafeTemplateThemePrompt, classifyTelegramMessage } from './telegram-request-routing.mjs'
 
 const __dirname      = dirname(fileURLToPath(import.meta.url))
 const ROOT           = join(__dirname, '..')
@@ -262,46 +263,8 @@ function makeSlug(text) {
 }
 
 // ── メッセージ解析 ────────────────────────────────────────────────────────
-// 評価順の保証:
-//   1. approve / reject  — \b で単語境界を確認し、後続文字に依らず必ず先に評価
-//   2. 日本語コマンド    — 長さ制限より前に評価
-//   3. 禁止コマンド
-//   4. 記事リクエスト   — 上記に該当しなかったものだけがここに到達する
-
 function parseMessage(text) {
-  const t = text.trim()
-
-  // ─ approve / reject ──────────────────────────────────────────────────────
-  // /^approve\b/i: "approve" が単語として完結しているメッセージを漏れなく捕捉する。
-  // スペース区切りに限らず、後続文字（改行・カンマ等）があっても
-  // request ハンドラーには絶対に到達しない。
-  if (/^approve\b/i.test(t)) {
-    const m = t.match(/^approve\s+(\S+)(?:\s+by\s*(.+))?$/i)
-    if (m) return { type: 'approve', slug: m[1].trim(), reviewedBy: m[2]?.trim() ?? '' }
-    return { type: 'skip', reason: 'approve 形式不正（書式: approve <slug> [by <名前>]）' }
-  }
-
-  if (/^reject\b/i.test(t)) {
-    const m = t.match(/^reject\s+(\S+)(?:\s+(.+))?$/i)
-    if (m) return { type: 'reject', slug: m[1].trim(), reason: m[2]?.trim() ?? '' }
-    return { type: 'skip', reason: 'reject 形式不正（書式: reject <slug> [<理由>]）' }
-  }
-
-  // ─ 日本語コマンド（length 制限より前に評価する）────────────────────────
-  if (/^(承認|OK|投稿|公開|これで|これでOK)\s*$/i.test(t)) return { type: 'jp_approve' }
-  if (/^(差し戻し|修正|NG|やり直し)\s*$/i.test(t))         return { type: 'jp_reject'  }
-
-  // ─ 禁止コマンド ──────────────────────────────────────────────────────────
-  if (/^publish\b/i.test(t)) return { type: 'skip', reason: 'publish コマンドは Telegram から禁止' }
-  if (/^push\b/i.test(t))    return { type: 'skip', reason: 'push コマンドは Telegram から禁止' }
-  if (/^deploy\b/i.test(t))  return { type: 'skip', reason: 'deploy コマンドは禁止' }
-  if (/^\/[a-z]/i.test(t))   return { type: 'skip', reason: 'Bot コマンド（/ 始まり）' }
-  if (/npm run/i.test(t))    return { type: 'skip', reason: 'npm run コマンド' }
-
-  // ─ 記事リクエスト ─────────────────────────────────────────────────────────
-  if (t.length < 8) return { type: 'skip', reason: '短すぎます（8文字未満）' }
-
-  return { type: 'request', text: t }
+  return classifyTelegramMessage(text)
 }
 
 // ── 承認フロー ────────────────────────────────────────────────────────────
@@ -365,15 +328,17 @@ function rejectPost(slug, reason) {
 
 // ── 下書き生成フロー（AI本文生成付き） ───────────────────────────────────
 
-async function generateDraft(requestText, updateId, fromUser) {
+async function generateDraft(requestText, updateId, fromUser, requestMode = 'freeform') {
   const store    = loadRequests()
   const date     = getTodayJst()
-  const category = detectCategory(requestText)
   const now      = getJstTimestamp()
   const apiKey   = process.env.ANTHROPIC_API_KEY
+  const isTemplateRequest = requestMode === 'template'
 
   // AI タイトル + 本文生成（ANTHROPIC_API_KEY がある場合）
-  let title       = requestText.slice(0, 60).trim()
+  let selectedTheme = requestText
+  let category      = detectCategory(selectedTheme)
+  let title         = selectedTheme.slice(0, 60).trim()
   let bodyContent = null
   let aiUsed      = false
 
@@ -381,16 +346,37 @@ async function generateDraft(requestText, updateId, fromUser) {
     try {
       const client = new Anthropic({ apiKey })
 
+      if (isTemplateRequest) {
+        const themePrompt = buildSafeTemplateThemePrompt(requestText)
+        const themeResp = await client.messages.create({
+          model:      'claude-haiku-4-5-20251001',
+          max_tokens: 100,
+          messages:   [{ role: 'user', content: themePrompt }],
+        })
+        const aiTheme = themeResp.content[0]?.type === 'text' ? themeResp.content[0].text.trim() : ''
+        if (aiTheme) {
+          selectedTheme = aiTheme.replace(/^[-*•\s]+/, '').replace(/^テーマ[:：]\s*/u, '').trim()
+          category = detectCategory(selectedTheme)
+          title = selectedTheme.slice(0, 60)
+        } else {
+          selectedTheme = '定期検診の受診目安'
+          category = detectCategory(selectedTheme)
+          title = selectedTheme
+        }
+      }
+
       // タイトル生成（haiku: 軽量 1 call）
       const titlePrompt = [
         'あなたは歯科医院の医療情報ライターです。',
-        '以下の依頼内容から、患者向けブログ記事のタイトルを1行だけ生成してください。',
+        isTemplateRequest
+          ? '以下のテーマから、患者向けブログ記事のタイトルを1行だけ生成してください。'
+          : '以下の依頼内容から、患者向けブログ記事のタイトルを1行だけ生成してください。',
         '・60文字以内',
         '・具体的で検索されやすいタイトル',
         '・断定・保証表現（「必ず」「確実に」等）は使わない',
         '・タイトルのみ出力すること（前置き・説明不要）',
         '',
-        `依頼: ${requestText}`,
+        isTemplateRequest ? `テーマ: ${selectedTheme}` : `依頼: ${requestText}`,
       ].join('\n')
       const titleResp = await client.messages.create({
         model:      'claude-haiku-4-5-20251001',
@@ -401,13 +387,14 @@ async function generateDraft(requestText, updateId, fromUser) {
       if (aiTitle) title = aiTitle.slice(0, 60)
 
       // 本文生成（buildArticlePrompt を再利用）
+      const topicText = isTemplateRequest ? selectedTheme : requestText
       const bodyPrompt = buildArticlePrompt({
         title,
         category,
-        keyword:     requestText.slice(0, 50),
-        intent:      requestText,
+        keyword:     topicText.slice(0, 50),
+        intent:      topicText,
         medicalRisk: 'medium',
-        topic:       requestText,
+        topic:       topicText,
       })
       const bodyResp = await client.messages.create({
         model:      'claude-haiku-4-5-20251001',
@@ -461,6 +448,7 @@ async function generateDraft(requestText, updateId, fromUser) {
     draft:               false,
     image:               '',
     ai_generated:        aiUsed,
+    request_mode:        requestMode,
     source_request_id:   String(updateId),
     source_request_text: requestText.slice(0, 80),
   }
@@ -1042,8 +1030,8 @@ async function main() {
       }
 
       try {
-        const result = await generateDraft(parsed.text, upd.update_id, fromUser)
-        console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}`)
+        const result = await generateDraft(parsed.text, upd.update_id, fromUser, parsed.requestMode)
+        console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}${parsed.requestMode === 'template' ? ' / template' : ''}`)
 
         // chat_id ごとに pending slug をリストに追加（日本語承認コマンドで参照）
         const draftChatId = msgChatId || defaultChatId || ''

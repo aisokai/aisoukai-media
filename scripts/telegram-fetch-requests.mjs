@@ -8,6 +8,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { classifyTelegramMessage } from './telegram-request-routing.mjs'
 
 const __dirname   = dirname(fileURLToPath(import.meta.url))
 const ROOT        = join(__dirname, '..')
@@ -37,25 +38,6 @@ function loadRequests() {
   } catch {
     return { last_update_id: 0, requests: [] }
   }
-}
-
-// approve/publish 系・コマンド・短すぎるメッセージを除外する
-// 戻り値: null = 記事リクエストとして採用 / string = スキップ理由
-function getSkipReason(text) {
-  if (!text || text.trim().length < 8) return 'テキストが短すぎます（8文字未満）'
-  const t = text.trim()
-  if (/^approve/i.test(t))  return 'approve コマンドのため除外（Telegram からの approve 禁止）'
-  if (/^reject/i.test(t))   return 'reject コマンドのため除外'
-  if (/^publish/i.test(t))  return 'publish コマンドのため除外（Telegram からの publish 禁止）'
-  if (/^push/i.test(t))     return 'push コマンドのため除外'
-  if (/^deploy/i.test(t))   return 'deploy コマンドのため除外'
-  if (/^\/[a-z]/i.test(t))  return 'Bot コマンド（/ 始まり）のため除外'
-  if (/npm run/i.test(t))   return 'npm run コマンドのため除外'
-  return null
-}
-
-function isArticleRequest(text) {
-  return getSkipReason(text) === null
 }
 
 async function fetchUpdates(botToken, offset) {
@@ -113,10 +95,21 @@ async function main() {
     if (!msg?.text) continue
     if (chatId && String(msg.chat?.id) !== String(chatId) && String(msg.from?.id) !== String(chatId)) continue
     if (knownIds.has(upd.update_id)) continue
-    const skipReason = getSkipReason(msg.text)
-    if (skipReason !== null) {
+    const parsed = classifyTelegramMessage(msg.text)
+    if (parsed.type !== 'request') {
+      const reason = parsed.type === 'skip'
+        ? parsed.reason
+        : parsed.type === 'approve'
+          ? 'approve コマンドのため除外（Telegram からの approve 禁止）'
+          : parsed.type === 'reject'
+            ? 'reject コマンドのため除外'
+            : parsed.type === 'jp_approve'
+              ? '承認コマンドのため除外'
+              : parsed.type === 'jp_reject'
+                ? '差し戻しコマンドのため除外'
+                : '記事リクエスト以外のため除外'
       console.log(`  ⏭ スキップ [${upd.update_id}]: "${msg.text.slice(0, 35)}"`)
-      console.log(`           理由: ${skipReason}`)
+      console.log(`           理由: ${reason}`)
       continue
     }
 
