@@ -362,6 +362,22 @@ npm run request:list                   # リクエスト一覧を表示
 - 受信した記事リクエストから直接 approve / publish はしない
 - launchd 自動化対応: `npm run ops:mwf:install` で月水金 08:30 に自動実行できる
 
+### 暫定Laptop運用（`telegram:ops` の 3 分おき再実行）
+
+Wi-Fi 切断や一時的な API 失敗後も、復帰時に Telegram 処理を再開できるようにする暫定運用。
+
+```bash
+npm run telegram:ops:install    # launchd に登録（3分おきに自動実行）
+npm run telegram:ops:status     # 登録状態・ログ保存先を確認
+npm run telegram:ops:uninstall  # 解除
+```
+
+- 実行間隔: 3分おき
+- 実行コマンド: `cd ~/Desktop/aisoukai-media && npm run telegram:ops -- --apply --build`
+- ログ: `logs/telegram-ops.log`
+- エラーログ: `logs/telegram-ops-error.log`
+- Wi-Fi 切断や API 失敗時はエラー終了してよい。次回実行で再取得する
+
 ### Telegram リクエスト → 下書きライフサイクル
 
 Telegram から受信した記事リクエストを下書き記事に変換するフロー。

@@ -47,3 +47,7 @@ public/images/library/inbox/
 
 # Telegram runtime session state (volatile, not version-controlled)
 data/telegram-session.json
+
+# Telegram launchd runtime logs
+logs/telegram-ops.log
+logs/telegram-ops-error.log
