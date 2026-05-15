@@ -50,6 +50,64 @@ const REQUESTS_PATH  = join(ROOT, 'data', 'article-requests.json')
 const SESSION_PATH   = join(ROOT, 'data', 'telegram-session.json')
 const LOGS_DIR       = join(ROOT, 'logs')
 const LOG_PATH       = join(LOGS_DIR, 'review-history.md')
+const LIBRARY_PATH   = join(ROOT, 'data', 'image-library.json')
+
+// 記事カテゴリ（日本語）→ image-library category（英語）
+const ARTICLE_CAT_TO_LIB_CAT = {
+  '虫歯治療':    'cavity',
+  '歯周病治療':  'general',
+  '根管治療':    'general',
+  '親知らず':    'general',
+  '予防歯科':    'preventive',
+  'インプラント': 'implant',
+  '小児歯科':    'pediatric',
+  'お知らせ':    'announcement',
+}
+
+// ── 画像自動割当ユーティリティ ────────────────────────────────────────────
+
+function tokenize(text) {
+  const set = new Set()
+  const str = String(text ?? '')
+  for (const token of str.split(/[\s、。・「」【】（）()[\]：:,，！？!?]+/)) {
+    if (token.length >= 2) set.add(token)
+  }
+  for (const w of (str.toLowerCase().match(/[a-z0-9]{2,}/g) ?? [])) {
+    set.add(w)
+  }
+  return set
+}
+
+function scoreImage(image, articleTokens) {
+  let score = 0
+  for (const tag of image.tags ?? []) {
+    if (articleTokens.has(tag)) { score += 2; continue }
+    for (const token of articleTokens) {
+      if (tag.includes(token) || token.includes(tag)) { score += 0.5; break }
+    }
+  }
+  return score
+}
+
+// 最適な画像エントリを返す。候補なしなら null
+function findBestImage({ images, title, category, excerpt, bodyContent }) {
+  if (!images || images.length === 0) return null
+
+  const articleText = [title, category, excerpt ?? '', bodyContent?.slice(0, 300) ?? ''].join(' ')
+  const tokens = tokenize(articleText)
+
+  const best = images
+    .map((img) => ({ img, score: scoreImage(img, tokens) }))
+    .sort((a, b) => b.score - a.score)[0]
+
+  if (best && best.score > 0) return best.img
+
+  // カテゴリ fallback
+  const libCat = ARTICLE_CAT_TO_LIB_CAT[category] ?? 'general'
+  return images.find((img) => img.category === libCat)
+    ?? images.find((img) => img.category === 'general')
+    ?? null
+}
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
 
@@ -532,6 +590,31 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
     ? `${title}についてお知らせします。`
     : `${title}について、原因・受診目安・注意点を整理します。`
 
+  // ── 画像自動割当 ─────────────────────────────────────────────────────────
+  let assignedImageId   = ''
+  let assignedImagePath = ''
+  let assignedImageAlt  = ''
+
+  if (existsSync(LIBRARY_PATH)) {
+    try {
+      const lib = JSON.parse(readFileSync(LIBRARY_PATH, 'utf8'))
+      const best = findBestImage({
+        images:      lib.images ?? [],
+        title,
+        category,
+        excerpt,
+        bodyContent,
+      })
+      if (best) {
+        assignedImageId   = best.id
+        assignedImagePath = best.path
+        assignedImageAlt  = best.alt
+      }
+    } catch (e) {
+      console.log(`    ⚠️ 画像自動割当スキップ（ライブラリ読込エラー）: ${e.message}`)
+    }
+  }
+
   // frontmatter 組み立て
   const frontmatter = {
     title,
@@ -543,7 +626,8 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
     author:              '藍想会メディア編集部',
     reviewed:            false,
     draft:               false,
-    image:               '',
+    image:               assignedImagePath,
+    image_alt:           assignedImageAlt,
     ai_generated:        aiUsed,
     request_mode:        requestMode,
     source_request_id:   String(updateId),
@@ -580,7 +664,7 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
   ]
   saveRequests(store)
 
-  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed }
+  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed, assignedImageId }
 }
 
 // ── プロセス実行ユーティリティ ────────────────────────────────────────────
@@ -1194,6 +1278,8 @@ async function main() {
               replyText = [
                 `📝 ${result.title}`,
                 ``,
+                ...(result.assignedImageId ? [`🖼 割当画像: ${result.assignedImageId}`] : [`🖼 画像: 未割当（手動で設定してください）`]),
+                ``,
                 `下書きを確認する`,
                 ...(reviewUrl ? [reviewUrl] : []),
                 ``,
@@ -1204,6 +1290,8 @@ async function main() {
             // --build なし: ローカル生成のみ、通知だけ送る
             replyText = [
               `📝 ${result.title}`,
+              ``,
+              ...(result.assignedImageId ? [`🖼 割当画像: ${result.assignedImageId}`] : [`🖼 画像: 未割当（手動で設定してください）`]),
               ``,
               `下書きを確認する`,
               ...(reviewUrl ? [reviewUrl] : []),
