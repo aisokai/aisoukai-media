@@ -38,7 +38,12 @@ function isUnclearedLicense(img) {
 
 function main() {
   const argv  = process.argv.slice(2)
-  const showAll = argv.includes('--all')
+  const showAll   = argv.includes('--all')
+  const catIdx    = argv.indexOf('--category')
+  const catFilter = catIdx >= 0 ? argv[catIdx + 1] ?? null : null
+
+  const BAR = '═'.repeat(62)
+  const DIV = '─'.repeat(62)
 
   if (!existsSync(LIBRARY_PATH)) {
     console.error('エラー: data/image-library.json が見つかりません')
@@ -70,6 +75,31 @@ function main() {
     } catch { /* 読み取り失敗は無視 */ }
   }
 
+  // ── --category フィルタ（指定時は詳細一覧のみ表示して終了）──────────────
+  if (catFilter) {
+    const filtered = images.filter((img) => img.category === catFilter)
+    console.log()
+    if (filtered.length === 0) {
+      const available = [...new Set(images.map((i) => i.category))].sort().join(' / ')
+      console.log(`  カテゴリ「${catFilter}」の画像は見つかりません。`)
+      console.log(`  利用可能カテゴリ: ${available}`)
+      console.log(BAR)
+      return
+    }
+    console.log(`カテゴリ「${catFilter}」の画像（${filtered.length} 件）:`)
+    console.log(DIV)
+    for (const img of filtered) {
+      const usedStr = usedPaths.has(img.path) ? '✅ 使用中' : '　 未使用'
+      console.log(`[${img.id}]  ${usedStr}`)
+      console.log(`  alt  : ${img.alt ?? '（未設定）'}`)
+      console.log(`  tags : ${(img.tags ?? []).join(' / ')}`)
+      console.log(`  path : ${img.path}`)
+      console.log()
+    }
+    console.log(BAR)
+    return
+  }
+
   // 集計
   const categoryCount = {}
   for (const img of images) {
@@ -83,8 +113,6 @@ function main() {
   const generalImages = images.filter((img) => img.category === 'general')
 
   const LIMIT = showAll ? Infinity : 10
-  const BAR = '═'.repeat(62)
-  const DIV = '─'.repeat(62)
 
   console.log(BAR)
   console.log('  image:list — 画像ライブラリ サマリー')
@@ -173,6 +201,11 @@ function main() {
     console.log()
   }
 
+  console.log('カテゴリ別詳細を確認するには:')
+  console.log('  npm run image:list -- --category <cat>')
+  const availCats = Object.keys(categoryCount).sort().join(' / ')
+  console.log(`  カテゴリ: ${availCats}`)
+  console.log()
   console.log(BAR)
 }
 
