@@ -6,6 +6,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
+import { tokenize, scoreImage, feedbackAdjustment, loadFeedback } from './lib/image-scoring.mjs'
 
 const __dirname    = dirname(fileURLToPath(import.meta.url))
 const ROOT         = join(__dirname, '..')
@@ -24,43 +25,6 @@ function parseArgs(argv) {
     }
   }
   return args
-}
-
-// 記事テキストをトークン集合に変換（タグ単位 + 2文字以上の日本語連続）
-function tokenize(text) {
-  const set = new Set()
-  const str = String(text ?? '')
-
-  // 区切り文字で分割したトークン（タグそのまま）
-  for (const token of str.split(/[\s、。・「」【】（）()[\]：:,，！？!?]+/)) {
-    if (token.length >= 2) set.add(token)
-  }
-
-  // ASCII 単語（英数字）
-  for (const w of (str.toLowerCase().match(/[a-z0-9]{2,}/g) ?? [])) {
-    set.add(w)
-  }
-
-  return set
-}
-
-function scoreImage(image, articleTokens) {
-  let score = 0
-  for (const tag of image.tags ?? []) {
-    // 完全一致
-    if (articleTokens.has(tag)) {
-      score += 2
-      continue
-    }
-    // 部分一致（タグが記事トークンに含まれる or 記事トークンがタグに含まれる）
-    for (const token of articleTokens) {
-      if (tag.includes(token) || token.includes(tag)) {
-        score += 0.5
-        break
-      }
-    }
-  }
-  return score
 }
 
 function main() {
@@ -95,22 +59,23 @@ function main() {
   }
 
   const { data, content } = matter(readFileSync(filePath, 'utf8'))
-  const images = library.images ?? []
+  const images            = library.images ?? []
+  const feedback          = loadFeedback()
 
   const BAR = '━'.repeat(58)
   const DIV = '─'.repeat(58)
   console.log(BAR)
-  console.log(`画像候補提示`)
+  console.log(`画像候補提示（フィードバック反映）`)
   console.log(BAR)
-  console.log(`  slug     : ${slugInput}`)
-  console.log(`  タイトル : ${String(data.title ?? '').slice(0, 48)}`)
-  console.log(`  カテゴリ : ${data.category ?? ''}`)
-  console.log(`  ライブラリ: ${images.length} 件`)
+  console.log(`  slug       : ${slugInput}`)
+  console.log(`  タイトル   : ${String(data.title ?? '').slice(0, 48)}`)
+  console.log(`  カテゴリ   : ${data.category ?? ''}`)
+  console.log(`  ライブラリ : ${images.length} 件`)
+  console.log(`  フィードバック: ${feedback.length} 件`)
   console.log()
 
   if (images.length === 0) {
     console.log('  ライブラリに画像が登録されていません。')
-    console.log('  data/image-library.json に画像メタデータを追加してから再実行してください。')
     console.log(BAR)
     return
   }
@@ -135,13 +100,19 @@ function main() {
     } catch {}
   }
 
-  // スコアリング・ソート・上位5件（既使用画像を後順に）
+  // スコアリング（ベース + フィードバック調整）・ソート・上位5件
   const scored = images
-    .map((img) => ({
-      img,
-      score:       scoreImage(img, articleTokens),
-      alreadyUsed: usedImages.has(img.id),
-    }))
+    .map((img) => {
+      const base = scoreImage(img, articleTokens)
+      const adj  = feedbackAdjustment(img.id, data.category ?? '', articleTokens, feedback)
+      return {
+        img,
+        score:       base + adj,
+        base,
+        adj,
+        alreadyUsed: usedImages.has(img.id),
+      }
+    })
     .sort((a, b) => {
       if (a.alreadyUsed !== b.alreadyUsed) return a.alreadyUsed ? 1 : -1
       return b.score - a.score
@@ -164,13 +135,15 @@ function main() {
   console.log(`画像候補 (${candidates.length} 件):`)
   console.log(DIV)
 
-  for (const [i, { img, score, alreadyUsed }] of candidates.entries()) {
-    console.log(`${i + 1}. [${img.id}]  スコア: ${score.toFixed(1)}${alreadyUsed ? '  ⚠️ 他記事で使用中' : ''}`)
+  for (const [i, { img, score, base, adj, alreadyUsed }] of candidates.entries()) {
+    const adjStr = adj !== 0 ? ` (ベース ${base.toFixed(1)} ${adj >= 0 ? '+' : ''}${adj.toFixed(1)} FB)` : ''
+    console.log(`${i + 1}. [${img.id}]  スコア: ${score.toFixed(1)}${adjStr}${alreadyUsed ? '  ⚠️ 他記事で使用中' : ''}`)
     console.log(`   path    : ${img.path}`)
     console.log(`   alt     : ${img.alt}`)
     console.log(`   tags    : ${(img.tags ?? []).join(' / ')}`)
     console.log(`   source  : ${img.license_source ?? ''}`)
     console.log(`   割当    : npm run image:assign -- ${slugInput} --image ${img.id}`)
+    console.log(`   FB記録  : npm run image:feedback -- ${slugInput} --image ${img.id} --action approve|reject`)
     if (i < candidates.length - 1) console.log()
   }
 
