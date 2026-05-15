@@ -2,7 +2,7 @@
 // image-suggest.mjs
 // 記事 slug に合った画像候補を image-library.json から提示する CLI。
 // 読み取り専用。ファイルは変更しない。
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
@@ -124,10 +124,28 @@ function main() {
   ].join(' ')
   const articleTokens = tokenize(articleText)
 
-  // スコアリング・ソート・上位5件
+  // 他記事で使用中の画像IDを収集（対象記事自身はスキップ）
+  const usedImages = new Set()
+  for (const pf of readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'))) {
+    if (pf === filename) continue
+    try {
+      const { data: pd } = matter(readFileSync(join(POSTS_DIR, pf), 'utf8'))
+      const imgId = images.find((img) => img.path === pd.image)?.id
+      if (imgId) usedImages.add(imgId)
+    } catch {}
+  }
+
+  // スコアリング・ソート・上位5件（既使用画像を後順に）
   const scored = images
-    .map((img) => ({ img, score: scoreImage(img, articleTokens) }))
-    .sort((a, b) => b.score - a.score)
+    .map((img) => ({
+      img,
+      score:       scoreImage(img, articleTokens),
+      alreadyUsed: usedImages.has(img.id),
+    }))
+    .sort((a, b) => {
+      if (a.alreadyUsed !== b.alreadyUsed) return a.alreadyUsed ? 1 : -1
+      return b.score - a.score
+    })
     .slice(0, 5)
 
   const candidates = scored.filter(({ score }) => score > 0)
@@ -146,8 +164,8 @@ function main() {
   console.log(`画像候補 (${candidates.length} 件):`)
   console.log(DIV)
 
-  for (const [i, { img, score }] of candidates.entries()) {
-    console.log(`${i + 1}. [${img.id}]  スコア: ${score.toFixed(1)}`)
+  for (const [i, { img, score, alreadyUsed }] of candidates.entries()) {
+    console.log(`${i + 1}. [${img.id}]  スコア: ${score.toFixed(1)}${alreadyUsed ? '  ⚠️ 他記事で使用中' : ''}`)
     console.log(`   path    : ${img.path}`)
     console.log(`   alt     : ${img.alt}`)
     console.log(`   tags    : ${(img.tags ?? []).join(' / ')}`)

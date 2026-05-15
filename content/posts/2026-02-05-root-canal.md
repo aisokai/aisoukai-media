@@ -9,11 +9,11 @@ tags:
   - 歯の保存
 author: 藍想会メディア編集部
 reviewed: true
-image: /images/library/preventive/preventive-33802476.jpg
+image: /images/library/cavity/cavity-34431026.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
-image_alt: 歯科医師がパノラマX線画像の前で患者に説明しているイメージ
+image_alt: ゴールドクラウンと歯科技工ケースのイメージ
 ---
 
 ## 根管治療とはどんな処置か

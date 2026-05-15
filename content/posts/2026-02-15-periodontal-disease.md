@@ -9,11 +9,11 @@ tags:
   - 予防
 author: 藍想会メディア編集部
 reviewed: true
-image: /images/library/preventive/preventive-33802469.jpg
+image: /images/library/preventive/preventive-34130816.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
-image_alt: 歯科医師がクリップボードで患者に診察内容を説明しているイメージ
+image_alt: ピンク制服の歯科スタッフが歯の模型を持って説明するイメージ
 ---
 
 ## 歯周病とはどのような病気か

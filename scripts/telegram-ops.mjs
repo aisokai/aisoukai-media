@@ -90,23 +90,27 @@ function scoreImage(image, articleTokens) {
 }
 
 // 最適な画像エントリを返す。候補なしなら null
-function findBestImage({ images, title, category, excerpt, bodyContent }) {
+function findBestImage({ images, title, category, excerpt, bodyContent, usedImages = new Set() }) {
   if (!images || images.length === 0) return null
-
   const articleText = [title, category, excerpt ?? '', bodyContent?.slice(0, 300) ?? ''].join(' ')
   const tokens = tokenize(articleText)
-
-  const best = images
-    .map((img) => ({ img, score: scoreImage(img, tokens) }))
-    .sort((a, b) => b.score - a.score)[0]
-
+  const scored = images
+    .map((img) => ({
+      img,
+      score: scoreImage(img, tokens) + (usedImages.has(img.id) ? -1000 : 0),
+    }))
+    .sort((a, b) => b.score - a.score)
+  const best = scored[0]
   if (best && best.score > 0) return best.img
-
-  // カテゴリ fallback
+  // カテゴリ fallback（未使用優先、不足時は使用済みも許容）
   const libCat = ARTICLE_CAT_TO_LIB_CAT[category] ?? 'general'
-  return images.find((img) => img.category === libCat)
-    ?? images.find((img) => img.category === 'general')
-    ?? null
+  return (
+    images.find((img) => img.category === libCat   && !usedImages.has(img.id)) ??
+    images.find((img) => img.category === 'general' && !usedImages.has(img.id)) ??
+    images.find((img) => img.category === libCat) ??
+    images.find((img) => img.category === 'general') ??
+    null
+  )
 }
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
@@ -598,12 +602,24 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
   if (existsSync(LIBRARY_PATH)) {
     try {
       const lib = JSON.parse(readFileSync(LIBRARY_PATH, 'utf8'))
+
+      // 既存記事で使用中の画像IDを収集（重複割当を避ける）
+      const usedImages = new Set()
+      for (const f of readdirSync(POSTS_DIR).filter((fn) => fn.endsWith('.md'))) {
+        try {
+          const { data: pd } = matter(readFileSync(join(POSTS_DIR, f), 'utf8'))
+          const imgId = (lib.images ?? []).find((img) => img.path === pd.image)?.id
+          if (imgId) usedImages.add(imgId)
+        } catch {}
+      }
+
       const best = findBestImage({
         images:      lib.images ?? [],
         title,
         category,
         excerpt,
         bodyContent,
+        usedImages,
       })
       if (best) {
         assignedImageId   = best.id

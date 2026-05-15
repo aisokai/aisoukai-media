@@ -9,11 +9,11 @@ tags:
   - 口腔外科
 author: 藍想会メディア編集部
 reviewed: true
-image: /images/library/preventive/preventive-33802476.jpg
+image: /images/library/general/general-34430968.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
-image_alt: 歯科医師がパノラマX線画像の前で患者に説明しているイメージ
+image_alt: 歯科用切削・研磨バーセットがケースに収納されたイメージ
 ---
 
 ## 親知らずとは
