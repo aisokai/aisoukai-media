@@ -743,7 +743,7 @@ async function runDraftPipeline({ slug }) {
   // ─ 2. git add（draft ファイル + data ファイルのみ）────────────────────────
 
   const relPost = `content/posts/${slug}.md`
-  const addTargets = [relPost, 'data/article-requests.json', 'data/telegram-session.json']
+  const addTargets = [relPost, 'data/article-requests.json']
     .filter((p) => existsSync(join(ROOT, p)))
   const addR = runGit(['add', ...addTargets])
   steps.push({ name: 'git add', ok: addR.ok, output: addR.output })
