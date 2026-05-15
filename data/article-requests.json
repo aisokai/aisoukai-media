@@ -1,5 +1,5 @@
 {
-  "last_update_id": 145026183,
+  "last_update_id": 145026185,
   "requests": [
     {
       "update_id": 145026172,
@@ -124,6 +124,26 @@
           "action": "drafted",
           "at": "2026-05-14T23:14:56.098+09:00",
           "draft_slug": "2026-05-14-req-145026183"
+        }
+      ]
+    },
+    {
+      "update_id": 145026184,
+      "from": "カエルス",
+      "text": "ブログ書いて",
+      "received_at": "2026-05-15T15:50:43.900+09:00",
+      "status": "drafted",
+      "status_updated_at": "2026-05-15T15:50:43.900+09:00",
+      "draft_slug": "2026-05-15-req-145026184",
+      "history": [
+        {
+          "action": "received",
+          "at": "2026-05-15T15:50:43.900+09:00"
+        },
+        {
+          "action": "drafted",
+          "at": "2026-05-15T15:50:43.900+09:00",
+          "draft_slug": "2026-05-15-req-145026184"
         }
       ]
     }

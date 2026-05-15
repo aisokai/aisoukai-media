@@ -51,3 +51,4 @@ data/telegram-session.json
 # Telegram launchd runtime logs
 logs/telegram-ops.log
 logs/telegram-ops-error.log
+logs/*.log
