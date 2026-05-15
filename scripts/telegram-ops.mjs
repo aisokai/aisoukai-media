@@ -4,11 +4,11 @@
 // Human がトリガーする。AI が自動実行してはならない。
 //
 // メッセージ種別:
-//   "承認" / "OK" / "投稿" 等     → 直近 pending slug を承認（TELEGRAM_ALLOWED_CHAT_IDS のみ有効）
+//   "承認" / "OK" / "投稿" 等     → 最新 pending slug を承認（複数あっても最後追加分を自動採用）
 //   "差し戻し" / "修正" / "NG" 等 → 直近 pending slug を差し戻し（同上）
-//   "approve <slug> [by <名前>]"  → 明示スラグ承認（互換維持）
+//   "approve <slug> [by <名前>]"  → 明示スラグ承認（直近以外を承認したい場合）
 //   "reject <slug> <理由>"        → 明示スラグ差し戻し（互換維持）
-//   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成 + pending_slug 保存
+//   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成（pending が複数でも新規作成）
 //   publish / push / deploy 等     → スキップ
 //
 // フラグ:
@@ -684,37 +684,13 @@ function formatPipelineReply(result, opts = {}) {
 
 // 日本語承認フロー用（formatPipelineReply と同じ opts インタフェース）
 function formatJpApproveReply(result, opts = {}) {
-  const { verbose = false, siteUrl = null } = opts
+  const { siteUrl = null } = opts
   if (!result.ok) return formatPipelineReply(result, opts)
 
-  // push 成功 + 非 verbose → 最短通知
-  if (result.pushed && !verbose) {
-    const blogUrl = siteUrl ? `${siteUrl}/blog/${result.slug}` : result.slug
-    return `✅ 投稿完了\n🔗 ${blogUrl}`
+  if (result.pushed && siteUrl) {
+    return `直近の下書きを承認しました\n🔗 ${siteUrl}/blog/${result.slug}`
   }
-
-  const stepLines = result.steps.map((s) => `${s.ok ? '✅' : '❌'} ${s.name}`)
-
-  if (result.pushed) {
-    const lines = [
-      `✅ 承認・build・push が完了しました。`,
-      ``,
-      `スラグ: ${result.slug}`,
-      ``,
-      ...stepLines,
-    ]
-    if (siteUrl) lines.push(``, `🔗 ${siteUrl}/blog/${result.slug}`)
-    return lines.join('\n')
-  }
-
-  return [
-    `✅ 承認・validate が完了しました。`,
-    `（build/push は --build フラグで有効化されます）`,
-    ``,
-    `スラグ: ${result.slug}`,
-    ``,
-    ...stepLines,
-  ].join('\n')
+  return `直近の下書きを承認しました`
 }
 
 // ── メイン ────────────────────────────────────────────────────────────────
@@ -826,31 +802,15 @@ async function main() {
           if (!dryRun) {
             await sendTelegram(
               botToken, msgChatId || defaultChatId,
-              `⚠️ 承認待ちの下書きが見つかりません。\n「approve <スラグ> by <名前>」で明示指定してください。`,
+              `承認対象の下書きがありません。`,
             ).catch(() => {})
           }
           continue
         }
 
-        // 複数件: 一覧を返信して終了
-        if (pendingItems.length > 1) {
-          console.log(`    ⚠️ 承認待ち複数: ${pendingItems.map((p) => p.slug).join(', ')}`)
-          if (!dryRun) {
-            const list = pendingItems
-              .map((p, i) => `${i + 1}. <code>${escHtml(p.slug)}</code>\n   ${escHtml(p.title)}`)
-              .join('\n\n')
-            await sendTelegram(
-              botToken, msgChatId || defaultChatId,
-              `⚠️ 承認待ちの下書きが ${pendingItems.length} 件あります:\n\n${list}\n\n「approve &lt;スラグ&gt; by &lt;名前&gt;」で指定してください。`,
-              'HTML',
-            ).catch(() => {})
-          }
-          continue
-        }
-
-        // 1件: 自動採用
-        const target = pendingItems[0]
-        console.log(`    → 自動採用: ${target.slug}`)
+        // 1件以上: 最後に追加した（最新の）pending を採用
+        const target = pendingItems[pendingItems.length - 1]
+        console.log(`    → 直近を採用: ${target.slug}（pending 合計 ${pendingItems.length} 件）`)
 
         if (dryRun) {
           console.log(`    [dry-run] パイプラインをスキップ`)
@@ -1037,24 +997,10 @@ async function main() {
         const draftChatId = msgChatId || defaultChatId || ''
         addSessionPending(draftChatId, result.slug, result.title)
 
-        // 下書き確認 URL（siteUrl は main スコープで取得済み）
-        const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
-        const linkHtml  = reviewUrl
-          ? `<a href="${escHtml(reviewUrl)}">下書きを確認する</a>`
-          : `/admin/pending-review`
-
-        const replyLines = [
-          `📝 <b>${escHtml(result.title)}</b>`,
-          `<code>${escHtml(result.slug)}</code>`,
-          ``,
-          linkHtml,
-          ``,
-          `「承認」で投稿 / 「差し戻し」で修正`,
-        ]
-        const replyText = replyLines.join('\n')
+        const replyText = `下書きを作成しました。確認後「承認」で投稿できます`
 
         if (defaultChatId || msgChatId) {
-          await sendTelegram(botToken, msgChatId || defaultChatId, replyText, 'HTML').catch((e) => {
+          await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
             console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
           })
         }
