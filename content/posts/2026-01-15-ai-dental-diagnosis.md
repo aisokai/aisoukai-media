@@ -9,8 +9,9 @@ tags:
   - 医療テクノロジー
 author: 藍想会メディア編集部
 reviewed: false
-image: ''
+image: /images/library/cavity/cavity-34431025.jpg
 rejection_reason: 実運用前の整理
+image_alt: セラミッククラウンと歯科技工ケースのイメージ
 ---
 
 ## はじめに

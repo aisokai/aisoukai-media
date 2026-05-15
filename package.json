@@ -34,6 +34,7 @@
     "telegram:ops:status": "node scripts/setup-launchd-telegram-ops.mjs --status",
     "image:suggest": "node scripts/image-suggest.mjs",
     "image:assign": "node scripts/image-assign.mjs",
+    "image:assign-bulk": "node scripts/image-assign-bulk.mjs",
     "image:import-inbox": "node scripts/image-import-inbox.mjs",
     "image:list": "node scripts/image-list.mjs",
     "image:check": "node scripts/image-check.mjs",
