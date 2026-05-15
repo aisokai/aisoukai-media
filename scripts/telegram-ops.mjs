@@ -42,7 +42,7 @@ import matter from 'gray-matter'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 import { buildSafeTemplateThemePrompt, classifyTelegramMessage } from './telegram-request-routing.mjs'
-import { tokenize, scoreImage, findCandidates, loadFeedback } from './lib/image-scoring.mjs'
+import { findCandidates, loadFeedback } from './lib/image-scoring.mjs'
 
 const __dirname      = dirname(fileURLToPath(import.meta.url))
 const ROOT           = join(__dirname, '..')
