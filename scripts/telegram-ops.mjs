@@ -8,7 +8,7 @@
 //   "差し戻し" / "修正" / "NG" 等 → 直近 pending slug を差し戻し（同上）
 //   "approve <slug> [by <名前>]"  → 明示スラグ承認（直近以外を承認したい場合）
 //   "reject <slug> <理由>"        → 明示スラグ差し戻し（互換維持）
-//   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成（pending が複数でも新規作成）
+//   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成 + validate + push（--build 時）
 //   publish / push / deploy 等     → スキップ
 //
 // フラグ:
@@ -728,6 +728,75 @@ async function runApprovePipeline({ slug, by, build, botToken, replyId }) {
   return { ok: true, slug: postSlug, reviewedBy: ar.reviewedBy, today: ar.today, steps, pushed: true }
 }
 
+// ── draft → validate → git add/commit/push パイプライン ──────────────────
+// Next.js build は行わない（reviewed:false なので公開には出ない）
+
+async function runDraftPipeline({ slug }) {
+  const steps = []
+
+  // ─ 1. validate:posts ──────────────────────────────────────────────────────
+
+  const vr = runNpm('validate:posts')
+  steps.push({ name: 'validate:posts', ok: vr.ok, output: vr.output.slice(0, 200) })
+  if (!vr.ok) return { ok: false, failedAt: 'validate:posts', error: vr.output, steps, slug }
+
+  // ─ 2. git add（draft ファイル + data ファイルのみ）────────────────────────
+
+  const relPost = `content/posts/${slug}.md`
+  const addTargets = [relPost, 'data/article-requests.json', 'data/telegram-session.json']
+    .filter((p) => existsSync(join(ROOT, p)))
+  const addR = runGit(['add', ...addTargets])
+  steps.push({ name: 'git add', ok: addR.ok, output: addR.output })
+  if (!addR.ok) return { ok: false, failedAt: 'git add', error: addR.output, steps, slug }
+
+  // ─ 3. 安全チェック ────────────────────────────────────────────────────────
+
+  const staged   = getStagedFiles()
+  const badStaged = filterSensitive(staged)
+  if (badStaged.length > 0) {
+    runGit(['reset', 'HEAD'])
+    return {
+      ok: false, failedAt: 'safety-check',
+      error: `機密ファイルがステージに含まれています: ${badStaged.join(', ')}`,
+      steps, slug,
+    }
+  }
+
+  const untracked    = getUntrackedFiles()
+  const badUntracked = filterSensitive(untracked)
+  if (badUntracked.length > 0) {
+    runGit(['reset', 'HEAD'])
+    return {
+      ok: false, failedAt: 'safety-check',
+      error: `未追跡に機密ファイルがあります（push を中止）: ${badUntracked.join(', ')}`,
+      steps, slug,
+    }
+  }
+
+  if (staged.length === 0) {
+    steps.push({ name: 'git commit', ok: true, output: 'nothing to commit (既に最新)' })
+    steps.push({ name: 'git push',   ok: true, output: 'skipped' })
+    return { ok: true, slug, steps, pushed: false }
+  }
+
+  steps.push({ name: 'safety-check', ok: true, output: `staged: ${staged.join(', ')}` })
+
+  // ─ 4. git commit ──────────────────────────────────────────────────────────
+
+  const commitMsg = `draft: ${slug}\n\nGenerated via Telegram bot`
+  const cr = runGit(['commit', '-m', commitMsg])
+  steps.push({ name: 'git commit', ok: cr.ok, output: cr.output.slice(0, 200) })
+  if (!cr.ok) return { ok: false, failedAt: 'git commit', error: cr.output, steps, slug }
+
+  // ─ 5. git push ────────────────────────────────────────────────────────────
+
+  const pr = runGit(['push', 'origin', 'main'])
+  steps.push({ name: 'git push', ok: pr.ok, output: pr.output.slice(0, 200) })
+  if (!pr.ok) return { ok: false, failedAt: 'git push', error: pr.output, steps, slug }
+
+  return { ok: true, slug, steps, pushed: true }
+}
+
 // ── パイプライン結果を Telegram 返信テキストに変換 ────────────────────────
 // opts.verbose: true のとき全ステップを表示（デフォルト: 成功時は要約のみ）
 // opts.siteUrl: push 成功時の公開URL生成に使用
@@ -1106,16 +1175,45 @@ async function main() {
           addSessionPending(draftChatId, result.slug, result.title)
 
           const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
-          const replyParts = [
-            `📝 ${result.title}`,
-            ``,
-            `下書きを確認する`,
-            ...(reviewUrl ? [reviewUrl] : []),
-            ``,
-            `確認後「承認」で投稿できます`,
-          ]
+          let replyText
+
+          if (build) {
+            // validate → git add → commit → push（Next.js build なし）
+            const draftPipe = await runDraftPipeline({ slug: result.slug })
+            for (const s of draftPipe.steps) {
+              console.log(`    ${s.ok ? '✅' : '❌'} ${s.name}: ${s.output ? s.output.slice(0, 80) : ''}`)
+            }
+
+            if (!draftPipe.ok) {
+              replyText = [
+                `❌ 下書き push 失敗（${draftPipe.failedAt}）`,
+                draftPipe.error?.slice(0, 200) ?? '',
+              ].join('\n')
+            } else {
+              // push 完了後に通知（本番 /admin/pending-review リンク）
+              replyText = [
+                `📝 ${result.title}`,
+                ``,
+                `下書きを確認する`,
+                ...(reviewUrl ? [reviewUrl] : []),
+                ``,
+                `確認後「承認」で投稿できます`,
+              ].join('\n')
+            }
+          } else {
+            // --build なし: ローカル生成のみ、通知だけ送る
+            replyText = [
+              `📝 ${result.title}`,
+              ``,
+              `下書きを確認する`,
+              ...(reviewUrl ? [reviewUrl] : []),
+              ``,
+              `確認後「承認」で投稿できます`,
+            ].join('\n')
+          }
+
           if (defaultChatId || msgChatId) {
-            await sendTelegram(botToken, msgChatId || defaultChatId, replyParts.join('\n')).catch((e) => {
+            await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
               console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
             })
           }
