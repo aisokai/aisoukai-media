@@ -42,6 +42,7 @@ import matter from 'gray-matter'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 import { buildSafeTemplateThemePrompt, classifyTelegramMessage } from './telegram-request-routing.mjs'
+import { tokenize, scoreImage, findCandidates, loadFeedback } from './lib/image-scoring.mjs'
 
 const __dirname      = dirname(fileURLToPath(import.meta.url))
 const ROOT           = join(__dirname, '..')
@@ -52,60 +53,6 @@ const LOGS_DIR       = join(ROOT, 'logs')
 const LOG_PATH       = join(LOGS_DIR, 'review-history.md')
 const LIBRARY_PATH   = join(ROOT, 'data', 'image-library.json')
 
-// 記事カテゴリ（日本語）→ image-library category（英語）
-const ARTICLE_CAT_TO_LIB_CAT = {
-  '虫歯治療':    'cavity',
-  '歯周病治療':  'general',
-  '根管治療':    'general',
-  '親知らず':    'general',
-  '予防歯科':    'preventive',
-  'インプラント': 'implant',
-  '小児歯科':    'pediatric',
-  'お知らせ':    'announcement',
-}
-
-// ── 画像自動割当ユーティリティ ────────────────────────────────────────────
-
-function tokenize(text) {
-  const set = new Set()
-  const str = String(text ?? '')
-  for (const token of str.split(/[\s、。・「」【】（）()[\]：:,，！？!?]+/)) {
-    if (token.length >= 2) set.add(token)
-  }
-  for (const w of (str.toLowerCase().match(/[a-z0-9]{2,}/g) ?? [])) {
-    set.add(w)
-  }
-  return set
-}
-
-function scoreImage(image, articleTokens) {
-  let score = 0
-  for (const tag of image.tags ?? []) {
-    if (articleTokens.has(tag)) { score += 2; continue }
-    for (const token of articleTokens) {
-      if (tag.includes(token) || token.includes(tag)) { score += 0.5; break }
-    }
-  }
-  return score
-}
-
-// スコア上位 limit 件の画像候補を返す（自動割当なし・Human選択用）
-function findCandidates({ images, title, category, excerpt, bodyContent, usedImages = new Set(), limit = 3 }) {
-  if (!images || images.length === 0) return []
-  const articleText = [title, category, excerpt ?? '', bodyContent?.slice(0, 300) ?? ''].join(' ')
-  const tokens = tokenize(articleText)
-  const scored = images
-    .map((img) => ({ img, score: scoreImage(img, tokens) }))
-    .filter(({ score, img }) => score > 0 && !usedImages.has(img.id))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-  if (scored.length > 0) return scored.map(({ img }) => img)
-  // カテゴリ fallback（スコア 0 時 — 使用済みを除外、libCat → general の順）
-  const libCat = ARTICLE_CAT_TO_LIB_CAT[category] ?? 'general'
-  return images
-    .filter((img) => (img.category === libCat || img.category === 'general') && !usedImages.has(img.id))
-    .slice(0, limit)
-}
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
 
@@ -613,6 +560,7 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
         bodyContent,
         usedImages,
         limit:       3,
+        feedback:    loadFeedback(),
       })
     } catch (e) {
       console.log(`    ⚠️ 画像候補収集スキップ（ライブラリ読込エラー）: ${e.message}`)
