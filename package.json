@@ -44,6 +44,7 @@
     "image:license:bulk-template": "node scripts/image-license-bulk-template.mjs",
     "image:purchase:list": "node scripts/image-purchase-list.mjs",
     "image:usage": "node scripts/image-usage.mjs",
+    "image:misassign": "node scripts/image-misassign.mjs",
     "test:telegram": "node scripts/test-telegram-notify.mjs",
     "article:manual": "node scripts/manual-article-flow.mjs",
     "article:scheduled": "node scripts/scheduled-article-flow.mjs",
