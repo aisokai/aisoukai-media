@@ -12,6 +12,9 @@ const ROOT         = join(__dirname, '..')
 const POSTS_DIR    = join(ROOT, 'content', 'posts')
 const LIBRARY_PATH = join(ROOT, 'data', 'image-library.json')
 
+// 割当スコアがこれ未満かつ代替候補が存在する場合に 🔴 RED フラグ
+const SCORE_THRESHOLD = 2
+
 const ARTICLE_CAT_TO_LIB_CAT = {
   '虫歯治療':    'cavity',
   '歯周病治療':  'general',
@@ -49,8 +52,6 @@ function scoreImage(image, articleTokens) {
 function main() {
   const BAR = '═'.repeat(62)
   const DIV = '─'.repeat(62)
-  // 割当スコアがこれ未満かつ代替候補が存在する場合に 🔴 RED フラグ
-  const SCORE_THRESHOLD = 2
 
   console.log(BAR)
   console.log('  image:misassign — 誤割当検出レポート')
@@ -67,8 +68,9 @@ function main() {
     console.error(`パースエラー: ${e.message}`)
     process.exit(1)
   }
-  const images   = lib.images ?? []
-  const pathToId = new Map(images.map((img) => [img.path, img.id]))
+  const images    = lib.images ?? []
+  const pathToId  = new Map(images.map((img) => [img.path, img.id]))
+  const idToImage = new Map(images.map((img) => [img.id, img]))
 
   const postFiles = existsSync(POSTS_DIR)
     ? readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md')).sort()
@@ -89,7 +91,7 @@ function main() {
     if (!imgPath) continue  // 未割当はスキップ
 
     const assignedId  = pathToId.get(imgPath)
-    const assignedImg = images.find((img) => img.id === assignedId)
+    const assignedImg = idToImage.get(assignedId)
     if (!assignedImg) continue  // ライブラリ未登録
 
     const articleText = [
@@ -157,9 +159,9 @@ function main() {
       console.log(`  ${r.slug}`)
       console.log(`    タイトル: ${r.title}`)
       console.log(`    カテゴリ: ${r.category}`)
-      console.log(`    現割当: [${r.assignedId}]  スコア: ${r.assignedScore}  cat: ${r.assignedImg.category}`)
+      console.log(`    現割当: [${r.assignedId}]  スコア: ${r.assignedScore}  cat: ${r.assignedImg.category ?? ''}`)
       console.log(`      alt: ${(r.assignedImg.alt ?? '').slice(0, 50)}`)
-      console.log(`    推奨  : [${r.bestId}]  スコア: ${r.bestScore}  cat: ${r.bestImg.category}`)
+      console.log(`    推奨  : [${r.bestId}]  スコア: ${r.bestScore}  cat: ${r.bestImg.category ?? ''}`)
       console.log(`      alt: ${(r.bestImg.alt ?? '').slice(0, 50)}`)
       console.log(`    修正  : npm run image:assign -- ${r.slug} --image ${r.bestId}`)
       console.log()
@@ -175,9 +177,9 @@ function main() {
     for (const y of yellowFlags) {
       console.log(`  ${y.slug}`)
       console.log(`    カテゴリ: ${y.category}（期待ライブラリcat: ${y.expectedLibCat}）`)
-      console.log(`    現割当: [${y.assignedId}]  cat: ${y.assignedImg.category}  スコア: ${y.assignedScore}`)
+      console.log(`    現割当: [${y.assignedId}]  cat: ${y.assignedImg.category ?? ''}  スコア: ${y.assignedScore}`)
       if (y.bestImg) {
-        console.log(`    代替候補: [${y.bestId}]  cat: ${y.bestImg.category}  スコア: ${y.bestScore}`)
+        console.log(`    代替候補: [${y.bestId}]  cat: ${y.bestImg.category ?? ''}  スコア: ${y.bestScore}`)
         console.log(`    修正  : npm run image:assign -- ${y.slug} --image ${y.bestId}`)
       }
       console.log()
