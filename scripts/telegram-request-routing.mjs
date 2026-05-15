@@ -24,23 +24,37 @@ function isTemplateRequestText(text) {
   return TEMPLATE_REQUEST_RE.test(text)
 }
 
-export function buildSafeTemplateThemePrompt(requestText) {
-  return [
+export function buildSafeTemplateThemePrompt(requestText, existingPostsContext = '') {
+  const lines = [
     'あなたは歯科医院の医療情報ライターです。',
-    '依頼文は短く、記事テーマの指定がありません。',
-    '患者向けの安全な一般歯科啓発テーマを1つだけ選んでください。',
-    '選ぶテーマは、診断の断定や治療の保証表現を含まない、一般的で安全な内容にしてください。',
-    '候補の例:',
-    '- 定期検診の受診目安',
-    '- 初期虫歯の気づき方',
-    '- 歯周病の初期サイン',
-    '- 仕上げ磨きのコツ',
-    '- 親知らずを相談するタイミング',
-    '- 歯科受診の目安',
-    '出力はテーマ名1行のみ。前置きや説明は不要です。',
+    '患者向けの安全な一般歯科啓発テーマを5つ提案してください。',
+    '各テーマは診断の断定や治療の保証表現を含まない、一般的で安全な内容にしてください。',
+    '出力は1行に1テーマのみ（番号・前置き・説明は不要）。',
+  ]
+
+  if (existingPostsContext) {
+    lines.push(
+      '',
+      '【既掲載記事（同テーマ・同カテゴリを避けること）】',
+      existingPostsContext,
+    )
+  }
+
+  lines.push(
+    '',
+    '提案例（参考のみ、このまま使わないこと）:',
+    '- 根管治療後の痛みが続く場合の対処',
+    '- 歯周病と生活習慣の関係',
+    '- 銀歯とセラミックの違い',
+    '- 子どもの仕上げ磨きの目安年齢',
+    '- インプラント治療の流れと期間',
     '',
     `依頼: ${requestText}`,
-  ].join('\n')
+    '',
+    '5つのテーマを1行ずつ出力（番号なし）:',
+  )
+
+  return lines.join('\n')
 }
 
 export function classifyTelegramMessage(text) {

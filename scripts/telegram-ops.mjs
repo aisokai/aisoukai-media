@@ -235,7 +235,7 @@ const CATEGORY_RULES = [
   { category: '歯周病治療',  words: ['歯周', '歯肉', '歯槽', '歯ぐき', '歯周炎', '歯周病', '出血'] },
   { category: '親知らず',    words: ['親知らず', '智歯', '親不知'] },
   { category: '虫歯治療',    words: ['虫歯', '詰め物', '被せ物', 'クラウン', 'インレー', 'CAD', 'CAM', 'セラミック', '齲蝕'] },
-  { category: '予防歯科',    words: ['クリーニング', 'フッ素', '予防', 'メンテナンス', 'PMTC', 'ブラッシング'] },
+  { category: '予防歯科',    words: ['クリーニング', 'フッ素', '予防', 'メンテナンス', 'PMTC', 'ブラッシング', '定期検診', '健診'] },
   { category: 'インプラント', words: ['インプラント', '人工歯根'] },
   { category: '小児歯科',    words: ['小児', '子ども', '子供', 'お子', '乳歯', 'こども'] },
   { category: 'お知らせ',    words: ['お知らせ', '休診', '診療時間', 'お休み', '年末年始'] },
@@ -326,6 +326,69 @@ function rejectPost(slug, reason) {
   return { ok: true, slug: actualSlug }
 }
 
+// ── 重複テーマ検出 ────────────────────────────────────────────────────────
+
+// 全記事の frontmatter を返す（公開済み・スケジュール・pending すべて対象）
+function loadAllPostMetas() {
+  if (!existsSync(POSTS_DIR)) return []
+  return readdirSync(POSTS_DIR)
+    .filter((f) => f.endsWith('.md'))
+    .flatMap((f) => {
+      try {
+        const { data } = matter(readFileSync(join(POSTS_DIR, f), 'utf8'))
+        return [{
+          slug:     f.replace(/\.md$/, ''),
+          title:    String(data.title ?? ''),
+          date:     String(data.date ?? ''),
+          category: String(data.category ?? ''),
+          excerpt:  String(data.excerpt ?? ''),
+        }]
+      } catch { return [] }
+    })
+}
+
+// 漢字・カタカナ bigram + 3 字以上 ASCII トークンを抽出
+function extractBigrams(text) {
+  const tokens = new Set()
+  const cjk = [...text].filter((c) => {
+    const cp = c.codePointAt(0)
+    return (cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0x30A0 && cp <= 0x30FF)
+  })
+  for (let i = 0; i < cjk.length - 1; i++) tokens.add(cjk[i] + cjk[i + 1])
+  for (const m of text.matchAll(/[A-Za-z]{3,}/g)) tokens.add(`a:${m[0].toUpperCase()}`)
+  return tokens
+}
+
+// Dice 係数（bigram セット間）
+function diceSimilarity(a, b) {
+  if (a.size === 0 && b.size === 0) return 0
+  let hits = 0
+  for (const g of a) if (b.has(g)) hits++
+  return (2 * hits) / (a.size + b.size)
+}
+
+// 候補テーマが既存記事と重複するか判定
+// - 直近 30 日 + 同カテゴリ + Dice > 0.30 → 重複（定期検診 vs 定期検診 など）
+// - 直近 30 日 + 同カテゴリ + ASCII キーワード共有 → 重複（CAD/CAM vs CAD/CAM など）
+// - 全期間:     Dice > 0.55 → 重複（ほぼ同一タイトル）
+function isThemeDuplicate(candidate, allPosts, cutoffDate) {
+  const cCat = detectCategory(candidate)
+  const cTok = extractBigrams(candidate)
+  const cAscii = [...cTok].filter((t) => t.startsWith('a:'))
+
+  for (const p of allPosts) {
+    const pTok   = extractBigrams(p.title)
+    const dice   = diceSimilarity(cTok, pTok)
+    const recent = p.date >= cutoffDate
+    const sameCat = p.category === cCat
+
+    if (recent && sameCat && dice > 0.30) return true
+    if (recent && sameCat && cAscii.some((t) => pTok.has(t))) return true
+    if (dice > 0.55) return true
+  }
+  return false
+}
+
 // ── 下書き生成フロー（AI本文生成付き） ───────────────────────────────────
 
 async function generateDraft(requestText, updateId, fromUser, requestMode = 'freeform') {
@@ -347,21 +410,55 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
       const client = new Anthropic({ apiKey })
 
       if (isTemplateRequest) {
-        const themePrompt = buildSafeTemplateThemePrompt(requestText)
+        // 既存記事を読み込み、AI に渡すコンテキストと重複チェック用データを構築
+        const allPostMetas = loadAllPostMetas()
+        const cutoffDate   = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+        const ctxDate      = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+        const ctxPosts     = allPostMetas.filter((p) => p.date >= ctxDate)
+        const existingCtx  = ctxPosts.map((p) => `- ${p.title}（${p.category}）`).join('\n')
+
+        const themePrompt = buildSafeTemplateThemePrompt(requestText, existingCtx)
         const themeResp = await client.messages.create({
           model:      'claude-haiku-4-5-20251001',
-          max_tokens: 100,
+          max_tokens: 300,
           messages:   [{ role: 'user', content: themePrompt }],
         })
-        const aiTheme = themeResp.content[0]?.type === 'text' ? themeResp.content[0].text.trim() : ''
-        if (aiTheme) {
-          selectedTheme = aiTheme.replace(/^[-*•\s]+/, '').replace(/^テーマ[:：]\s*/u, '').trim()
-          category = detectCategory(selectedTheme)
-          title = selectedTheme.slice(0, 60)
+        const aiText = themeResp.content[0]?.type === 'text' ? themeResp.content[0].text.trim() : ''
+
+        if (!aiText) {
+          // AI 無応答 → フォールバック
+          selectedTheme = '歯科受診の目安と受診頻度'
+          category      = detectCategory(selectedTheme)
+          title         = selectedTheme
+          console.log(`    ⚠️ テーマ AI 無応答 → フォールバック`)
         } else {
-          selectedTheme = '定期検診の受診目安'
-          category = detectCategory(selectedTheme)
-          title = selectedTheme
+          // 候補を 1 行ずつ解析（最大 5 件）
+          const candidates = aiText
+            .split('\n')
+            .map((l) => l.replace(/^[-*•\d.）】\s]+/, '').trim())
+            .filter(Boolean)
+            .slice(0, 5)
+
+          console.log(`    テーマ候補: ${candidates.join(' / ')}`)
+
+          let chosen = null
+          for (const cand of candidates) {
+            if (isThemeDuplicate(cand, allPostMetas, cutoffDate)) {
+              console.log(`    ⏭ 重複スキップ: ${cand}`)
+            } else {
+              chosen = cand
+              console.log(`    ✅ テーマ選定: ${chosen}（既存記事と重複しないため）`)
+              break
+            }
+          }
+
+          if (!chosen) {
+            return { ok: false, reason: '候補不足: 重複しない新テーマが見つかりませんでした。テーマを具体的に指定して再送してください。' }
+          }
+
+          selectedTheme = chosen
+          category      = detectCategory(selectedTheme)
+          title         = selectedTheme.slice(0, 60)
         }
       }
 
@@ -991,27 +1088,37 @@ async function main() {
 
       try {
         const result = await generateDraft(parsed.text, upd.update_id, fromUser, parsed.requestMode)
-        console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}${parsed.requestMode === 'template' ? ' / template' : ''}`)
 
-        // chat_id ごとに pending slug をリストに追加（日本語承認コマンドで参照）
-        const draftChatId = msgChatId || defaultChatId || ''
-        addSessionPending(draftChatId, result.slug, result.title)
+        if (!result.ok) {
+          // テーマ候補不足（重複回避できなかった）
+          console.log(`    ⚠️ ${result.reason}`)
+          if (defaultChatId || msgChatId) {
+            await sendTelegram(
+              botToken, msgChatId || defaultChatId,
+              `⚠️ ${result.reason}`,
+            ).catch(() => {})
+          }
+        } else {
+          console.log(`    ✅ 下書き生成: ${result.slug}  AI=${result.aiUsed}${parsed.requestMode === 'template' ? ' / template' : ''}`)
 
-        const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
-        const replyParts = [
-          `📝 ${result.title}`,
-          ``,
-          `下書きを確認する`,
-          ...(reviewUrl ? [reviewUrl] : []),
-          ``,
-          `確認後「承認」で投稿できます`,
-        ]
-        const replyText = replyParts.join('\n')
+          // chat_id ごとに pending slug をリストに追加（日本語承認コマンドで参照）
+          const draftChatId = msgChatId || defaultChatId || ''
+          addSessionPending(draftChatId, result.slug, result.title)
 
-        if (defaultChatId || msgChatId) {
-          await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
-            console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
-          })
+          const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
+          const replyParts = [
+            `📝 ${result.title}`,
+            ``,
+            `下書きを確認する`,
+            ...(reviewUrl ? [reviewUrl] : []),
+            ``,
+            `確認後「承認」で投稿できます`,
+          ]
+          if (defaultChatId || msgChatId) {
+            await sendTelegram(botToken, msgChatId || defaultChatId, replyParts.join('\n')).catch((e) => {
+              console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+            })
+          }
         }
       } catch (err) {
         console.error(`    ❌ 下書き生成エラー: ${err.message}`)
