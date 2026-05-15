@@ -89,28 +89,22 @@ function scoreImage(image, articleTokens) {
   return score
 }
 
-// 最適な画像エントリを返す。候補なしなら null
-function findBestImage({ images, title, category, excerpt, bodyContent, usedImages = new Set() }) {
-  if (!images || images.length === 0) return null
+// スコア上位 limit 件の画像候補を返す（自動割当なし・Human選択用）
+function findCandidates({ images, title, category, excerpt, bodyContent, usedImages = new Set(), limit = 3 }) {
+  if (!images || images.length === 0) return []
   const articleText = [title, category, excerpt ?? '', bodyContent?.slice(0, 300) ?? ''].join(' ')
   const tokens = tokenize(articleText)
   const scored = images
-    .map((img) => ({
-      img,
-      score: scoreImage(img, tokens) + (usedImages.has(img.id) ? -1000 : 0),
-    }))
+    .map((img) => ({ img, score: scoreImage(img, tokens) }))
+    .filter(({ score, img }) => score > 0 && !usedImages.has(img.id))
     .sort((a, b) => b.score - a.score)
-  const best = scored[0]
-  if (best && best.score > 0) return best.img
-  // カテゴリ fallback（未使用優先、不足時は使用済みも許容）
+    .slice(0, limit)
+  if (scored.length > 0) return scored.map(({ img }) => img)
+  // カテゴリ fallback（スコア 0 時 — 使用済みを除外、libCat → general の順）
   const libCat = ARTICLE_CAT_TO_LIB_CAT[category] ?? 'general'
-  return (
-    images.find((img) => img.category === libCat   && !usedImages.has(img.id)) ??
-    images.find((img) => img.category === 'general' && !usedImages.has(img.id)) ??
-    images.find((img) => img.category === libCat) ??
-    images.find((img) => img.category === 'general') ??
-    null
-  )
+  return images
+    .filter((img) => (img.category === libCat || img.category === 'general') && !usedImages.has(img.id))
+    .slice(0, limit)
 }
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
@@ -594,16 +588,14 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
     ? `${title}についてお知らせします。`
     : `${title}について、原因・受診目安・注意点を整理します。`
 
-  // ── 画像自動割当 ─────────────────────────────────────────────────────────
-  let assignedImageId   = ''
-  let assignedImagePath = ''
-  let assignedImageAlt  = ''
+  // ── 画像候補収集（自動割当なし — Humanが選択する） ──────────────────────
+  let imageCandidates = []
 
   if (existsSync(LIBRARY_PATH)) {
     try {
       const lib = JSON.parse(readFileSync(LIBRARY_PATH, 'utf8'))
 
-      // 既存記事で使用中の画像IDを収集（重複割当を避ける）
+      // 既存記事で使用中の画像IDを収集（候補から除外）
       const usedImages = new Set()
       for (const f of readdirSync(POSTS_DIR).filter((fn) => fn.endsWith('.md'))) {
         try {
@@ -613,21 +605,17 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
         } catch {}
       }
 
-      const best = findBestImage({
+      imageCandidates = findCandidates({
         images:      lib.images ?? [],
         title,
         category,
         excerpt,
         bodyContent,
         usedImages,
+        limit:       3,
       })
-      if (best) {
-        assignedImageId   = best.id
-        assignedImagePath = best.path
-        assignedImageAlt  = best.alt
-      }
     } catch (e) {
-      console.log(`    ⚠️ 画像自動割当スキップ（ライブラリ読込エラー）: ${e.message}`)
+      console.log(`    ⚠️ 画像候補収集スキップ（ライブラリ読込エラー）: ${e.message}`)
     }
   }
 
@@ -642,8 +630,8 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
     author:              '藍想会メディア編集部',
     reviewed:            false,
     draft:               false,
-    image:               assignedImagePath,
-    image_alt:           assignedImageAlt,
+    image:               '',
+    image_alt:           '',
     ai_generated:        aiUsed,
     request_mode:        requestMode,
     source_request_id:   String(updateId),
@@ -680,7 +668,24 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
   ]
   saveRequests(store)
 
-  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed, assignedImageId }
+  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed, imageCandidates }
+}
+
+// 画像候補リスト（Telegram 通知用）
+function formatCandidateLines(candidates, slug) {
+  if (candidates.length === 0) {
+    return [
+      `🖼 画像: 未割当（候補なし）`,
+      `  → npm run image:suggest -- ${slug} で確認`,
+    ]
+  }
+  return [
+    `🖼 画像候補（未割当 — 選択後に割当を実行）:`,
+    ...candidates.map((img, i) =>
+      `${i + 1}. [${img.id}]  ${(img.alt ?? '').slice(0, 30)}`
+    ),
+    `割当: npm run image:assign -- ${slug} --image <id>`,
+  ]
 }
 
 // ── プロセス実行ユーティリティ ────────────────────────────────────────────
@@ -1294,7 +1299,7 @@ async function main() {
               replyText = [
                 `📝 ${result.title}`,
                 ``,
-                ...(result.assignedImageId ? [`🖼 割当画像: ${result.assignedImageId}`] : [`🖼 画像: 未割当（手動で設定してください）`]),
+                ...formatCandidateLines(result.imageCandidates, result.slug),
                 ``,
                 `下書きを確認する`,
                 ...(reviewUrl ? [reviewUrl] : []),
@@ -1307,7 +1312,7 @@ async function main() {
             replyText = [
               `📝 ${result.title}`,
               ``,
-              ...(result.assignedImageId ? [`🖼 割当画像: ${result.assignedImageId}`] : [`🖼 画像: 未割当（手動で設定してください）`]),
+              ...formatCandidateLines(result.imageCandidates, result.slug),
               ``,
               `下書きを確認する`,
               ...(reviewUrl ? [reviewUrl] : []),
