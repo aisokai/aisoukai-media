@@ -59,21 +59,21 @@ export function feedbackAdjustment(imageId, articleCategory, articleTokens, entr
   for (const e of entries) {
     const sameCategory = e.article_category === articleCategory
 
-    if (e.action === 'reject' && e.image_id === imageId) {
-      adj += sameCategory ? -1.5 : -0.5
-    }
-
-    if (e.action === 'approve' && e.image_id === imageId) {
-      if (sameCategory) {
-        adj += 1.0
-      } else {
-        const entryTags = new Set(e.article_tags ?? [])
-        const overlap   = [...entryTags].some((t) => articleTokens.has(t))
-        if (overlap) adj += 0.5
+    if (e.image_id === imageId) {
+      if (e.action === 'reject') {
+        adj += sameCategory ? -1.5 : -0.5
+      } else if (e.action === 'approve') {
+        if (sameCategory) {
+          adj += 1.0
+        } else {
+          const entryTags = new Set(e.article_tags ?? [])
+          const overlap   = [...entryTags].some((t) => articleTokens.has(t))
+          if (overlap) adj += 0.5
+        }
       }
     }
 
-    // correct_image は approve 扱い
+    // correct_image は approve 扱い（image_id とは独立して評価）
     if (e.correct_image === imageId) {
       adj += sameCategory ? 1.0 : 0.5
     }
