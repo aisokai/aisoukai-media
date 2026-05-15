@@ -997,7 +997,16 @@ async function main() {
         const draftChatId = msgChatId || defaultChatId || ''
         addSessionPending(draftChatId, result.slug, result.title)
 
-        const replyText = `下書きを作成しました。確認後「承認」で投稿できます`
+        const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
+        const replyParts = [
+          `📝 ${result.title}`,
+          ``,
+          `下書きを確認する`,
+          ...(reviewUrl ? [reviewUrl] : []),
+          ``,
+          `確認後「承認」で投稿できます`,
+        ]
+        const replyText = replyParts.join('\n')
 
         if (defaultChatId || msgChatId) {
           await sendTelegram(botToken, msgChatId || defaultChatId, replyText).catch((e) => {
