@@ -148,9 +148,9 @@ function main() {
   console.log(`  reviewed_by : ${by}`)
   console.log('━'.repeat(52))
   console.log()
-  console.log('次のステップ:')
-  console.log('  1. npm run validate:publish-ready で公開対象を確認')
-  console.log('  2. npm run build でビルドを確認')
+  console.log('次:')
+  console.log('  validate:publish-ready')
+  console.log('  build')
 }
 
 main()

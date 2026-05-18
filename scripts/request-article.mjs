@@ -165,9 +165,9 @@ function main() {
   console.log(`  追記先     : data/article-topics.sample.csv`)
   console.log('━'.repeat(52))
   console.log()
-  console.log('次のステップ:')
-  console.log('  1. npm run validate:topics で追記内容を確認')
-  console.log(`  2. npm run generate:draft -- ${topicId} で AI 下書きを生成`)
+  console.log('次:')
+  console.log('  validate:topics')
+  console.log(`  generate:draft -- ${topicId}`)
 }
 
 main()

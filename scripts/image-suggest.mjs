@@ -6,7 +6,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
-import { tokenize, scoreImage, feedbackAdjustment, loadFeedback } from './lib/image-scoring.mjs'
+import { findCandidates, loadFeedback } from './lib/image-scoring.mjs'
 
 const __dirname    = dirname(fileURLToPath(import.meta.url))
 const ROOT         = join(__dirname, '..')
@@ -80,15 +80,6 @@ function main() {
     return
   }
 
-  // 記事テキストからトークンを生成（title + category + excerpt + 本文先頭300文字）
-  const articleText = [
-    data.title,
-    data.category,
-    data.excerpt ?? data.description ?? '',
-    content.slice(0, 300),
-  ].join(' ')
-  const articleTokens = tokenize(articleText)
-
   // 他記事で使用中の画像IDを収集（対象記事自身はスキップ）
   const usedImages = new Set()
   for (const pf of readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'))) {
@@ -101,25 +92,16 @@ function main() {
   }
 
   // スコアリング（ベース + フィードバック調整）・ソート・上位5件
-  const scored = images
-    .map((img) => {
-      const base = scoreImage(img, articleTokens)
-      const adj  = feedbackAdjustment(img.id, data.category ?? '', articleTokens, feedback)
-      return {
-        img,
-        score:       base + adj,
-        base,
-        adj,
-        alreadyUsed: usedImages.has(img.id),
-      }
-    })
-    .sort((a, b) => {
-      if (a.alreadyUsed !== b.alreadyUsed) return a.alreadyUsed ? 1 : -1
-      return b.score - a.score
-    })
-    .slice(0, 5)
-
-  const candidates = scored.filter(({ score }) => score > 0)
+  const candidates = findCandidates({
+    images,
+    title:       String(data.title ?? ''),
+    category:    String(data.category ?? ''),
+    excerpt:     String(data.excerpt ?? data.description ?? ''),
+    bodyContent: content,
+    usedImages,
+    limit:       5,
+    feedback,
+  })
 
   if (candidates.length === 0) {
     console.log('  候補なし — ライブラリ内の tags と記事の内容が一致しませんでした。')
@@ -135,12 +117,17 @@ function main() {
   console.log(`画像候補 (${candidates.length} 件):`)
   console.log(DIV)
 
-  for (const [i, { img, score, base, adj, alreadyUsed }] of candidates.entries()) {
+  for (const [i, candidate] of candidates.entries()) {
+    const { img, score, base, adj, notes, concerns, alreadyUsed } = candidate
     const adjStr = adj !== 0 ? ` (ベース ${base.toFixed(1)} ${adj >= 0 ? '+' : ''}${adj.toFixed(1)} FB)` : ''
     console.log(`${i + 1}. [${img.id}]  スコア: ${score.toFixed(1)}${adjStr}${alreadyUsed ? '  ⚠️ 他記事で使用中' : ''}`)
     console.log(`   path    : ${img.path}`)
     console.log(`   alt     : ${img.alt}`)
     console.log(`   tags    : ${(img.tags ?? []).join(' / ')}`)
+    console.log(`   理由    : ${notes.join(' / ')}`)
+    if (concerns.length > 0) {
+      console.log(`   懸念    : ${concerns.join(' / ')}`)
+    }
     console.log(`   source  : ${img.license_source ?? ''}`)
     console.log(`   割当    : npm run image:assign -- ${slugInput} --image ${img.id}`)
     console.log(`   FB記録  : npm run image:feedback -- ${slugInput} --image ${img.id} --action approve|reject`)

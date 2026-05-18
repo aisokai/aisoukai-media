@@ -134,8 +134,8 @@ function buildDraftNotification(slug, data, siteUrl) {
     ``,
     linkHtml,
     ``,
-    `問題なければ「承認」と返信してください。`,
-    `差し戻しなら「差し戻し」と返信してください。`,
+    `次: 承認`,
+    `差し戻し: 差し戻し`,
   ]
   return lines.join('\n')
 }

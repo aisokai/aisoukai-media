@@ -5,11 +5,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadRequestStore, summarizeRequestStore } from './lib/request-status.mjs'
 
 const __dirname     = dirname(fileURLToPath(import.meta.url))
 const ROOT          = join(__dirname, '..')
-const REQUESTS_PATH = join(ROOT, 'data', 'article-requests.json')
-
 // .env.local を読んで process.env に反映（既存の環境変数は上書きしない）
 function loadEnv() {
   const envPath = join(ROOT, '.env.local')
@@ -18,53 +17,6 @@ function loadEnv() {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.+)$/)
     if (m) process.env[m[1]] ??= m[2].trim().replace(/^["']|["']$/g, '')
   }
-}
-
-function loadRequests() {
-  if (!existsSync(REQUESTS_PATH)) return { last_update_id: 0, requests: [] }
-  try {
-    return JSON.parse(readFileSync(REQUESTS_PATH, 'utf8'))
-  } catch {
-    return { last_update_id: 0, requests: [] }
-  }
-}
-
-function buildNotificationText(store) {
-  const { requests } = store
-
-  const byStatus = { requested: [], drafted: [], ignored: [], archived: [] }
-  for (const r of requests) {
-    const bucket = byStatus[r.status]
-    if (bucket) bucket.push(r)
-  }
-
-  const lines = ['📨 記事リクエスト状態サマリー', '']
-  lines.push(`🔔 未処理(requested):  ${byStatus.requested.length}件`)
-  lines.push(`📝 下書き生成済み:     ${byStatus.drafted.length}件`)
-  lines.push(`🚫 見送り(ignored):    ${byStatus.ignored.length}件`)
-  lines.push(`📦 アーカイブ済み:     ${byStatus.archived.length}件`)
-
-  // 未処理リクエストを最大10件表示（受信日時の新しい順）
-  const pending = [...byStatus.requested].sort((a, b) => b.update_id - a.update_id)
-  if (pending.length > 0) {
-    lines.push('')
-    lines.push('未処理リクエスト:')
-    for (const [i, r] of pending.slice(0, 10).entries()) {
-      const preview = r.text.slice(0, 35).replace(/\n/g, ' ')
-      const suffix  = r.text.length > 35 ? '…' : ''
-      lines.push(`${i + 1}. [${r.update_id}] "${preview}${suffix}"`)
-    }
-    if (pending.length > 10) {
-      lines.push(`  ...他 ${pending.length - 10} 件`)
-    }
-    lines.push('')
-    lines.push('下書き生成: npm run request:draft -- <update_id> --category "カテゴリ"')
-  } else {
-    lines.push('')
-    lines.push('未処理リクエストはありません。')
-  }
-
-  return lines.join('\n')
 }
 
 async function sendTelegram(botToken, chatId, text) {
@@ -84,8 +36,9 @@ async function sendTelegram(botToken, chatId, text) {
 async function main() {
   loadEnv()
 
-  const store = loadRequests()
-  const text  = buildNotificationText(store)
+  const store = loadRequestStore(join(ROOT, 'data', 'article-requests.json'))
+  const { lines } = summarizeRequestStore(store, { maxItems: 3 })
+  const text  = lines.join('\n')
 
   // ── console 出力 ──
   console.log('━'.repeat(56))

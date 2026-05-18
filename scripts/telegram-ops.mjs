@@ -629,10 +629,11 @@ function formatCandidateLines(candidates, slug) {
   }
   return [
     `🖼 画像候補（未割当 — 選択後に割当を実行）:`,
-    ...candidates.map((img, i) =>
-      `${i + 1}. [${img.id}]  ${(img.alt ?? '').slice(0, 30)}`
+    ...candidates.map((candidate, i) =>
+      `${i + 1}. [${candidate.img.id}]  ${(candidate.img.alt ?? '').slice(0, 30)}${candidate.notes?.[0] ? ` / ${candidate.notes[0]}` : ''}${candidate.concerns?.length ? ` / 懸念: ${candidate.concerns[0]}` : ''}`
     ),
-    `割当: npm run image:assign -- ${slug} --image <id>`,
+    `次: 画像を選んで割当`,
+    `  npm run image:assign -- ${slug} --image <id>`,
   ]
 }
 
@@ -1249,24 +1250,22 @@ async function main() {
                 ``,
                 ...formatCandidateLines(result.imageCandidates, result.slug),
                 ``,
-                `下書きを確認する`,
+                `次: 承認`,
                 ...(reviewUrl ? [reviewUrl] : []),
-                ``,
-                `確認後「承認」で投稿できます`,
+                `差し戻しは「差し戻し」`,
               ].join('\n')
             }
           } else {
             // --build なし: ローカル生成のみ、通知だけ送る
             replyText = [
-              `📝 ${result.title}`,
-              ``,
-              ...formatCandidateLines(result.imageCandidates, result.slug),
-              ``,
-              `下書きを確認する`,
-              ...(reviewUrl ? [reviewUrl] : []),
-              ``,
-              `確認後「承認」で投稿できます`,
-            ].join('\n')
+                `📝 ${result.title}`,
+                ``,
+                ...formatCandidateLines(result.imageCandidates, result.slug),
+                ``,
+                `次: 承認`,
+                ...(reviewUrl ? [reviewUrl] : []),
+                `差し戻しは「差し戻し」`,
+              ].join('\n')
           }
 
           if (defaultChatId || msgChatId) {

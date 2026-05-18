@@ -33,6 +33,86 @@ export function scoreImage(image, articleTokens) {
   return score
 }
 
+const REJECT_REASON_RULES = [
+  { pattern: /(人物|顔|表情|ポーズ|違和感)/, penalty: 1.4, label: '人物違和感' },
+  { pattern: /(診療内容|内容不一致|治療内容|医療内容|症例と違う|用途違い)/, penalty: 1.8, label: '診療内容不一致' },
+  { pattern: /(汎用|素材感|ストック|イメージ写真|ありがち)/, penalty: 1.2, label: '汎用素材感' },
+]
+
+function collectRejectSignals(entries, imageId) {
+  const labels = new Set()
+  let penalty = 0
+
+  for (const e of entries) {
+    if (e.image_id !== imageId || e.action !== 'reject') continue
+    const reason = String(e.reason ?? '')
+    for (const rule of REJECT_REASON_RULES) {
+      if (rule.pattern.test(reason)) {
+        labels.add(rule.label)
+        penalty += rule.penalty
+      }
+    }
+  }
+
+  return { labels: [...labels], penalty }
+}
+
+export function explainImageCandidate(image, articleTokens, articleCategory, entries = [], usedImages = new Set()) {
+  const base = scoreImage(image, articleTokens)
+  const adj = feedbackAdjustment(image.id, articleCategory, articleTokens, entries)
+  const score = base + adj
+  const notes = []
+  const concerns = []
+
+  const exactTags = []
+  const fuzzyTags = []
+  for (const tag of image.tags ?? []) {
+    if (articleTokens.has(tag)) exactTags.push(tag)
+    else {
+      for (const token of articleTokens) {
+        if (tag.includes(token) || token.includes(tag)) {
+          fuzzyTags.push(tag)
+          break
+        }
+      }
+    }
+  }
+
+  if (exactTags.length > 0) {
+    notes.push(`タグ一致: ${exactTags.slice(0, 3).join(' / ')}`)
+  } else if (fuzzyTags.length > 0) {
+    notes.push(`語句近似: ${fuzzyTags.slice(0, 3).join(' / ')}`)
+  } else {
+    notes.push('タグ一致は弱め')
+  }
+
+  if (image.category === articleCategory && articleCategory) {
+    notes.push('カテゴリ一致')
+  } else if (image.category === 'general') {
+    notes.push('汎用カテゴリ')
+  }
+
+  if (usedImages.has(image.id)) {
+    concerns.push('他記事で使用中')
+  }
+
+  const rejectSignals = collectRejectSignals(entries, image.id)
+  if (rejectSignals.labels.length > 0) {
+    concerns.push(`過去の却下: ${rejectSignals.labels.join(' / ')}`)
+  }
+
+  return {
+    img: image,
+    score,
+    base,
+    adj,
+    notes,
+    concerns,
+    alreadyUsed: usedImages.has(image.id),
+    rejectPenalty: rejectSignals.penalty,
+  }
+}
+
 // フィードバックデータを読み込む（ファイル不在時は空配列）
 export function loadFeedback() {
   if (!existsSync(FEEDBACK_PATH)) return []
@@ -58,10 +138,14 @@ export function feedbackAdjustment(imageId, articleCategory, articleTokens, entr
   let adj = 0
   for (const e of entries) {
     const sameCategory = e.article_category === articleCategory
+    const reason = String(e.reason ?? '')
 
     if (e.image_id === imageId) {
       if (e.action === 'reject') {
-        adj += sameCategory ? -1.5 : -0.5
+        adj += sameCategory ? -2.0 : -0.8
+        for (const rule of REJECT_REASON_RULES) {
+          if (rule.pattern.test(reason)) adj -= rule.penalty
+        }
       } else if (e.action === 'approve') {
         if (sameCategory) {
           adj += 1.0
@@ -114,20 +198,17 @@ export function findCandidates({
 
   const scored = images
     .filter((img) => !usedImages.has(img.id))
-    .map((img) => {
-      const base = scoreImage(img, articleTokens)
-      const adj  = feedbackAdjustment(img.id, category, articleTokens, entries)
-      return { img, score: base + adj, base, adj }
-    })
+    .map((img) => explainImageCandidate(img, articleTokens, category, entries, usedImages))
     .filter(({ score }) => score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
 
-  if (scored.length > 0) return scored.map(({ img }) => img)
+  if (scored.length > 0) return scored
 
   // カテゴリ fallback（スコア 0 の時）
   const libCat = ARTICLE_CAT_TO_LIB_CAT[category] ?? 'general'
   return images
     .filter((img) => (img.category === libCat || img.category === 'general') && !usedImages.has(img.id))
+    .map((img) => explainImageCandidate(img, articleTokens, category, entries, usedImages))
     .slice(0, limit)
 }

@@ -3,10 +3,10 @@
 // pending review 記事の一覧を console 出力 + Telegram 通知する。
 // 通知のみ。approve / reject / publish とは接続しない。
 // AI が自動実行してはならない。
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import matter from 'gray-matter'
+import { buildReviewSummary, loadContentStatus } from './lib/content-status.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
@@ -20,82 +20,6 @@ function loadEnv() {
     const m = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.+)$/)
     if (m) process.env[m[1]] ??= m[2].trim().replace(/^["']|["']$/g, '')
   }
-}
-
-function toDateStr(val) {
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
-  return String(val ?? '')
-}
-
-function getAllPostsStatus() {
-  if (!existsSync(POSTS_DIR)) {
-    return { live: [], scheduled: [], pending: [], pendingFuture: [], rejected: [] }
-  }
-
-  const today = new Date().toISOString().slice(0, 10)
-  const live = []; const scheduled = []; const pending = []
-  const pendingFuture = []; const rejected = []
-
-  for (const f of readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'))) {
-    const { data } = matter(readFileSync(join(POSTS_DIR, f), 'utf8'))
-    const publishAt  = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
-    const isFuture   = publishAt > today
-    const reviewed   = data.reviewed === true
-    const draft      = data.draft === true
-    const hasReject  = !!data.rejection_reason
-    const entry      = { slug: f.replace(/\.md$/, ''), title: String(data.title ?? '（タイトル未設定）'), publishAt, isFuture }
-
-    if (reviewed) {
-      if (!draft && !isFuture) live.push(entry)
-      else if (isFuture)       scheduled.push(entry)
-    } else {
-      if (hasReject)           rejected.push(entry)
-      else if (isFuture)       pendingFuture.push(entry)
-      else                     pending.push(entry)
-    }
-  }
-
-  // 日付降順ソート（review待ち・future は最新優先）
-  const byDateDesc = (a, b) => (a.publishAt < b.publishAt ? 1 : a.publishAt > b.publishAt ? -1 : 0)
-  pending.sort(byDateDesc); pendingFuture.sort(byDateDesc)
-
-  return { live, scheduled, pending, pendingFuture, rejected }
-}
-
-function buildNotificationText(status, dashboardUrl) {
-  const { live, scheduled, pending, pendingFuture, rejected } = status
-  const totalPending = pending.length + pendingFuture.length
-
-  const lines = ['📊 コンテンツ状態サマリー', '']
-  lines.push(`✅ 公開中:            ${live.length}件`)
-  lines.push(`📅 公開予定(reviewed): ${scheduled.length}件`)
-  lines.push(`📝 review待ち:         ${pending.length}件`)
-  lines.push(`📅 review待ち(future): ${pendingFuture.length}件`)
-  lines.push(`🚫 差し戻し済み:       ${rejected.length}件`)
-
-  // review待ち記事を最大10件表示（今すぐ approve 可能なものを優先）
-  const reviewQueue = [...pending, ...pendingFuture].slice(0, 10)
-  if (reviewQueue.length > 0) {
-    lines.push('')
-    lines.push('review待ち記事:')
-    for (const [i, post] of reviewQueue.entries()) {
-      const tag = post.isFuture ? ` [📅${post.publishAt}]` : ''
-      lines.push(`${i + 1}. ${post.title}${tag}`)
-    }
-    if (totalPending > 10) {
-      lines.push(`  ...他 ${totalPending - 10} 件`)
-    }
-  }
-
-  if (totalPending === 0 && live.length > 0) {
-    lines.push('')
-    lines.push('review待ちはありません。')
-  }
-
-  lines.push('')
-  lines.push(`管理画面:\n${dashboardUrl}`)
-
-  return lines.join('\n')
 }
 
 async function sendTelegram(botToken, chatId, text) {
@@ -119,8 +43,14 @@ async function main() {
     ? `${process.env.NEXT_PUBLIC_SITE_URL}/admin/pending-review`
     : 'https://aisoukai-media.vercel.app/admin/pending-review'
 
-  const status = getAllPostsStatus()
-  const text   = buildNotificationText(status, dashboardUrl)
+  const status = loadContentStatus(POSTS_DIR)
+  const text   = buildReviewSummary(status, {
+    dashboardUrl,
+    heading: '📊 review待ちサマリー',
+    maxItems: 3,
+    noPendingText: '承認待ちはありません',
+    showNextAction: true,
+  })
 
   // ── console 出力 ──
   console.log('━'.repeat(56))

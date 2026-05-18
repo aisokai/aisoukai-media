@@ -8,9 +8,13 @@
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadContentStatus } from './lib/content-status.mjs'
+import { loadRequestStore } from './lib/request-status.mjs'
 
 const __dirname    = dirname(fileURLToPath(import.meta.url))
 const ROOT         = join(__dirname, '..')
+const POSTS_DIR    = join(ROOT, 'content', 'posts')
+const REQUESTS_PATH = join(ROOT, 'data', 'article-requests.json')
 const SEND_DAYS    = new Set([1, 3, 5])       // 月=1, 水=3, 金=5 (JST UTC+9)
 const DAY_NAMES_JA = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -88,25 +92,41 @@ header('6/6  pending-review 通知 (notify:pending-review)')
 run('notify-pending-review.mjs')
 
 // ── フッター ──────────────────────────────────
+const contentStatus = loadContentStatus(POSTS_DIR)
+const requestStore = loadRequestStore(REQUESTS_PATH)
+const requestedCount = (requestStore.requests ?? []).filter((r) => r.status === 'requested').length
+const reviewCount = contentStatus.pending.length + contentStatus.pendingFuture.length
+
 console.log()
 console.log(WIDE)
 console.log('  ops:mwf 完了')
 console.log(BAR)
 console.log()
-console.log('  次のアクション（Human が手動で実行）:')
-console.log()
-console.log('  ① 未処理リクエストがある場合:')
-console.log('      npm run request:draft -- <update_id> \\')
-console.log('        --category "カテゴリ" --date YYYY-MM-DD --yes')
-console.log()
-console.log('  ② review 待ちがある場合:')
-console.log('      npm run approve:post -- <slug> --reviewed-by "氏名"')
-console.log()
-console.log('  ③ 承認後にデプロイ:')
-console.log('      npm run build')
-console.log('      git push origin main  ← Human が手動実行')
-console.log()
-console.log('  ④ 下書き完了後のクリーンアップ:')
-console.log('      npm run request:archive -- --all-done')
+console.log('  今やること:')
+if (reviewCount > 0) {
+  if (contentStatus.pending.length > 0) {
+    console.log(`  ① review待ち ${reviewCount}件（今すぐ承認可 ${contentStatus.pending.length}件）`)
+    console.log('      npm run approve:post -- <slug> --reviewed-by "氏名"')
+  } else {
+    console.log(`  ① review待ち ${reviewCount}件（公開日待ち）`)
+    console.log('      公開日到来を待ってから approve:post を実行')
+  }
+} else {
+  console.log('  ① review待ちはありません')
+}
+
+if (requestedCount > 0) {
+  console.log(`  ② 未処理リクエスト ${requestedCount}件`)
+  console.log('      npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD --yes')
+} else {
+  console.log('  ② 未処理リクエストはありません')
+}
+
+if (reviewCount === 0 && requestedCount === 0) {
+  console.log('  ③ 追加の処理はありません')
+} else {
+  console.log('  ③ 承認後に build を確認')
+  console.log('      npm run build')
+}
 console.log(WIDE)
 console.log()

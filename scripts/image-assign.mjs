@@ -100,10 +100,10 @@ function main() {
   console.log(`  license     : ${imageEntry.license_source ?? ''} / ${imageEntry.license_note ?? ''}`)
   console.log(BAR)
   console.log()
-  console.log('次のステップ:')
-  console.log('  1. npm run validate:posts で検証する')
-  console.log('  2. npm run dev → ブラウザで表示を確認する')
-  console.log('  3. git add + commit（push は Human が手動実行）')
+  console.log('次:')
+  console.log('  validate:posts')
+  console.log('  dev で表示確認')
+  console.log('  commit（push は Human）')
 }
 
 main()
