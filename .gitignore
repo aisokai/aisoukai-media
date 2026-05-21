@@ -52,3 +52,6 @@ data/telegram-session.json
 logs/telegram-ops.log
 logs/telegram-ops-error.log
 logs/*.log
+
+# internal superpowers planning docs (not version-controlled)
+docs/superpowers/plans/
