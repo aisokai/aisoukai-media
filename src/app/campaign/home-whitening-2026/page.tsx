@@ -24,6 +24,12 @@ const recommendedItems = [
   '歯科医院で相談しながら進めたい方',
 ]
 
+const concernItems = [
+  '何を選べばよいか分からず、自己判断で始めるのが不安',
+  '市販品や自己流では、自分に合っているか判断しにくい',
+  'しみることや、お口の状態に問題がないか気になる',
+]
+
 const featureCards = [
   {
     title: '自宅で進めやすい',
@@ -47,6 +53,21 @@ const comparisonRows = [
   { item: '進め方', home: '少しずつ継続', office: '来院時に処置' },
   { item: '向いている方', home: '自分のペースで始めたい方', office: '短時間で院内施術を受けたい方' },
   { item: '今回の対象', home: 'キャンペーン対象', office: '対象外' },
+]
+
+const clinicReasons = [
+  {
+    title: '専用トレーを作製できる',
+    body: '歯科医院で専用トレーを作るため、ご自宅での使用方法を合わせて案内しやすくなります。',
+  },
+  {
+    title: 'お口の状態を確認して案内',
+    body: 'むし歯・歯周病などの状態確認を行い、始められるかどうかを見たうえでご案内します。',
+  },
+  {
+    title: '気になる症状も相談しやすい',
+    body: 'しみる感じや使い方の不安があったときも、相談しながら進められます。',
+  },
 ]
 
 const flowSteps = [
@@ -151,11 +172,11 @@ export default function HomeWhiteningCampaignPage() {
                     HOME WHITENING CAMPAIGN
                   </p>
                   <h1 className="max-w-[10em] text-[38px] font-black leading-[1.08] tracking-[-0.03em] text-[#163b67] sm:text-[46px]">
-                    2026年
+                    自宅で少しずつ、
+                    <br />
+                    相談しながら進める
                     <br />
                     ホームホワイトニング
-                    <br />
-                    キャンペーン
                   </h1>
                   <p className="max-w-[34rem] text-[15px] leading-7 text-slate-600">
                     歯科医院で専用トレーを作製し、ご自宅で少しずつ進めるホームホワイトニングです。
@@ -301,6 +322,61 @@ export default function HomeWhiteningCampaignPage() {
       <section className="mx-auto max-w-[1120px] space-y-14 px-4 py-12 md:px-6 md:py-16">
         <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
           <div className="rounded-[32px] border border-[#d7eef2] bg-white p-6 shadow-sm">
+            <SectionLabel>Concern</SectionLabel>
+            <h2 className="mt-3 text-[28px] font-black leading-tight text-[#163b67]">
+              こんなお悩みはありませんか
+            </h2>
+            <ul className="mt-6 space-y-4">
+              {concernItems.map((item) => (
+                <li key={item} className="flex gap-3 rounded-2xl bg-[#f7fbfc] p-4 text-[15px] leading-7 text-slate-700">
+                  <Sparkles className="mt-1 h-5 w-5 shrink-0 text-[#44b6c9]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-[32px] border border-[#e6dcc2] bg-[linear-gradient(180deg,#fffef9_0%,#f9f2df_100%)] p-6 shadow-sm">
+            <SectionLabel>Why Consult First</SectionLabel>
+            <h2 className="mt-3 text-[28px] font-black leading-tight text-[#163b67]">
+              自己流で選ぶ前に、まず相談したい理由
+            </h2>
+            <div className="mt-6 space-y-4 text-[15px] leading-7 text-slate-700">
+              <p className="rounded-[24px] bg-white p-5">
+                ホームホワイトニングは、ご自宅で進めやすい一方で、
+                お口の状態や使い方によって始め方の判断が変わることがあります。
+              </p>
+              <p className="rounded-[24px] bg-white p-5">
+                歯科医院で専用トレーを作製し、使い方の説明を受けてから始めることで、
+                ご自身に合う進め方かどうかを確認しやすくなります。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <section className="rounded-[34px] border border-[#d7eef2] bg-[linear-gradient(135deg,#f6fcfd_0%,#edf8fb_100%)] px-6 py-7 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <SectionLabel>Consultation CTA</SectionLabel>
+              <h2 className="mt-3 text-[26px] font-black leading-tight text-[#163b67]">
+                ホームホワイトニングを始める前に、まずは内容確認から
+              </h2>
+              <p className="mt-3 text-[14px] leading-7 text-slate-600">
+                相談だけでも問題ありません。キャンペーン内容と進め方をご確認いただけます。
+              </p>
+            </div>
+            <Link
+              href={ctaHref}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0f4f8c] px-6 py-4 text-[15px] font-bold text-white shadow-[0_14px_30px_rgba(15,79,140,0.22)] transition-transform hover:-translate-y-0.5"
+            >
+              予約・相談する
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
+
+        <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
+          <div className="rounded-[32px] border border-[#d7eef2] bg-white p-6 shadow-sm">
             <SectionLabel>Recommended</SectionLabel>
             <h2 className="mt-3 text-[28px] font-black leading-tight text-[#163b67]">こんな方におすすめです</h2>
             <ul className="mt-6 space-y-4">
@@ -344,6 +420,21 @@ export default function HomeWhiteningCampaignPage() {
                 </div>
                 <h3 className="mt-4 text-[18px] font-bold text-[#163b67]">{title}</h3>
                 <p className="mt-3 text-[14px] leading-7 text-slate-600">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-[36px] border border-[#d7eef2] bg-white p-6 shadow-sm md:p-8">
+          <SectionLabel>Reasons</SectionLabel>
+          <h2 className="mt-3 text-[30px] font-black leading-tight text-[#163b67]">
+            歯科医院で専用トレーを作る価値
+          </h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {clinicReasons.map((reason) => (
+              <div key={reason.title} className="rounded-[26px] bg-[#f6fcfd] p-5">
+                <h3 className="text-[18px] font-bold text-[#163b67]">{reason.title}</h3>
+                <p className="mt-3 text-[14px] leading-7 text-slate-600">{reason.body}</p>
               </div>
             ))}
           </div>
