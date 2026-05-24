@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/`,        changeFrequency: 'daily',   priority: 1.0 },
     { url: `${SITE_URL}/blog`,    changeFrequency: 'daily',   priority: 0.9 },
     { url: `${SITE_URL}/about`,   changeFrequency: 'monthly', priority: 0.5 },
+    { url: `${SITE_URL}/campaign/home-whitening-2026`, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${SITE_URL}/contact`, changeFrequency: 'monthly', priority: 0.4 },
     { url: `${SITE_URL}/privacy`, changeFrequency: 'monthly', priority: 0.3 },
   ]
