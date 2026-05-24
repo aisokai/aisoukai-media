@@ -12,6 +12,9 @@
 }
 
 @layer utilities {
+  .font-serif-jp {
+    font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "BIZ UDPMincho", serif;
+  }
   .prose h2 {
     @apply text-xl font-bold text-gray-900 mt-12 mb-5 pl-4;
     border-left: 4px solid #1e3a5f;
@@ -32,3 +35,4 @@
     @apply list-decimal pl-6 space-y-1;
   }
 }
+
