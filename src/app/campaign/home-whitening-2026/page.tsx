@@ -16,6 +16,13 @@ import { buildCanonicalUrl, SITE_NAME } from '@/lib/seo'
 const pagePath = '/campaign/home-whitening-2026'
 const ctaHref = '/contact'
 
+const worryItems = [
+  { title: '歯科医院で相談した方がいい？', icon: Smile },
+  { title: 'しみることはある？', icon: Sparkles },
+  { title: '費用はどのくらい？', icon: Gem },
+  { title: 'どのくらいの期間が必要？', icon: Clock3 },
+]
+
 const recommendedItems = [
   '歯の黄ばみが気になる方',
   '自然な白さを目指したい方',
@@ -46,13 +53,6 @@ const featureCards = [
     body: '急いで強く白くするのではなく、日常になじみやすい白さを目指したい方に向いています。',
     icon: Sparkles,
   },
-]
-
-const comparisonRows = [
-  { item: '施術場所', home: 'ご自宅', office: '歯科医院' },
-  { item: '進め方', home: '少しずつ継続', office: '来院時に処置' },
-  { item: '向いている方', home: '自分のペースで始めたい方', office: '短時間で院内施術を受けたい方' },
-  { item: '今回の対象', home: 'キャンペーン対象', office: '対象外' },
 ]
 
 const clinicReasons = [
@@ -98,7 +98,6 @@ const cautions = [
   'むし歯・歯周病がある場合は、先に治療が必要になることがあります。',
   '詰め物・被せ物は白くなりません。',
   '知覚過敏の症状が出る場合があります。',
-  '掲載画像はイメージを含みます。実際のジェル・トレーとは異なる場合があります。',
 ]
 
 const faqs = [
@@ -120,18 +119,10 @@ const faqs = [
   },
 ]
 
-const campaignSummary = [
-  { label: '価格', value: '28,000円（税込）', tone: 'bg-white text-[#143a62]' },
-  {
-    label: '期間',
-    value: '2026年6月1日（月）〜2026年9月30日（水）',
-    tone: 'bg-[#fbf7ef] text-slate-700',
-  },
-  {
-    label: '内容',
-    value: 'ジェル6本 / トレー上下 / ケースセット',
-    tone: 'bg-[#f6fbfb] text-slate-700',
-  },
+const campaignFacts = [
+  { label: '期間', value: '2026年6月1日（月）〜2026年9月30日（水）' },
+  { label: '内容', value: 'ジェル6本 / トレー上下 / ケースセット' },
+  { label: '相談', value: '仮導線は /contact で受付中' },
 ]
 
 export const metadata: Metadata = {
@@ -157,13 +148,13 @@ export const metadata: Metadata = {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#9b7a34]">
+    <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[#0d7187]">
       {children}
     </p>
   )
 }
 
-function SectionTitle({
+function CenterHeading({
   label,
   title,
   body,
@@ -173,9 +164,29 @@ function SectionTitle({
   body?: string
 }) {
   return (
-    <div className="max-w-[42rem]">
+    <div className="mx-auto max-w-[42rem] text-center">
       <SectionLabel>{label}</SectionLabel>
-      <h2 className="mt-3 text-[28px] font-black leading-[1.2] tracking-[-0.02em] text-[#16324f] md:text-[34px]">
+      <h2 className="mt-3 text-[30px] font-medium leading-[1.25] tracking-[-0.03em] text-[#135d73] md:text-[42px]">
+        {title}
+      </h2>
+      {body ? <p className="mt-5 text-[15px] leading-8 text-slate-600">{body}</p> : null}
+    </div>
+  )
+}
+
+function SideHeading({
+  label,
+  title,
+  body,
+}: {
+  label: string
+  title: string
+  body?: string
+}) {
+  return (
+    <div className="max-w-[40rem]">
+      <SectionLabel>{label}</SectionLabel>
+      <h2 className="mt-3 text-[28px] font-medium leading-[1.3] tracking-[-0.03em] text-[#135d73] md:text-[38px]">
         {title}
       </h2>
       {body ? <p className="mt-4 text-[15px] leading-8 text-slate-600">{body}</p> : null}
@@ -185,178 +196,112 @@ function SectionTitle({
 
 export default function HomeWhiteningCampaignPage() {
   return (
-    <div className="bg-[#fcfaf5] text-slate-800">
-      <section className="relative overflow-hidden bg-[linear-gradient(180deg,#fffdf8_0%,#f7f3e9_36%,#f8fbfb_100%)]">
-        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top,rgba(229,208,159,0.30),transparent_58%)]" />
-        <div className="absolute left-1/2 top-24 h-72 w-72 -translate-x-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.82)_0%,rgba(255,255,255,0)_68%)] blur-3xl" />
-        <div className="mx-auto max-w-[1120px] px-4 pb-14 pt-8 md:px-6 md:pb-20 md:pt-12">
-          <div className="relative overflow-hidden rounded-[36px] border border-[#e6ddcc] bg-white/92 shadow-[0_30px_90px_rgba(68,73,55,0.10)] backdrop-blur">
-            <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#d3bc81_0%,#efe4c7_50%,#d3bc81_100%)]" />
-            <div className="grid gap-8 px-5 py-6 sm:px-7 sm:py-8 lg:grid-cols-[1.02fr_0.98fr] lg:px-10 lg:py-10">
-              <div className="space-y-6 lg:space-y-7">
-                <div className="flex flex-wrap gap-2 text-[12px] font-semibold">
-                  <span className="rounded-full bg-[#16324f] px-4 py-2 text-white">
-                    2026年 ホームホワイトニングキャンペーン
-                  </span>
-                  <span className="rounded-full border border-[#eadfca] bg-[#fbf7ef] px-4 py-2 text-[#7c6330]">
-                    期間: 2026年6月1日（月）〜2026年9月30日（水）
-                  </span>
-                </div>
+    <div className="bg-[#fffdfa] text-slate-800">
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[28rem] bg-[linear-gradient(180deg,#fffdfa_0%,#f8f4ec_58%,#ffffff_100%)]" />
+        <div className="absolute right-[-8rem] top-16 h-64 w-64 rounded-full bg-[#f5ece4] blur-3xl" />
+        <div className="absolute left-[-6rem] top-28 h-56 w-56 rounded-full bg-[#eef7f7] blur-3xl" />
+        <div className="relative mx-auto max-w-[1120px] px-4 pb-18 pt-8 md:px-6 md:pb-24 md:pt-12">
+          <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <div className="space-y-7">
+              <div className="flex flex-wrap gap-2 text-[12px] font-semibold">
+                <span className="rounded-full bg-[#135d73] px-4 py-2 text-white">
+                  2026年 ホームホワイトニングキャンペーン
+                </span>
+                <span className="rounded-full border border-[#efe3d6] bg-white px-4 py-2 text-[#8b6b4a]">
+                  期間: 2026年6月1日（月）〜2026年9月30日（水）
+                </span>
+              </div>
 
-                <div className="space-y-4">
-                  <p className="text-[12px] font-bold uppercase tracking-[0.28em] text-[#9b7a34]">
-                    Clean. Calm. Professional.
-                  </p>
-                  <h1 className="max-w-[11em] text-[34px] font-black leading-[1.1] tracking-[-0.035em] text-[#16324f] sm:text-[44px] md:text-[52px]">
-                    自宅で続けやすい
-                    <br />
-                    上品な白さを、
-                    <br />
-                    まずは相談から
-                  </h1>
-                  <p className="max-w-[37rem] text-[15px] leading-8 text-slate-600 md:text-[16px]">
-                    歯科医院で専用トレーを作製し、ご自宅で少しずつ進めるホームホワイトニングです。
-                    キャンペーン価格と内容を分かりやすく整理し、はじめての方でも相談しやすい導線でご案内しています。
-                  </p>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {campaignSummary.map((item) => (
-                    <div
-                      key={item.label}
-                      className={`rounded-[24px] border border-[#efe6d6] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] ${item.tone}`}
-                    >
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a7444]">
-                        {item.label}
-                      </p>
-                      <p className="mt-2 text-[14px] font-bold leading-6 sm:text-[15px]">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid gap-3 rounded-[28px] border border-[#efe6d6] bg-[#fbf8f1] p-4 sm:grid-cols-2">
-                  <div>
-                    <div className="flex items-center gap-2 text-[#16324f]">
-                      <Smile className="h-5 w-5" />
-                      <p className="text-[13px] font-bold">こんな方におすすめ</p>
-                    </div>
-                    <ul className="mt-3 space-y-2 text-[14px] leading-6 text-slate-600">
-                      <li>歯の黄ばみが気になる方</li>
-                      <li>自然な白さを目指したい方</li>
-                      <li>自宅で無理なく始めたい方</li>
-                    </ul>
-                  </div>
-                  <div className="rounded-[22px] border border-[#eadfca] bg-white px-4 py-4">
-                    <div className="flex items-center gap-2 text-[#7c6330]">
-                      <Gem className="h-5 w-5" />
-                      <p className="text-[13px] font-bold">キャンペーン内容</p>
-                    </div>
-                    <ul className="mt-3 space-y-2 text-[14px] leading-6 text-slate-600">
-                      <li>ホームホワイトニングジェル6本</li>
-                      <li>トレー上下</li>
-                      <li>通常ケース代220円もセット</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Link
-                    href={ctaHref}
-                    className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#16324f] px-6 py-4 text-[15px] font-bold text-white shadow-[0_16px_34px_rgba(22,50,79,0.22)] transition-transform hover:-translate-y-0.5"
-                  >
-                    予約・相談する
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <a
-                    href="#faq"
-                    className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#d9ccb3] bg-white px-6 py-4 text-[15px] font-bold text-[#7c6330] transition-colors hover:bg-[#fbf8f1]"
-                  >
-                    よくある質問を見る
-                  </a>
-                </div>
-
-                <p className="text-[12px] leading-6 text-slate-500">
-                  ※ 予約・相談ボタンは現在仮導線としてお問い合わせページへ遷移します。後日、予約URL等へ差し替える可能性があります。
+              <div className="space-y-5">
+                <p className="text-[13px] font-bold uppercase tracking-[0.28em] text-[#0d7187]">
+                  Home Whitening Campaign
+                </p>
+                <h1 className="max-w-[10em] text-[40px] font-medium leading-[1.18] tracking-[-0.05em] text-[#135d73] sm:text-[54px] md:text-[64px]">
+                  歯を白く
+                  <br />
+                  きれいにしたい
+                  <br />
+                  あなたへ
+                </h1>
+                <p className="max-w-[34rem] text-[15px] leading-8 text-slate-600 md:text-[16px]">
+                  自宅で少しずつ進めたい方へ向けた、三谷ファミリー歯科クリニックのホームホワイトニングキャンペーンです。
+                  価格と内容を分かりやすく整理し、はじめての方でも相談しやすいLPとしてまとめています。
                 </p>
               </div>
 
-              <div className="relative">
-                <div className="absolute inset-x-8 top-5 h-32 rounded-full bg-[radial-gradient(circle,rgba(229,208,159,0.42)_0%,rgba(229,208,159,0)_72%)] blur-2xl" />
-                <div className="relative rounded-[32px] border border-[#e8deca] bg-[linear-gradient(180deg,#fffefb_0%,#f8f4ea_100%)] p-4 shadow-[0_22px_54px_rgba(99,82,38,0.10)] sm:p-5">
-                  <div className="rounded-[28px] bg-[#16324f] px-5 py-5 text-white">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#e8d9b0]">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Link
+                  href={ctaHref}
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#135d73] px-6 py-4 text-[15px] font-bold text-white shadow-[0_14px_30px_rgba(19,93,115,0.16)] transition-transform hover:-translate-y-0.5"
+                >
+                  予約・相談する
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <a
+                  href="#price"
+                  className="inline-flex min-h-14 items-center justify-center rounded-full border border-[#e7d8c8] bg-white px-6 py-4 text-[15px] font-bold text-[#8b6b4a] transition-colors hover:bg-[#fdf7f0]"
+                >
+                  価格を見る
+                </a>
+              </div>
+
+              <p className="text-[12px] leading-6 text-slate-500">
+                ※ 予約・相談ボタンは現在仮導線としてお問い合わせページへ遷移します。
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="overflow-hidden rounded-[36px] border border-[#efe3d6] bg-[linear-gradient(135deg,#ffffff_0%,#fcf6ef_44%,#f7fbfb_100%)] p-5 shadow-[0_30px_80px_rgba(109,94,74,0.08)] md:p-7">
+                <div className="grid gap-4 md:grid-cols-[0.94fr_1.06fr]">
+                  <div className="min-h-[280px] rounded-[28px] bg-[linear-gradient(180deg,#f9f3ec_0%,#ffffff_100%)] p-5">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.26em] text-[#0d7187]">
                       Campaign Price
                     </p>
-                    <p className="mt-3 text-[18px] font-bold leading-7">
+                    <p className="mt-4 text-[18px] leading-8 text-slate-600">
                       ホームホワイトニングジェル6本
                       <br />
-                      トレー上下 + ケースセット
-                    </p>
-                    <div className="mt-5 flex items-end gap-2">
-                      <p className="text-[38px] font-black leading-none tracking-[-0.04em]">28,000円</p>
-                      <p className="pb-1 text-[15px] font-semibold">（税込）</p>
-                    </div>
-                    <p className="mt-4 inline-flex rounded-full bg-white/12 px-3 py-2 text-[12px] font-bold text-[#f7ecd0]">
+                      トレー上下
+                      <br />
                       通常ケース代220円もセット
                     </p>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[24px] border border-[#ece4d4] bg-white p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">通常</p>
-                      <p className="mt-3 text-[15px] font-bold leading-7 text-[#16324f]">
-                        ホームホワイトニング
-                        <br />
-                        ジェル4本 + トレー上下
+                    <div className="mt-8 border-t border-[#eadfd0] pt-6">
+                      <p className="text-[13px] font-semibold text-slate-500">キャンペーン価格</p>
+                      <p className="mt-2 text-[38px] font-bold tracking-[-0.04em] text-[#135d73] sm:text-[46px]">
+                        28,000円
+                        <span className="ml-1 text-[16px] font-medium text-slate-500">（税込）</span>
                       </p>
-                      <p className="mt-4 text-[23px] font-black text-slate-900">
-                        33,000円
-                        <span className="text-[14px] font-bold text-slate-500">（税込）</span>
-                      </p>
-                    </div>
-                    <div className="rounded-[24px] border border-[#e7d7b5] bg-[#fbf7ef] p-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#9b7a34]">今回の内容</p>
-                      <ul className="mt-3 space-y-2 text-[14px] leading-6 text-slate-700">
-                        <li className="flex gap-2">
-                          <Check className="mt-1 h-4 w-4 shrink-0 text-[#9b7a34]" />
-                          <span>ジェルが4本から6本へ増量</span>
-                        </li>
-                        <li className="flex gap-2">
-                          <Check className="mt-1 h-4 w-4 shrink-0 text-[#9b7a34]" />
-                          <span>トレー上下を含む基本セット</span>
-                        </li>
-                        <li className="flex gap-2">
-                          <Check className="mt-1 h-4 w-4 shrink-0 text-[#9b7a34]" />
-                          <span>通常ケース代220円もセット</span>
-                        </li>
-                      </ul>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-[22px] border border-[#ece4d4] bg-white px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a7444]">対象</p>
-                      <p className="mt-2 text-[14px] font-semibold leading-6 text-slate-700">
-                        自宅で無理なく
-                        <br />
-                        始めたい方
+                  <div className="flex flex-col justify-between rounded-[28px] border border-[#ecf3f3] bg-white p-5">
+                    <div>
+                      <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-[#8b6b4a]">
+                        通常内容との比較
                       </p>
+                      <div className="mt-4 rounded-[22px] bg-[#faf7f2] p-4">
+                        <p className="text-[12px] font-bold text-slate-400">通常</p>
+                        <p className="mt-2 text-[15px] font-semibold leading-7 text-[#19475a]">
+                          ホームホワイトニングジェル4本
+                          <br />
+                          + トレー上下
+                        </p>
+                        <p className="mt-3 text-[28px] font-bold tracking-[-0.03em] text-slate-800">
+                          33,000円
+                          <span className="ml-1 text-[14px] font-medium text-slate-500">（税込）</span>
+                        </p>
+                      </div>
                     </div>
-                    <div className="rounded-[22px] border border-[#ece4d4] bg-white px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a7444]">方式</p>
-                      <p className="mt-2 text-[14px] font-semibold leading-6 text-slate-700">
-                        専用トレーを
-                        <br />
-                        ご自宅で使用
-                      </p>
-                    </div>
-                    <div className="rounded-[22px] border border-[#ece4d4] bg-white px-4 py-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a7444]">相談</p>
-                      <p className="mt-2 text-[14px] font-semibold leading-6 text-slate-700">
-                        お口の状態を
-                        <br />
-                        確認して案内
-                      </p>
+
+                    <div className="mt-4 space-y-3">
+                      {campaignFacts.map((fact) => (
+                        <div key={fact.label} className="border-t border-[#edf2f2] pt-3">
+                          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0d7187]">
+                            {fact.label}
+                          </p>
+                          <p className="mt-1 text-[14px] leading-6 text-slate-600">{fact.value}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -367,285 +312,292 @@ export default function HomeWhiteningCampaignPage() {
       </section>
 
       <section className="bg-white">
-        <div className="mx-auto max-w-[1120px] px-4 py-14 md:px-6 md:py-18">
-          <SectionTitle
-            label="Offer"
-            title="通常内容との違いを、ひと目で確認できます"
-            body="28,000円（税込）を中心に、通常内容との違いと今回のキャンペーン対象範囲を整理しています。スマホでも読みやすいよう、比較はカードと行リストの両方で確認しやすくしています。"
+        <div className="mx-auto max-w-[1120px] px-4 py-16 md:px-6 md:py-22">
+          <CenterHeading
+            label="Question"
+            title="ホワイトニングに興味はあるけど不安…"
+            body="はじめて検討する方が気になりやすい点を先に整理し、そのうえでキャンペーン内容と進め方をご案内します。"
           />
 
-          <div className="mt-8 grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
-            <div className="rounded-[32px] border border-[#eadfca] bg-[#fbf8f1] p-5 sm:p-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-[24px] border border-[#ebe2d4] bg-white p-5">
-                  <p className="text-[12px] font-bold text-slate-400">通常</p>
-                  <p className="mt-3 text-[16px] font-bold leading-7 text-[#16324f]">
-                    ホームホワイトニングジェル4本
-                    <br />
-                    + トレー上下
-                  </p>
-                  <p className="mt-4 text-[24px] font-black text-slate-900">
-                    33,000円
-                    <span className="ml-1 text-[14px] font-bold text-slate-500">（税込）</span>
-                  </p>
-                </div>
-
-                <div className="rounded-[24px] border border-[#d8c490] bg-[linear-gradient(180deg,#fffaf0_0%,#f5ead0_100%)] p-5">
-                  <p className="text-[12px] font-bold text-[#9b7a34]">キャンペーン</p>
-                  <p className="mt-3 text-[16px] font-bold leading-7 text-[#16324f]">
-                    ホームホワイトニングジェル6本
-                    <br />
-                    + トレー上下 + ケースセット
-                  </p>
-                  <p className="mt-4 text-[30px] font-black tracking-[-0.03em] text-[#16324f]">
-                    28,000円
-                    <span className="ml-1 text-[15px] font-bold text-[#7c6330]">（税込）</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 rounded-[24px] border border-[#ebe2d4] bg-white p-4">
-                <p className="text-[13px] font-bold text-[#16324f]">今回のポイント</p>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[18px] bg-[#fbf8f1] px-4 py-3 text-[13px] font-semibold text-slate-700">
-                    ジェル6本
-                  </div>
-                  <div className="rounded-[18px] bg-[#fbf8f1] px-4 py-3 text-[13px] font-semibold text-slate-700">
-                    トレー上下
-                  </div>
-                  <div className="rounded-[18px] bg-[#fbf8f1] px-4 py-3 text-[13px] font-semibold text-slate-700">
-                    ケース代220円もセット
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-[32px] border border-[#e6ebec] bg-[#f7fbfb] p-5 sm:p-6">
-              <p className="text-[13px] font-bold text-[#16324f]">ホームホワイトニングと院内ホワイトニングの違い</p>
-              <div className="mt-4 space-y-3">
-                {comparisonRows.map((row) => (
-                  <div
-                    key={row.item}
-                    className="rounded-[22px] border border-white bg-white/90 px-4 py-4 shadow-[0_8px_20px_rgba(43,68,78,0.05)]"
-                  >
-                    <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#7a8c95]">
-                      {row.item}
-                    </p>
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[16px] bg-[#f5f9fa] px-3 py-3">
-                        <p className="text-[12px] font-bold text-[#16324f]">ホームホワイトニング</p>
-                        <p className="mt-1 text-[14px] leading-6 text-slate-600">{row.home}</p>
-                      </div>
-                      <div className="rounded-[16px] bg-[#fbf7ef] px-3 py-3">
-                        <p className="text-[12px] font-bold text-[#7c6330]">院内ホワイトニング</p>
-                        <p className="mt-1 text-[14px] leading-6 text-slate-600">{row.office}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-[linear-gradient(180deg,#f8fbfb_0%,#fcfaf5_100%)]">
-        <div className="mx-auto max-w-[1120px] px-4 py-14 md:px-6 md:py-18">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <div className="rounded-[32px] border border-[#e5ecec] bg-white p-6 shadow-[0_14px_40px_rgba(48,70,78,0.06)]">
-              <SectionTitle
-                label="Concern"
-                title="こんなお悩みはありませんか"
-                body="自己流で始める前に、まずはお口の状態や進め方を確認したいという声に合わせた内容です。"
-              />
-              <ul className="mt-6 space-y-4">
-                {concernItems.map((item) => (
-                  <li key={item} className="flex gap-3 rounded-[24px] bg-[#f7fbfb] p-4 text-[15px] leading-7 text-slate-700">
-                    <Sparkles className="mt-1 h-5 w-5 shrink-0 text-[#9b7a34]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="rounded-[32px] border border-[#eadfca] bg-[linear-gradient(180deg,#fffefb_0%,#fbf6eb_100%)] p-6 shadow-[0_14px_40px_rgba(99,82,38,0.06)]">
-              <SectionTitle
-                label="Recommended"
-                title="こうした方に向いています"
-                body="急いで強い変化を求めるよりも、ご自宅で無理なく進めたい方に合いやすい方法です。"
-              />
-              <ul className="mt-6 space-y-4">
-                {recommendedItems.map((item) => (
-                  <li key={item} className="flex gap-3 rounded-[24px] bg-white p-4 text-[15px] leading-7 text-slate-700">
-                    <Check className="mt-1 h-5 w-5 shrink-0 text-[#9b7a34]" />
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-white">
-        <div className="mx-auto max-w-[1120px] px-4 py-14 md:px-6 md:py-18">
-          <SectionTitle
-            label="Why Consult First"
-            title="自己流で選ぶ前に、まず相談したい理由"
-            body="ホームホワイトニングはご自宅で進めやすい一方で、お口の状態や使い方によって始め方の判断が変わることがあります。歯科医院で確認してから始めることで、無理のない進め方を選びやすくなります。"
-          />
-
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {clinicReasons.map((reason) => (
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {worryItems.map(({ title, icon: Icon }) => (
               <div
-                key={reason.title}
-                className="rounded-[28px] border border-[#ebe3d6] bg-[#fffefb] p-5 shadow-[0_12px_28px_rgba(78,67,40,0.05)]"
+                key={title}
+                className="rounded-[30px] border border-[#edf3f3] bg-[#fcfefd] px-5 py-7 text-center shadow-[0_10px_24px_rgba(49,86,95,0.04)]"
               >
-                <h3 className="text-[18px] font-bold text-[#16324f]">{reason.title}</h3>
-                <p className="mt-3 text-[14px] leading-7 text-slate-600">{reason.body}</p>
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[#dbe8eb] text-[#1c9ab5]">
+                  <Icon className="h-6 w-6" />
+                </div>
+                <p className="mt-5 text-[20px] font-medium leading-8 tracking-[-0.02em] text-[#135d73]">
+                  {title}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[linear-gradient(180deg,#fffdfa_0%,#fcf7f1_100%)]">
+        <div className="mx-auto max-w-[1120px] px-4 py-16 md:px-6 md:py-22">
+          <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="space-y-8">
+              <SideHeading
+                label="Concern"
+                title="まずは、お悩みや不安から"
+                body="自己判断で始める前に、ホームホワイトニングがご自身に合っているかを確認しやすい構成にしています。"
+              />
+              <ul className="space-y-4">
+                {concernItems.map((item) => (
+                  <li
+                    key={item}
+                    className="rounded-[24px] border border-[#efe5da] bg-white px-5 py-5 text-[15px] leading-8 text-slate-700"
+                  >
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="rounded-[34px] border border-[#efe5da] bg-white px-6 py-7 shadow-[0_16px_40px_rgba(93,81,60,0.06)]">
+              <SideHeading
+                label="Why Consult"
+                title="歯科医院で相談しながら始める理由"
+                body="ホームホワイトニングはご自宅で進めやすい方法ですが、お口の状態によっては事前に確認した方がよいケースがあります。"
+              />
+
+              <div className="mt-8 space-y-5">
+                {clinicReasons.map((reason) => (
+                  <div key={reason.title} className="border-t border-[#edf2f2] pt-5 first:border-t-0 first:pt-0">
+                    <h3 className="text-[22px] font-medium tracking-[-0.02em] text-[#135d73]">{reason.title}</h3>
+                    <p className="mt-3 text-[15px] leading-8 text-slate-600">{reason.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="price" className="bg-white">
+        <div className="mx-auto max-w-[1120px] px-4 py-16 md:px-6 md:py-22">
+          <CenterHeading
+            label="Price"
+            title="キャンペーン内容と価格"
+            body="価格は見やすく、ただし煽りすぎない形で整理しています。通常内容との違いもあわせてご確認ください。"
+          />
+
+          <div className="mt-10 overflow-hidden rounded-[36px] border border-[#e7dccc] bg-[#fffdfa]">
+            <div className="grid gap-0 md:grid-cols-2">
+              <div className="border-b border-[#eee3d4] px-6 py-7 md:border-b-0 md:border-r">
+                <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-slate-400">通常</p>
+                <p className="mt-4 text-[20px] font-medium leading-8 tracking-[-0.02em] text-[#135d73]">
+                  ホームホワイトニングジェル4本 + トレー上下
+                </p>
+                <p className="mt-6 text-[40px] font-bold tracking-[-0.04em] text-slate-800">
+                  33,000円
+                  <span className="ml-1 text-[16px] font-medium text-slate-500">（税込）</span>
+                </p>
+              </div>
+
+              <div className="bg-[linear-gradient(180deg,#fcf7f0_0%,#fffdfa_100%)] px-6 py-7">
+                <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-[#0d7187]">キャンペーン</p>
+                <p className="mt-4 text-[20px] font-medium leading-8 tracking-[-0.02em] text-[#135d73]">
+                  ホームホワイトニングジェル6本 + トレー上下 + 通常ケース代220円もセット
+                </p>
+                <p className="mt-6 text-[44px] font-bold tracking-[-0.05em] text-[#135d73]">
+                  28,000円
+                  <span className="ml-1 text-[16px] font-medium text-slate-500">（税込）</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-0 border-t border-[#eee3d4] sm:grid-cols-3">
+              <div className="border-b border-[#eee3d4] px-6 py-5 text-[15px] leading-7 text-slate-600 sm:border-b-0 sm:border-r">
+                ジェル6本
+              </div>
+              <div className="border-b border-[#eee3d4] px-6 py-5 text-[15px] leading-7 text-slate-600 sm:border-b-0 sm:border-r">
+                トレー上下
+              </div>
+              <div className="px-6 py-5 text-[15px] leading-7 text-slate-600">
+                通常ケース代220円もセット
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[30px] border border-[#edf3f3] bg-[#fbfdfd] px-6 py-7">
+            <div className="grid gap-5 md:grid-cols-3">
+              {featureCards.map(({ title, body, icon: Icon }) => (
+                <div key={title}>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#dbe8eb] text-[#1c9ab5]">
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="mt-4 text-[20px] font-medium tracking-[-0.02em] text-[#135d73]">{title}</h3>
+                  <p className="mt-3 text-[14px] leading-7 text-slate-600">{body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-[linear-gradient(180deg,#fffdfa_0%,#f8fbfb_100%)]">
+        <div className="mx-auto max-w-[1120px] px-4 py-16 md:px-6 md:py-22">
+          <CenterHeading
+            label="Recommended"
+            title="こんな方におすすめです"
+            body="急激な変化を求めるよりも、ご自宅で無理なく続けたい方に向いているキャンペーンです。"
+          />
+          <div className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {recommendedItems.map((item) => (
+              <div
+                key={item}
+                className="rounded-[26px] border border-[#e5ecec] bg-white px-5 py-5 text-[15px] leading-7 text-slate-700"
+              >
+                <div className="flex gap-3">
+                  <Check className="mt-1 h-5 w-5 shrink-0 text-[#0d7187]" />
+                  <span>{item}</span>
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-8 rounded-[34px] border border-[#e5ecec] bg-[linear-gradient(135deg,#f7fbfb_0%,#f2f7f7_100%)] p-6 sm:p-7">
+          <div className="mt-10 rounded-[34px] border border-[#efe5da] bg-white px-6 py-7 shadow-[0_16px_40px_rgba(93,81,60,0.05)]">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-              <div className="max-w-[36rem]">
+              <div className="max-w-[37rem]">
                 <SectionLabel>Consultation CTA</SectionLabel>
-                <h3 className="mt-3 text-[24px] font-black leading-[1.25] tracking-[-0.02em] text-[#16324f] sm:text-[28px]">
-                  ホームホワイトニングを始める前に、まずは内容確認から
+                <h3 className="mt-3 text-[28px] font-medium leading-[1.3] tracking-[-0.03em] text-[#135d73]">
+                  はじめる前に、まずは内容確認から
                 </h3>
-                <p className="mt-3 text-[14px] leading-7 text-slate-600">
-                  相談だけでも問題ありません。キャンペーン内容と進め方をご確認いただけます。
+                <p className="mt-3 text-[15px] leading-8 text-slate-600">
+                  ご相談だけでも問題ありません。お口の状態を確認しながら、進め方をご案内します。
                 </p>
               </div>
               <Link
                 href={ctaHref}
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#16324f] px-6 py-4 text-[15px] font-bold text-white shadow-[0_16px_30px_rgba(22,50,79,0.18)] transition-transform hover:-translate-y-0.5"
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-[#135d73] px-6 py-4 text-[15px] font-bold text-white shadow-[0_14px_28px_rgba(19,93,115,0.15)] transition-transform hover:-translate-y-0.5"
               >
                 予約・相談する
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </div>
+        </div>
+      </section>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {featureCards.map(({ title, body, icon: Icon }) => (
-              <div key={title} className="rounded-[28px] border border-[#e5ecec] bg-[#f8fbfb] p-5">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#16324f] shadow-sm">
-                  <Icon className="h-6 w-6" />
+      <section className="bg-white">
+        <div className="mx-auto max-w-[1120px] px-4 py-16 md:px-6 md:py-22">
+          <SideHeading
+            label="Flow"
+            title="ご相談から開始までの流れ"
+            body="スマホでも縦に読み進めやすいよう、流れはステップごとに整理しています。"
+          />
+
+          <div className="mt-10 space-y-8">
+            {flowSteps.map((step, index) => (
+              <div
+                key={step.title}
+                className="grid gap-4 border-t border-[#e9e6df] pt-6 md:grid-cols-[210px_1fr]"
+              >
+                <div className="flex items-center gap-4 text-[#135d73]">
+                  <div className="h-px w-14 bg-[#135d73]" />
+                  <p className="text-[18px] font-medium tracking-[-0.02em]">
+                    step {String(index + 1).padStart(2, '0')}
+                  </p>
                 </div>
-                <h3 className="mt-4 text-[18px] font-bold text-[#16324f]">{title}</h3>
-                <p className="mt-3 text-[14px] leading-7 text-slate-600">{body}</p>
+                <div>
+                  <h3 className="text-[30px] font-medium leading-[1.25] tracking-[-0.03em] text-[#135d73]">
+                    {step.title}
+                  </h3>
+                  <p className="mt-4 max-w-[44rem] text-[15px] leading-8 text-slate-600">{step.body}</p>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="bg-[linear-gradient(180deg,#fcfaf5_0%,#f8fbfb_100%)]">
-        <div className="mx-auto max-w-[1120px] px-4 py-14 md:px-6 md:py-18">
-          <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
-            <div className="rounded-[34px] border border-[#e5ecec] bg-white p-6 shadow-[0_14px_40px_rgba(48,70,78,0.06)] md:p-8">
-              <SectionTitle
-                label="Flow"
-                title="治療の流れ"
-                body="相談からご自宅での開始まで、進め方を段階ごとに確認できます。"
-              />
-              <div className="mt-6 space-y-4">
-                {flowSteps.map((step, index) => (
-                  <div key={step.title} className="flex gap-4 rounded-[24px] bg-[#f7fbfb] p-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#16324f] text-[15px] font-black text-white">
-                      {index + 1}
-                    </div>
-                    <div>
-                      <h3 className="text-[17px] font-bold text-[#16324f]">{step.title}</h3>
-                      <p className="mt-2 text-[14px] leading-7 text-slate-600">{step.body}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[34px] border border-[#eadfca] bg-[linear-gradient(180deg,#fffefb_0%,#fbf6eb_100%)] p-6 shadow-[0_14px_40px_rgba(99,82,38,0.06)] md:p-8">
-              <SectionTitle
+      <section className="bg-[linear-gradient(180deg,#fffdfa_0%,#fcf7f1_100%)]">
+        <div className="mx-auto max-w-[1120px] px-4 py-16 md:px-6 md:py-22">
+          <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="rounded-[34px] border border-[#efe5da] bg-white px-6 py-7">
+              <SideHeading
                 label="Caution"
                 title="注意事項"
-                body="安心してご相談いただくため、事前に知っておきたい点をまとめています。"
+                body="安心してご相談いただくため、あらかじめ知っておきたい点をまとめています。"
               />
-              <ul className="mt-6 space-y-4">
+              <ul className="mt-7 space-y-4">
                 {cautions.map((item) => (
-                  <li key={item} className="flex gap-3 rounded-[24px] bg-white p-4 text-[14px] leading-7 text-slate-600">
-                    <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-[#9b7a34]" />
+                  <li key={item} className="flex gap-3 text-[15px] leading-8 text-slate-600">
+                    <ShieldCheck className="mt-1 h-5 w-5 shrink-0 text-[#c89f65]" />
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <section id="faq" className="bg-white">
-        <div className="mx-auto max-w-[1120px] px-4 py-14 md:px-6 md:py-18">
-          <SectionTitle
-            label="FAQ"
-            title="よくある質問"
-            body="はじめて相談される方が気になりやすい点を、先に確認できるようにしています。"
-          />
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {faqs.map((faq) => (
-              <div
-                key={faq.question}
-                className="rounded-[28px] border border-[#e5ecec] bg-[#f8fbfb] p-5 shadow-[0_12px_28px_rgba(48,70,78,0.04)]"
-              >
-                <div className="flex gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#16324f]">
-                    <CircleHelp className="h-5 w-5" />
+            <div id="faq" className="rounded-[34px] border border-[#e5ecec] bg-[#fbfdfd] px-6 py-7">
+              <SideHeading
+                label="FAQ"
+                title="よくある質問"
+                body="はじめて相談する方が気になりやすい内容を先に確認できるようにしています。"
+              />
+              <div className="mt-7 space-y-5">
+                {faqs.map((faq) => (
+                  <div key={faq.question} className="border-t border-[#e8eff0] pt-5 first:border-t-0 first:pt-0">
+                    <div className="flex gap-3">
+                      <CircleHelp className="mt-1 h-5 w-5 shrink-0 text-[#0d7187]" />
+                      <div>
+                        <h3 className="text-[19px] font-medium tracking-[-0.02em] text-[#135d73]">
+                          {faq.question}
+                        </h3>
+                        <p className="mt-3 text-[15px] leading-8 text-slate-600">{faq.answer}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-[16px] font-bold leading-7 text-[#16324f]">{faq.question}</h3>
-                    <p className="mt-2 text-[14px] leading-7 text-slate-600">{faq.answer}</p>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       </section>
 
-      <section className="bg-[linear-gradient(180deg,#fffdf9_0%,#f4efe2_100%)]">
-        <div className="mx-auto max-w-[1120px] px-4 pb-16 pt-6 md:px-6 md:pb-24">
-          <div className="overflow-hidden rounded-[38px] border border-[#e6d6b8] bg-[linear-gradient(135deg,#16324f_0%,#21486f_58%,#8d7340_160%)] px-6 py-8 text-white shadow-[0_28px_80px_rgba(22,50,79,0.22)] md:px-10 md:py-10">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-[38rem]">
-                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#e8d9b0]">Final CTA</p>
-                <h2 className="mt-3 text-[30px] font-black leading-[1.15] tracking-[-0.03em] md:text-[38px]">
-                  この機会に、まずは
+      <section className="bg-white">
+        <div className="mx-auto max-w-[1120px] px-4 pb-18 pt-6 md:px-6 md:pb-24">
+          <div className="rounded-[40px] border border-[#efe5da] bg-[linear-gradient(135deg,#fffdfa_0%,#f8f4ec_52%,#f6fbfb_100%)] px-6 py-8 shadow-[0_18px_46px_rgba(101,86,65,0.06)] md:px-10 md:py-10">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-[40rem]">
+                <SectionLabel>Final CTA</SectionLabel>
+                <h2 className="mt-3 text-[32px] font-medium leading-[1.25] tracking-[-0.04em] text-[#135d73] md:text-[44px]">
+                  この機会に、
                   <br />
                   ご自身に合う進め方かどうかを
                   <br />
                   相談してみませんか
                 </h2>
-                <p className="mt-4 text-[15px] leading-8 text-white/82">
-                  ホームホワイトニングに興味がある方は、スタッフまでお気軽にご相談ください。ご自身に合う進め方かどうかの確認からでも大丈夫です。
+                <p className="mt-4 text-[15px] leading-8 text-slate-600">
+                  ホームホワイトニングに興味がある方は、スタッフまでお気軽にご相談ください。相談だけでも問題ありません。
                 </p>
               </div>
 
-              <div className="w-full max-w-[340px] rounded-[30px] border border-white/14 bg-white/10 p-5 backdrop-blur">
-                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[#e8d9b0]">Campaign Summary</p>
-                <p className="mt-3 text-[17px] font-bold leading-7">ジェル6本 / トレー上下 / ケースセット</p>
-                <p className="mt-4 text-[32px] font-black tracking-[-0.03em]">28,000円（税込）</p>
-                <p className="mt-2 text-[13px] leading-6 text-white/75">
+              <div className="w-full max-w-[340px] rounded-[30px] border border-white bg-white/90 p-5">
+                <p className="text-[12px] font-bold uppercase tracking-[0.22em] text-[#0d7187]">
+                  Campaign Summary
+                </p>
+                <p className="mt-4 text-[16px] leading-7 text-slate-600">
+                  ジェル6本 / トレー上下 / ケースセット
+                </p>
+                <p className="mt-3 text-[36px] font-bold tracking-[-0.04em] text-[#135d73]">28,000円（税込）</p>
+                <p className="mt-2 text-[13px] leading-6 text-slate-500">
                   期間: 2026年6月1日（月）〜2026年9月30日（水）
                 </p>
                 <Link
                   href={ctaHref}
-                  className="mt-5 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-white px-6 py-4 text-[15px] font-black text-[#16324f] transition-transform hover:-translate-y-0.5"
+                  className="mt-5 inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-full bg-[#135d73] px-6 py-4 text-[15px] font-bold text-white transition-transform hover:-translate-y-0.5"
                 >
                   予約・相談する
                   <ArrowRight className="h-4 w-4" />
                 </Link>
-                <p className="mt-3 text-[12px] leading-6 text-white/70">
+                <p className="mt-3 text-[12px] leading-6 text-slate-500">
                   現在は仮導線としてお問い合わせページへご案内しています。
                 </p>
               </div>
