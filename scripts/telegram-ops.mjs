@@ -1028,9 +1028,38 @@ async function main() {
           continue
         }
 
-        // 1件以上: 最後に追加した（最新の）pending を採用
-        const target = pendingItems[pendingItems.length - 1]
-        console.log(`    → 直近を採用: ${target.slug}（pending 合計 ${pendingItems.length} 件）`)
+        // 2件以上: 管理画面への誘導メッセージを返して終了
+        if (pendingItems.length > 1) {
+          const adminUrl = (siteUrl ? `${siteUrl}/admin/pending-review` : null)
+            ?? 'https://aisoukai-media.vercel.app/admin/pending-review'
+          const circledNums = ['①', '②', '③', '④', '⑤']
+          const listLines = pendingItems
+            .slice(0, 5)
+            .map((p, i) => {
+              const dateStr = p.created_at ? p.created_at.slice(0, 10) : ''
+              const label   = p.title ?? p.slug
+              return `${circledNums[i]} ${label}${dateStr ? `（${dateStr}）` : ''}`
+            })
+            .join('\n')
+          const msg =
+            `複数の review 待ちがあります。管理画面から承認してください:\n${adminUrl}\n\n` +
+            `現在 ${pendingItems.length}件:\n${listLines}\n\n` +
+            `特定の記事を承認する場合:\n  approve <slug> by <名前>`
+
+          console.log(`    ⚠️ pending 複数（${pendingItems.length}件）→ 管理画面誘導`)
+          if (dryRun) {
+            console.log(`    [dry-run] 管理画面誘導メッセージ:\n${msg.split('\n').map(l => '      ' + l).join('\n')}`)
+          } else {
+            await sendTelegram(botToken, msgChatId || defaultChatId, msg).catch((e) => {
+              console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+            })
+          }
+          continue
+        }
+
+        // 1件: その記事を承認
+        const target = pendingItems[0]
+        console.log(`    → 承認対象: ${target.slug}`)
 
         if (dryRun) {
           console.log(`    [dry-run] パイプラインをスキップ`)
