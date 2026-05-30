@@ -184,28 +184,33 @@ npm run status:content
 
 **目的**: スマホ画面で迷わず記事を選んで承認・却下できる管理画面にする
 
+**制約**: AGENTS.md により `approve API / publish API の実装は禁止`。
+承認操作は引き続き CLI コマンドで行う。管理画面はコマンドの**ワンタップコピー**を提供する。
+
 **変更ファイル**:
-- `src/app/admin/pending-review/page.tsx`（または該当ページコンポーネント）
-- `src/app/api/admin/approve/route.ts`（新規: 承認 API ルート）
-- `src/app/api/admin/reject/route.ts`（新規: 却下 API ルート）
+- `src/app/admin/pending-review/page.tsx`
+- `src/app/admin/pending-review/CopyButton.tsx`（改善）
+- `src/app/admin/pending-review/PostBodyPreview.tsx`（既存、必要に応じて）
 
 **実装内容**:
-1. 記事カード化:
+1. 記事カード化（モバイルファースト）:
    - タイトル（大）/ 日付・カテゴリ（小）
-   - 本文冒頭 100文字プレビュー
-   - 画像候補サムネイル（`image` フィールド）
-   - slug は `<details>` で折りたたみ
-   - 重複候補は `⚠️ 重複候補あり` バッジ
-2. 操作ボタン:
-   - `✅ 承認` ボタン → API に slug + reviewer を POST
-   - `❌ 却下` ボタン → 却下理由テキスト入力後に POST
-   - `⏸ 保留` ボタン → UI 上で非表示（再表示可）
-3. 承認 API: `approve-post.mjs` の `approvePost()` 相当の処理をサーバーサイドで実行
-4. スマホ幅（375px）で操作しやすいレイアウト（フルワイド・大きいボタン）
+   - 本文冒頭プレビュー（既存の PostBodyPreview を活用）
+   - 画像サムネイル表示（`post.image` フィールドから）
+   - slug は `<details>` で折りたたみ（補助情報に降格）
+   - 重複候補は `⚠️ 重複候補` バッジ（findDuplicateThemes を活用）
+2. 操作ボタン（コピー方式）:
+   - `✅ 承認コマンドをコピー` ボタン → クリップボードに `npm run approve:post -- <slug> --reviewed-by "氏名"` をコピー
+   - `❌ 却下` ボタン → 却下理由入力 → `npm run reject:post -- <slug> --reason "理由"` をコピー
+   - `⏸ 保留` ボタン → そのカードを UI 上で一時非表示（localStorage で管理）
+   - ボタンは iPhone タップ領域（44px+）
+3. reviewer 名は localStorage に保存（一度入力すれば毎回入力不要）
+4. スマホ幅（375px〜）で縦1列レイアウト
 
 **完了条件**:
 - iPhone 幅でカードが見やすい
-- 承認ボタン押下でファイルが更新される
+- 承認ボタンタップでコマンドがコピーされる
+- 重複候補バッジが表示される
 - `npm run build` が通る
 
 **検証コマンド**:
@@ -213,8 +218,6 @@ npm run status:content
 npm run build
 npm run validate:posts
 ```
-
-**Human Gate**: 承認 API のセキュリティ確認（admin 認証が必要か検討）
 
 ---
 
