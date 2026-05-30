@@ -162,78 +162,93 @@ export function findDuplicateThemes(items) {
   return clusters
 }
 
-function listDisplayTitle(item) {
-  const title = String(item.title ?? '').replace(/\s+/g, ' ').trim()
-  return title.length > 28 ? `${title.slice(0, 28)}…` : title
+// 丸数字（① ② ... ⑩）。11件以上は (11) 等にフォールバック
+const CIRCLE_NUMBERS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩']
+
+function circleNum(n) {
+  return CIRCLE_NUMBERS[n - 1] ?? `(${n})`
 }
 
-function formatReviewItem(item) {
-  const scope = item.isFuture ? '公開日待ち' : '今すぐ承認可'
-  return `- ${listDisplayTitle(item)} [${scope} / ${item.publishAt}]`
-}
+// タイトルを最大 MAX_TITLE_LEN 文字に切り詰める（超えたら … を付ける）
+const MAX_TITLE_LEN = 30
 
-function buildNextAction(status) {
-  const reviewCount = status.pending.length + status.pendingFuture.length
-  if (status.pending.length > 0) {
-    return `今やること: review待ち ${status.pending.length}件を承認してください`
-  }
-  if (status.pendingFuture.length > 0) {
-    return `今やること: review待ち ${reviewCount}件の公開日を確認してください`
-  }
-  if (status.scheduled.length > 0) {
-    return `今やること: 公開予定 ${status.scheduled.length}件を確認してください`
-  }
-  return '今やること: 承認待ちはありません'
+function trimTitle(title) {
+  const t = String(title ?? '').replace(/\s+/g, ' ').trim()
+  return t.length > MAX_TITLE_LEN ? `${t.slice(0, MAX_TITLE_LEN)}…` : t
 }
 
 export function formatContentStatusLines(status, {
   dashboardUrl,
   heading = 'コンテンツ状態サマリー',
-  maxItems = 3,
+  maxItems = 5,
   noPendingText = '承認待ちはありません',
   showNextAction = true,
 } = {}) {
-  const reviewCount = status.pending.length + status.pendingFuture.length
-  const lines = [heading, '']
+  const reviewQueue = [...status.pending, ...status.pendingFuture]
+  const reviewCount = reviewQueue.length
 
-  lines.push(`✅ 公開中:            ${status.live.length}件`)
-  lines.push(`📅 公開予定(reviewed): ${status.scheduled.length}件`)
-  if (reviewCount > 0) {
-    lines.push(`📝 review待ち:         ${reviewCount}件（今すぐ承認可 ${status.pending.length}件 / 公開日待ち ${status.pendingFuture.length}件）`)
-  } else {
-    lines.push(`📝 ${noPendingText}`)
-  }
-  lines.push(`🚫 差し戻し済み:       ${status.rejected.length}件`)
-
-  if (showNextAction) {
-    lines.push('')
-    lines.push(buildNextAction(status))
+  // --- 0件のシンプル表示 ---
+  if (reviewCount === 0) {
+    return [
+      '✅ review待ちはありません',
+      `（公開中: ${status.live.length}件）`,
+    ]
   }
 
-  const reviewQueue = [...status.pending, ...status.pendingFuture].slice(0, maxItems)
-  if (reviewQueue.length > 0) {
-    lines.push('')
-    lines.push('review待ち:')
-    for (const item of reviewQueue) {
-      lines.push(formatReviewItem(item))
-    }
-    const totalReview = status.pending.length + status.pendingFuture.length
-    if (totalReview > maxItems) {
-      lines.push(`...他 ${totalReview - maxItems} 件`)
-    }
-  }
+  // --- 重複検出: どのインデックスが重複クラスタに属するか ---
+  const duplicateClusters = findDuplicateThemes(reviewQueue)
 
-  const duplicateThemes = findDuplicateThemes([...status.pending, ...status.pendingFuture])
-  if (duplicateThemes.length > 0) {
-    lines.push('')
-    lines.push('⚠️ 重複テーマの可能性')
-    for (const group of duplicateThemes.slice(0, 3)) {
-      lines.push(`- ${group.label}: ${group.items.length}件`)
+  // slug → 表示番号（1始まり）のマップを作成
+  // reviewQueue の並び順が番号に対応する
+  const slugToNum = new Map()
+  reviewQueue.forEach((item, idx) => {
+    slugToNum.set(item.slug, idx + 1)
+  })
+
+  // 各インデックスが重複クラスタに含まれるかを判定するセット
+  const duplicateIndexes = new Set()
+  for (const cluster of duplicateClusters) {
+    for (const item of cluster.items) {
+      const num = slugToNum.get(item.slug)
+      if (num != null) duplicateIndexes.add(num)
     }
   }
 
+  // --- 見出し ---
+  const lines = [`📋 review待ち ${reviewCount}件`, '']
+
+  // --- 番号付きリスト（最大 maxItems 件） ---
+  const displayItems = reviewQueue.slice(0, maxItems)
+  for (let i = 0; i < displayItems.length; i++) {
+    const item = displayItems[i]
+    const num = i + 1
+    const badge = duplicateIndexes.has(num) ? '⚠️' : ''
+    lines.push(`${circleNum(num)} ${trimTitle(item.title)}（${item.publishAt}）${badge}`)
+  }
+
+  // 5件超の場合は残件数を追記
+  if (reviewCount > maxItems) {
+    lines.push(`（他 ${reviewCount - maxItems}件は管理画面で確認）`)
+  }
+
+  // --- 重複説明行 ---
+  for (const cluster of duplicateClusters) {
+    // クラスタ内の記事を番号でリストアップ（maxItems 表示範囲内のもののみ）
+    const nums = cluster.items
+      .map((item) => slugToNum.get(item.slug))
+      .filter((n) => n != null && n <= maxItems)
+      .sort((a, b) => a - b)
+      .map(circleNum)
+    if (nums.length >= 2) {
+      lines.push('')
+      lines.push(`⚠️ 重複候補: ${nums.join('')} 同タイトル`)
+    }
+  }
+
+  // --- 管理画面リンク ---
   lines.push('')
-  lines.push(`管理URL: ${dashboardUrl}`)
+  lines.push('承認・却下はこちら:')
+  lines.push(dashboardUrl)
 
   return lines
 }
