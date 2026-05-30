@@ -9,11 +9,11 @@ tags:
   - 予防
 author: 藍想会メディア編集部
 reviewed: true
-image: /images/library/preventive/preventive-34130816.jpg
+image: /images/library/periodontal/periodontal-3875359.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
-image_alt: ピンク制服の歯科スタッフが歯の模型を持って説明するイメージ
+image_alt: 指で押すとグラグラする歯を表現した粘土模型のイメージ
 ---
 
 ## 歯周病とはどのような病気か
