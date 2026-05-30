@@ -97,6 +97,7 @@ export type PendingReviewPost = {
   excerpt: string;
   contentHtml: string;
   rejectionReason?: string;
+  image?: string;
 };
 
 function toDateString(val: unknown): string {
@@ -132,6 +133,7 @@ export async function getPendingReviewPosts(): Promise<PendingReviewPost[]> {
         excerpt:         String(data['excerpt'] ?? data['description'] ?? ''),
         contentHtml:     processed.toString(),
         rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
+        image:           data['image'] ? String(data['image']) : undefined,
       };
     }),
   );

@@ -4,6 +4,7 @@ import { getRecentReviewLog } from '@/lib/reviewLog'
 import { NOINDEX_METADATA } from '@/lib/seo'
 import CopyButton from './CopyButton'
 import PostBodyPreview from './PostBodyPreview'
+import ReviewerNameClient from './ReviewerNameClient'
 
 export const metadata: Metadata = {
   title: 'Pending Review | Admin',
@@ -21,56 +22,55 @@ export default async function PendingReviewPage() {
   const rejected = allPosts.filter((p) =>  p.rejectionReason)
   const recentLog = getRecentReviewLog(8)
 
+  // 簡易重複検出: タイトルが完全一致する slug の組
+  const titleToSlugs = new Map<string, string[]>()
+  for (const post of pending) {
+    const existing = titleToSlugs.get(post.title) ?? []
+    titleToSlugs.set(post.title, [...existing, post.slug])
+  }
+  const duplicateSlugs = new Set<string>()
+  for (const slugs of titleToSlugs.values()) {
+    if (slugs.length > 1) slugs.forEach((s) => duplicateSlugs.add(s))
+  }
+
   return (
-    <div className="mx-auto max-w-[900px] px-4 py-10">
+    <div className="mx-auto max-w-[640px] px-4 py-8">
 
       {/* ── ヘッダー ── */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Human Review 待ち記事</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          reviewed: false の記事一覧。
-          <strong className="text-red-600">承認・公開ボタンはありません。</strong>
-          コマンドをコピーして CLI で実行してください。
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-xl font-bold text-gray-800">Human Review 待ち</h1>
+          <span className="rounded-full bg-yellow-100 px-3 py-1 text-sm font-bold text-yellow-800">
+            {pending.length} 件
+          </span>
+        </div>
+
+        {/* 承認者表示 */}
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+          <ReviewerNameClient />
+        </div>
+
+        {/* 操作ガイド */}
+        <p className="mt-3 text-sm text-gray-500">
+          コマンドをコピーして Terminal で実行してください。
+          <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-600">
+            承認者名は自動で差し込まれます
+          </span>
         </p>
-        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-xs text-gray-600">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-semibold text-gray-700">
-              各記事のコマンドはコピーして CLI で実行してください
-            </p>
-            <span className="rounded-full bg-white px-2.5 py-0.5 font-medium text-gray-500">
-              表示のみ / 変更ボタンなし
-            </span>
-          </div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <div className="rounded-lg border border-green-100 bg-white px-3 py-2">
-              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-green-700">
-                approve
-              </div>
-              <p className="font-mono text-[11px] text-gray-700">
-                npm run approve:post -- &lt;slug&gt; --reviewed-by &quot;氏名&quot;
-              </p>
-            </div>
-            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-              <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-700">
-                reject
-              </div>
-              <p className="font-mono text-[11px] text-gray-700">
-                npm run reject:post -- &lt;slug&gt; --reason &quot;理由&quot; --reviewed-by &quot;氏名&quot;
-              </p>
-            </div>
-          </div>
+
+        {/* バッジ凡例 */}
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          <span className="flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-orange-700">
+            📅 未来日 — その日まで非公開
+          </span>
+          <span className="flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-red-700">
+            ⚠️ 重複候補 — タイトル重複
+          </span>
         </div>
       </div>
 
       {/* ── 通常 pending セクション ── */}
       <section>
-        <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-gray-700">
-          レビュー待ち
-          <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-sm font-bold text-yellow-800">
-            {pending.length} 件
-          </span>
-        </h2>
-
         {pending.length === 0 ? (
           <div className="rounded-lg border border-green-200 bg-green-50 px-6 py-10 text-center text-green-700">
             Review 待ちの記事はありません。
@@ -80,103 +80,146 @@ export default async function PendingReviewPage() {
             {pending.map((post) => {
               const effectiveDate     = post.publishAt ?? post.date
               const isFutureScheduled = effectiveDate > today
+              const isDuplicate       = duplicateSlugs.has(post.slug)
               const approveCmd = `npm run approve:post -- ${post.slug} --reviewed-by "氏名"`
               const rejectCmd  = `npm run reject:post  -- ${post.slug} --reason "差し戻し理由"`
 
               return (
                 <div
                   key={post.slug}
-                  className={`rounded-xl border-2 bg-white p-5 shadow-sm ${
+                  className={`rounded-2xl border-2 bg-white shadow-sm ${
                     isFutureScheduled ? 'border-orange-300' : 'border-gray-200'
                   }`}
                 >
-                  {/* タイトル + バッジ */}
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <h3 className="text-base font-semibold text-gray-800">{post.title}</h3>
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">
-                        未承認
+                  {/* バッジ行 */}
+                  <div className="flex flex-wrap gap-1.5 px-4 pt-4">
+                    {isDuplicate && (
+                      <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                        ⚠️ 重複候補
                       </span>
-                      {post.aiGenerated && (
-                        <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-                          AI生成
-                        </span>
-                      )}
-                      {isFutureScheduled && (
-                        <span className="rounded-full bg-orange-500 px-2.5 py-0.5 text-xs font-bold text-white">
-                          📅 未来日 {effectiveDate}
-                        </span>
-                      )}
-                    </div>
+                    )}
+                    {isFutureScheduled && (
+                      <span className="rounded-full bg-orange-500 px-2.5 py-0.5 text-xs font-bold text-white">
+                        📅 未来日 {effectiveDate}
+                      </span>
+                    )}
+                    {post.aiGenerated && (
+                      <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                        AI生成
+                      </span>
+                    )}
+                    <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-semibold text-yellow-800">
+                      未承認
+                    </span>
                   </div>
 
-                  {/* 未来日注意バナー */}
-                  {isFutureScheduled && (
-                    <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 px-4 py-3">
-                      <span className="text-lg">⚠️</span>
-                      <p className="text-sm text-orange-800">
-                        公開予定日（{effectiveDate}）が未来のため、approved にしても
-                        <strong>その日が来るまでビルドに含まれません</strong>。
-                      </p>
-                    </div>
-                  )}
+                  <div className="px-4 pt-2 pb-4">
+                    {/* タイトル */}
+                    <h3 className="text-base font-semibold leading-snug text-gray-800">
+                      {post.title}
+                    </h3>
 
-                  {/* excerpt */}
-                  {post.excerpt && (
-                    <p className="mt-3 line-clamp-2 text-sm text-gray-500">{post.excerpt}</p>
-                  )}
+                    {/* サムネイル + カテゴリ + 日付 */}
+                    <div className="mt-2 flex items-center gap-3">
+                      {post.image && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={post.image}
+                          alt={post.title}
+                          width={80}
+                          height={80}
+                          className="h-[80px] w-[80px] shrink-0 rounded-lg object-cover"
+                        />
+                      )}
+                      <div className="text-xs text-gray-500">
+                        <p className="font-semibold text-gray-600">{post.category}</p>
+                        <p className={isFutureScheduled ? 'font-bold text-orange-600' : ''}>
+                          {post.date}
+                        </p>
+                        {post.publishAt && (
+                          <p className={post.publishAt > today ? 'font-bold text-orange-600' : ''}>
+                            公開: {post.publishAt}
+                          </p>
+                        )}
+                      </div>
+                    </div>
 
-                  {/* 本文プレビュー */}
-                  {post.contentHtml && (
-                    <PostBodyPreview contentHtml={post.contentHtml} />
-                  )}
+                    {/* excerpt */}
+                    {post.excerpt && (
+                      <p className="mt-2 line-clamp-2 text-sm text-gray-500">{post.excerpt}</p>
+                    )}
 
-                  {/* メタ情報 */}
-                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded bg-gray-50 p-3 text-xs sm:grid-cols-4">
-                    <div>
-                      <dt className="font-semibold text-gray-600">slug</dt>
-                      <dd className="break-all font-mono text-gray-500">{post.slug}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-gray-600">date</dt>
-                      <dd className={isFutureScheduled ? 'font-bold text-orange-600' : 'text-gray-500'}>
-                        {post.date}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-gray-600">publish_at</dt>
-                      <dd className={post.publishAt && post.publishAt > today ? 'font-bold text-orange-600' : 'text-gray-500'}>
-                        {post.publishAt ?? '—'}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-gray-600">category</dt>
-                      <dd className="text-gray-500">{post.category}</dd>
-                    </div>
-                  </dl>
+                    {/* 未来日注意バナー */}
+                    {isFutureScheduled && (
+                      <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2">
+                        <span>⚠️</span>
+                        <p className="text-xs text-orange-800">
+                          公開予定日（{effectiveDate}）が未来のため、approved にしても
+                          <strong>その日が来るまで非公開</strong>です。
+                        </p>
+                      </div>
+                    )}
 
-                  {/* コマンド + Copy ボタン */}
-                  <div className="mt-4 grid gap-2">
-                    {/* 承認コマンド */}
-                    <div className="flex flex-col gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 sm:flex-row sm:items-center">
-                      <span className="w-fit shrink-0 rounded-full bg-green-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                        approve
-                      </span>
-                      <code className="flex-1 break-all font-mono text-xs text-green-800">
-                        {approveCmd}
-                      </code>
-                      <CopyButton text={approveCmd} label="📋 承認コマンドをコピー" variant="approve" />
+                    {/* 承認ボタン（大・フルワイド） */}
+                    <div className="mt-4 grid gap-2">
+                      <CopyButton
+                        text={approveCmd}
+                        label="✅ 承認コマンドをコピー"
+                        variant="approve"
+                      />
+                      <CopyButton
+                        text={rejectCmd}
+                        label="❌ 却下コマンドをコピー"
+                        variant="reject"
+                      />
                     </div>
-                    {/* 差し戻しコマンド */}
-                    <div className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center">
-                      <span className="w-fit shrink-0 rounded-full bg-gray-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                        reject
-                      </span>
-                      <code className="flex-1 break-all font-mono text-xs text-gray-500">
-                        {rejectCmd}
-                      </code>
-                      <CopyButton text={rejectCmd} label="📋 差戻コマンドをコピー" variant="reject" />
-                    </div>
+
+                    {/* 折りたたみ: 本文プレビュー + メタ情報 */}
+                    <details className="mt-3 text-xs">
+                      <summary className="cursor-pointer select-none text-gray-400 hover:text-gray-600">
+                        ▶ slug / メタ情報 / 本文プレビュー
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {/* メタ情報 */}
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-gray-50 p-3 sm:grid-cols-4">
+                          <div>
+                            <dt className="font-semibold text-gray-600">slug</dt>
+                            <dd className="break-all font-mono text-gray-500">{post.slug}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold text-gray-600">date</dt>
+                            <dd className={isFutureScheduled ? 'font-bold text-orange-600' : 'text-gray-500'}>
+                              {post.date}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold text-gray-600">publish_at</dt>
+                            <dd className={post.publishAt && post.publishAt > today ? 'font-bold text-orange-600' : 'text-gray-500'}>
+                              {post.publishAt ?? '—'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold text-gray-600">category</dt>
+                            <dd className="text-gray-500">{post.category}</dd>
+                          </div>
+                        </dl>
+
+                        {/* コマンド全文（参照用） */}
+                        <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2">
+                          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-green-700">approve</p>
+                          <code className="break-all font-mono text-[11px] text-green-800">{approveCmd}</code>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-600">reject</p>
+                          <code className="break-all font-mono text-[11px] text-gray-600">{rejectCmd}</code>
+                        </div>
+
+                        {/* 本文プレビュー */}
+                        {post.contentHtml && (
+                          <PostBodyPreview contentHtml={post.contentHtml} />
+                        )}
+                      </div>
+                    </details>
                   </div>
                 </div>
               )
