@@ -47,7 +47,7 @@ async function main() {
   const text   = buildReviewSummary(status, {
     dashboardUrl,
     heading: '📊 review待ちサマリー',
-    maxItems: 3,
+    maxItems: 5,
     noPendingText: '承認待ちはありません',
     showNextAction: true,
   })

@@ -36,7 +36,7 @@ function main() {
       ? `${process.env.NEXT_PUBLIC_SITE_URL}/admin/pending-review`
       : 'https://aisoukai-media.vercel.app/admin/pending-review',
     heading: 'コンテンツ状態ダッシュボード',
-    maxItems: 3,
+    maxItems: 5,
     noPendingText: '承認待ちはありません',
     showNextAction: true,
   }))
