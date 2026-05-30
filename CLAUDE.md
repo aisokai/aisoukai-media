@@ -21,4 +21,22 @@
 
 - 通常作業: デフォルト（Sonnet）
 - 多ファイル因果追跡・設計判断: 上位モデルに切り替え
+
+## DMP AI編集部 ショートカット指示
+
+DMP = Dental Media Project。以下の短縮形でタスクを指示できる。
+
+| 指示形式 | 意味 | 実行コマンド |
+|---------|------|------------|
+| `dmp:blog <テーマ>` | ブログ記事を依頼 | article:manual または generate:draft |
+| `dmp:research` | 記事候補調査 | research:trends |
+| `dmp:status` | コンテンツ状態確認 | status:content |
+| `dmp:pending` | 承認待ち一覧 | list:pending-review |
+| `dmp:review <slug>` | 医療広告リスクチェック | validate:publish-ready + 手動確認 |
+
+**SNS / Website / YouTube 指示（Phase 2〜4 以降）**:
+- `dmp:sns <テーマ>` — SNS投稿ドラフトを依頼（Phase 2 で実装予定）
+- `dmp:youtube <テーマ>` — YouTubeスクリプトを依頼（Phase 4 で実装予定）
+
+詳細は `docs/dmp/` を参照。
 <!-- END:claude-code-supplement -->

@@ -1,0 +1,91 @@
+# DMP コンテンツキュー — サンプルスキーマ
+# このファイルは schema の参考例です。実運用では別ファイルを使用する。
+# 更新: 2026-05-31
+
+# status フィールドの有効値:
+#   idea / research / draft / review / approval_waiting / approved /
+#   published / rejected / archived
+
+queue:
+
+  - id: "DMP-2026-0001"
+    channel: blog
+    title: "ホワイトニングの種類と選び方"
+    category: "ホワイトニング"
+    status: approved
+    assigned_to: blog
+    priority: high
+    medical_risk: low
+    target_keyword: "ホワイトニング 種類"
+    patient_intent: "自分に合ったホワイトニング方法を知りたい"
+    created_at: "2026-05-31"
+    reviewed_by: "三谷"
+    reviewed_at: "2026-05-31"
+    notes: "院内ホワイトニングと市販品の比較を含める"
+    related_post: "2026-05-31-whitening-types.md"
+
+  - id: "DMP-2026-0002"
+    channel: blog
+    title: "子どもの虫歯予防：フッ素塗布の正しい知識"
+    category: "小児歯科"
+    status: draft
+    assigned_to: blog
+    priority: medium
+    medical_risk: low
+    target_keyword: "フッ素塗布 子ども"
+    patient_intent: "子どものフッ素塗布の安全性と効果を正確に知りたい"
+    created_at: "2026-05-30"
+    reviewed_by: null
+    reviewed_at: null
+    notes: "断定的な効果表現を避ける。「一般的に」「研究によると」等を使う"
+    related_post: "2026-05-30-fluoride-children.md"
+
+  - id: "DMP-2026-0003"
+    channel: sns
+    title: "Instagram: 歯ブラシの正しい持ち方（カルーセル案）"
+    category: "予防歯科"
+    status: idea
+    assigned_to: sns
+    priority: low
+    medical_risk: low
+    target_keyword: null
+    patient_intent: "正しいブラッシング方法を動画や画像で学びたい"
+    created_at: "2026-05-31"
+    reviewed_by: null
+    reviewed_at: null
+    notes: "Phase 2 で SNS部が担当。現在は idea ステージで保留"
+    related_post: null
+
+  - id: "DMP-2026-0004"
+    channel: youtube
+    title: "YouTube Shorts: 歯医者が怖い人へ3つのアドバイス"
+    category: "患者コミュニケーション"
+    status: idea
+    assigned_to: youtube
+    priority: low
+    medical_risk: low
+    target_keyword: "歯医者 怖い 克服"
+    patient_intent: "歯医者への恐怖心を和らげる方法を知りたい"
+    created_at: "2026-05-31"
+    reviewed_by: null
+    reviewed_at: null
+    notes: "Phase 4 で YouTube部が担当。スクリプト生成のみ。撮影は Human"
+    related_post: null
+
+# --- スキーマ定義 ---
+#
+# id:              DMP-YYYY-NNNN 形式。一意に識別する
+# channel:         blog / sns / website / youtube
+# title:           コンテンツタイトル（案）
+# category:        コンテンツカテゴリ
+# status:          上記 status フィールド参照
+# assigned_to:     担当部門 ID（dmp-departments.yaml の id）
+# priority:        high / medium / low
+# medical_risk:    high / medium / low（医療広告リスク）
+# target_keyword:  SEO 対象キーワード（null 可）
+# patient_intent:  患者の検索意図
+# created_at:      YYYY-MM-DD
+# reviewed_by:     承認者名（Human のみ。null = 未承認）
+# reviewed_at:     承認日（YYYY-MM-DD。null = 未承認）
+# notes:           運用メモ
+# related_post:    対応する記事ファイル名（content/posts/ 配下）

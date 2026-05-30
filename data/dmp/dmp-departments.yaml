@@ -1,0 +1,165 @@
+# DMP AI編集部 — 部門データ定義
+# DMP = Dental Media Project
+# 更新: 2026-05-31
+
+departments:
+
+  - id: editor_in_chief
+    name_ja: 編集長
+    name_en: Editor-in-Chief
+    role: >
+      ユーザーとの単一窓口。自然言語の依頼を DMP タスクに変換し、
+      適切な部門に割り振る。承認・公開の実行は行わない。
+    inputs:
+      - ユーザーの自然言語指示（Telegram / Claude Code 直接指示）
+    outputs:
+      - 部門別タスク定義
+      - コンテンツキューエントリー
+    can_approve: false
+    can_publish: false
+    phase: current
+
+  - id: research
+    name_ja: 調査部
+    name_en: Research
+    role: >
+      歯科トレンド調査、患者ニーズ分析、競合メディア調査、SEO キーワード収集。
+      調査結果は Human レビューを経てから採用する。
+    inputs:
+      - 歯科業界トレンド
+      - 患者からの FAQ
+      - 競合メディア
+    outputs:
+      - data/research/YYYY-MM-DD-trends.json
+      - data/research/YYYY-MM-DD-trends.csv
+    commands:
+      - npm run research:trends
+    can_approve: false
+    can_publish: false
+    phase: current
+
+  - id: blog
+    name_ja: ブログ部
+    name_en: Blog
+    role: >
+      記事アイデア生成、アウトライン作成、本文ドラフト、
+      SEO タイトル・メタディスクリプション。
+      生成記事は必ず reviewed:false / ai_generated:true で出力する。
+    inputs:
+      - data/article-topics.sample.csv（承認済み topic）
+      - data/article-requests.json（Telegram リクエスト）
+    outputs:
+      - content/posts/YYYY-MM-DD-slug.md（reviewed:false）
+    commands:
+      - npm run generate:draft -- <TOPIC-ID>
+      - npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD
+      - npm run article:scheduled
+    can_approve: false
+    can_publish: false
+    phase: current
+
+  - id: sns
+    name_ja: SNS部
+    name_en: SNS
+    role: >
+      Instagram / X / LINE の投稿ドラフト、カルーセルアウトライン、短文キャプション。
+      ドラフト生成のみ。Human がコピー&ペーストで手動投稿する。
+    inputs:
+      - 編集長からのタスク指示
+      - ブログ記事（リパーパス用）
+    outputs:
+      - data/dmp/sns-drafts/（将来）
+    commands: []
+    can_approve: false
+    can_publish: false
+    phase: phase2  # 未実装
+
+  - id: website
+    name_ja: ウェブサイト部
+    name_en: Website
+    role: >
+      クリニックサイト・LP・サービスページのコピーライティング、CVR 改善テキスト。
+      テキストドラフト生成のみ。Human が CMS または PR でデプロイする。
+    inputs:
+      - 編集長からのタスク指示
+      - 診療メニュー情報
+    outputs:
+      - docs/dmp/website-drafts/（将来）
+    commands: []
+    can_approve: false
+    can_publish: false
+    phase: phase3  # 未実装
+
+  - id: youtube
+    name_ja: YouTube部
+    name_en: YouTube
+    role: >
+      動画アイデア、スクリプト（本編・Shorts）、サムネイルテキスト案。
+      スクリプト生成のみ。Human が撮影・編集・YouTube Studio で投稿する。
+    inputs:
+      - 編集長からのタスク指示
+      - 調査部の SEO データ
+    outputs:
+      - data/dmp/youtube-scripts/（将来）
+    commands: []
+    can_approve: false
+    can_publish: false
+    phase: phase4  # 未実装
+
+  - id: creative
+    name_ja: クリエイティブ部
+    name_en: Creative
+    role: >
+      画像プロンプト生成、サムネイルコンセプト、ビジュアルディレクション。
+      最終的な画像の公開判断は Human。AI生成画像の医療行為写実的描写は禁止。
+    inputs:
+      - 編集長からのタスク指示
+      - 記事内容
+    outputs:
+      - 画像プロンプト（テキスト）
+      - data/image-library.json（既存）
+    commands:
+      - npm run image:suggest -- <slug>
+      - npm run image:assign -- <slug> --image <image-id>
+    can_approve: false
+    can_publish: false
+    phase: current
+
+  - id: review
+    name_ja: レビュー部
+    name_en: Review
+    role: >
+      医療広告表現リスク審査、事実確認、トーン確認、患者誤解リスク評価。
+      レビュー通過だけでは公開されない。Human 承認が別途必要。
+    inputs:
+      - content/posts/*.md（ドラフト）
+      - data/dmp/sns-drafts/（将来）
+    outputs:
+      - レビュー結果レポート（logs/review-history.md に append）
+    commands:
+      - npm run validate:publish-ready
+      - npm run validate:posts
+    can_approve: false
+    can_publish: false
+    phase: current
+
+  - id: publishing_control
+    name_ja: 公開管理部
+    name_en: Publishing Control
+    role: >
+      承認キュー管理、公開ステータス追跡、監査ログ。自動公開は禁止。
+      Human が approve:post → build → git push を明示的に実行する。
+    inputs:
+      - コンテンツキュー
+      - approve/reject 実行結果
+    outputs:
+      - 承認待ちリスト
+      - 公開ステータスレポート
+      - logs/review-history.md（append-only）
+    commands:
+      - npm run status:content
+      - npm run list:pending-review
+      - npm run validate:publish-ready
+    can_approve: false  # Human のみが approve を実行する
+    can_publish: false  # Human のみが publish を実行する
+    phase: current
