@@ -9,11 +9,11 @@ tags:
   - 歯の保存
 author: 藍想会メディア編集部
 reviewed: true
-image: /images/library/cavity/cavity-34431026.jpg
+image: /images/library/general/general-26207716.jpg
 draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
-image_alt: ゴールドクラウンと歯科技工ケースのイメージ
+image_alt: 重度の虫歯が神経に達した歯の断面カラーイラスト（根管治療適応例）
 ---
 
 ## 根管治療とはどんな処置か
