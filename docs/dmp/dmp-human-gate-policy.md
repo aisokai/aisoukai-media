@@ -15,6 +15,7 @@
 | AI による自動公開は禁止 | AGENTS.md |
 | AI による `publish_at` の過去日付操作は禁止 | AGENTS.md |
 | `reviewed: false` の記事はビルドに含まれない | 実装レベルで保証済み |
+| `reviewed: true` でも `publish_at` または `date` が未来の場合は即時公開しない | dmp-content-lifecycle.md |
 | approve 操作は Human が CLI または明示的 UI 操作でのみ実行 | AGENTS.md |
 | git push は Human が手動実行 | AGENTS.md・CLAUDE.md |
 | 外部 API（Meta/YouTube/LINE）への自動投稿は禁止 | AGENTS.md |

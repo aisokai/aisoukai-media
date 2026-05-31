@@ -27,8 +27,9 @@ approval_waiting        ← [GATE] Human 承認待ち
   ▼
 approved
   │  Human が手動 build / 手動投稿 を実施
+  │  ※ publish_at または記事日付が未来の場合は即時公開しない（後述）
   ▼
-published_manually      ← 公開済み（手動操作のみ）
+published               ← 公開済み（Human の手動操作のみ）
   または
 archived                ← 不採用・保留の最終状態
 ```
@@ -44,8 +45,8 @@ archived                ← 不採用・保留の最終状態
 | `draft` | ✅ AI 下書き生成可 | 任意で本文修正 | ブログ部 / SNS部 / etc. |
 | `review` | ✅ AI リスク評価可 | 評価結果を確認 | レビュー部 |
 | `approval_waiting` | ❌ AI 操作禁止 | approve / reject を明示実行 | Human |
-| `approved` | ❌ AI 操作禁止 | build / publish を明示実行 | Human |
-| `published_manually` | ❌ AI 操作禁止 | 必要に応じて更新 | Human |
+| `approved` | ❌ AI 操作禁止 | build / publish を明示実行（未来日付は保留） | Human |
+| `published` | ❌ AI 操作禁止 | 必要に応じて更新 | Human |
 | `archived` | ✅ AI がアーカイブ提案可 | 最終承認は Human | Human |
 
 ---
@@ -61,6 +62,7 @@ idea → research（npm run research:trends）
   → approval_waiting（list:pending-review で確認）
   → approved（npm run approve:post -- <slug> --reviewed-by "氏名"）
   → published（npm run build → Human が git push）
+  ※ publish_at または記事日付が未来の場合: approved のまま保留。build 時は静的生成から除外される
 ```
 
 関連ファイル:
@@ -76,7 +78,7 @@ idea → research
   → review（医療広告チェック）
   → approval_waiting
   → approved（Human がドラフトをコピー）
-  → published_manually（各プラットフォームで Human が手動投稿）
+  → published（各プラットフォームで Human が手動投稿）
 ```
 
 制約:
@@ -91,7 +93,7 @@ idea → draft（テキストドラフト Markdown）
   → review（医療広告チェック + SEO確認）
   → approval_waiting
   → approved
-  → published_manually（Human が CMS または PR でデプロイ）
+  → published（Human が CMS または PR でデプロイ）
 ```
 
 ### YouTube（Phase 4 以降）
@@ -102,7 +104,7 @@ idea → research（検索需要・競合調査）
   → review（医療情報正確性チェック）
   → approval_waiting
   → approved（Human がスクリプトを確認）
-  → published_manually（Human が撮影・編集・YouTube Studio で投稿）
+  → published（Human が撮影・編集・YouTube Studio で投稿）
 ```
 
 ---
@@ -124,6 +126,36 @@ idea → research（検索需要・競合調査）
 | `published` | 公開済み | 必要に応じて更新 |
 | `rejected` | 差し戻し | 修正後に resubmit |
 | `archived` | 最終状態 | なし（データ保持） |
+
+---
+
+## 未来日付コンテンツの公開ルール
+
+`reviewed: true` であっても以下の条件に該当するコンテンツは **即時公開しない**。
+
+| 条件 | 動作 | 理由 |
+|------|------|------|
+| `publish_at` が現在日より未来 | `approved` のまま保留。ビルドに含まれない | スケジュール公開の安全保証 |
+| 記事日付（`date` フィールド）が現在日より未来 | 同上 | 誤早期公開の防止 |
+| `draft: true` が残っている | 公開対象外 | 下書きフラグが残存している |
+
+### Blog での実装保証
+
+Next.js の静的生成ロジック（`src/lib/posts.ts`）は以下の記事を公開から除外する。
+
+- `reviewed: false`
+- `draft: true`
+- `publish_at` が現在日より未来
+
+Human が `npm run validate:publish-ready` を実行すると、上記フィルタ適用後に公開対象となる記事数を確認できる。
+
+### SNS / Website / YouTube（将来チャンネル）での運用
+
+自動スケジュール公開機能を実装する場合は、以下をコード実装時に必ず保証する。
+
+- `reviewed: true` かつ `approved` 状態であっても、`publish_at` が未来なら即時投稿しない
+- 投稿スケジュールのキャンセルは Human が明示的に実行する
+- スケジュール済みコンテンツの一覧は Human がいつでも確認できる状態を維持する
 
 ---
 
