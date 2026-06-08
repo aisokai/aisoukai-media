@@ -87,7 +87,12 @@ aisoukai-media/
 | `ANTHROPIC_API_KEY` | generate:draft 実行時 | Claude API キー。`.env.local` に記述し commit しないこと |
 | `TELEGRAM_BOT_TOKEN` | test:telegram / 将来の通知連携 | BotFather で取得したトークン。`.env.local` に記述し commit しないこと |
 | `TELEGRAM_CHAT_ID` | test:telegram / 将来の通知連携 | 通知先チャット ID（個人 DM の場合は数値 ID）。`.env.local` に記述し commit しないこと |
-| `TELEGRAM_ALLOWED_CHAT_IDS` | telegram:ops | `approve` / `reject` コマンドを受け付ける chat_id または from_id のカンマ区切りリスト。未設定時は `TELEGRAM_CHAT_ID` にフォールバック |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | telegram:ops | Telegram からの記事リクエスト取得・通知先制限に使用する chat_id または from_id のカンマ区切りリスト。未設定時は `TELEGRAM_CHAT_ID` にフォールバック |
+| `ADMIN_REVIEW_PASSWORD` | スマホ承認フロー | `/admin/pending-review` へログインするための管理者パスワード。Vercel Production に設定する |
+| `ADMIN_REVIEW_COOKIE_SECRET` | スマホ承認フロー | 管理画面ログイン Cookie の署名用秘密鍵。32文字以上のランダム文字列を Vercel Production に設定する |
+| `GITHUB_REVIEW_TOKEN` | スマホ承認フロー | `/admin/pending-review` の承認・却下操作で GitHub に commit するための token。`aisokai/aisoukai-media` への contents 書き込み権限が必要 |
+| `GITHUB_REVIEW_REPO` | スマホ承認フロー | GitHub repo 名。通常は `aisokai/aisoukai-media` |
+| `GITHUB_REVIEW_BRANCH` | スマホ承認フロー | commit 先 branch。通常は `main` |
 
 ```bash
 # .env.local に設定する例
@@ -113,8 +118,8 @@ TELEGRAM_CHAT_ID=<チャット ID>
    ```
 
 **Vercel へのデプロイ時:**
-Vercel ダッシュボード → Settings → Environment Variables に `NEXT_PUBLIC_SITE_URL` を設定してください。
-未設定または localhost URL のままでは本番ビルドがエラーで停止します（sitemap / OGP への localhost 混入を防ぐ安全装置）。
+Vercel ダッシュボード → Settings → Environment Variables に `NEXT_PUBLIC_SITE_URL` とスマホ承認フロー用の環境変数を設定してください。
+`NEXT_PUBLIC_SITE_URL` が未設定または localhost URL のままでは本番ビルドがエラーで停止します（sitemap / OGP への localhost 混入を防ぐ安全装置）。
 
 ## 公開条件
 
@@ -169,7 +174,7 @@ tags:
 | `npm run notify:pending-review` | pending review 記事の一覧を console 出力し、Telegram Bot に通知する（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run notify:posting-reminder` | 月・水・金にコンテンツ状態サマリーを Telegram に送る投稿確認リマインド。`--force` で曜日に関係なく送信 |
 | `npm run telegram:requests` | Telegram 受信メッセージから記事リクエストを取得（デフォルト dry-run / `--apply` で保存） |
-| `npm run telegram:ops` | Telegram 記事運用フロー: 新着メッセージを解析し、記事リクエスト→下書き生成・`approve <slug>`→承認・`reject <slug>`→差し戻しを処理（デフォルト dry-run / `--apply` で実行 / `--build` で build も実行） |
+| `npm run telegram:ops` | Telegram 記事運用フロー: 新着メッセージを解析し、記事リクエスト取得・下書き生成の補助を行う（デフォルト dry-run / `--apply` で実行 / `--build` で build も実行）。Telegram から直接 approve / reject / publish はしない |
 | `npm run request:list` | `data/article-requests.json` の記事リクエスト一覧を表示（読み取り専用） |
 | `npm run request:draft -- <update_id> --category "カテゴリ" --date YYYY-MM-DD` | リクエストから frontmatter のみの下書き記事を生成し、pending-review に追加する（Human がトリガー） |
 | `npm run request:ignore -- <update_id> --reason "理由"` | リクエストを見送り（ignored）にする。元メッセージは削除しない |
@@ -197,6 +202,17 @@ tags:
 | `npm run status:content` | 公開中・公開予定・review待ち・差し戻し済みの件数と一覧を表示する（読み取り専用） |
 | `npm run status:publish-ready` | publish-ready 判定チェック（exit 1 でも CI エラー扱いしない確認用コマンド） |
 
+### スマホ承認フロー
+
+1. Telegram 通知から `/admin/pending-review` を開く
+2. 管理者パスコードでログインする
+3. 記事本文・画像・注意事項を確認する
+4. 「承認」または「却下」を押す
+5. GitHub に Human 操作として commit される
+6. `reviewed:true` の記事のみ Vercel の通常デプロイで公開対象になる
+
+Telegram から直接承認しない。publish API は作らない。
+
 ## 運用開始フロー
 
 ### パターン A — AI トレンド調査起点
@@ -222,7 +238,7 @@ tags:
 7. npm run validate:publish-ready
    → publish-ready 件数を確認（exit 0 なら全承認済み）
 
-8. npm run build → Human が手動で push / deploy を判断・実行
+8. npm run build → Human が push / deploy を判断・実行
    → reviewed:true の記事のみ静的生成・sitemap 収録
 ```
 
@@ -271,9 +287,10 @@ npm run ops:mwf -- --force    # 曜日に関わらず実行
 npm run request:draft -- <update_id> --category "虫歯治療" --date 2026-06-01 --yes
 
 # ② review待ちを承認
+# スマホなら /admin/pending-review、CLIなら以下
 npm run approve:post -- <slug> --reviewed-by "三谷"
 
-# ③ 承認後にデプロイ（Human が手動実行）
+# ③ 承認後にデプロイ（Human の明示判断で実行）
 npm run build
 git push origin main
 
@@ -313,11 +330,12 @@ npm run article:manual -- --title "テーマ" --category "カテゴリ" --date Y
 # または
 npm run generate:draft -- TOPIC-XXXX
 
-# 2. 本文確認（ブラウザ or CLI）
+# 2. 本文確認（管理画面 or CLI）
 npm run list:pending-review
 # → http://localhost:3000/admin/pending-review でも確認可
 
 # 3. 承認 または 差し戻し（Human が実行）
+# スマホなら /admin/pending-review、CLIなら以下
 npm run approve:post -- <slug> --reviewed-by "氏名"
 # npm run reject:post -- <slug>
 
@@ -325,7 +343,7 @@ npm run approve:post -- <slug> --reviewed-by "氏名"
 npm run validate:publish-ready   # publish-ready 件数確認
 npm run build                     # エラーがないか確認
 
-# 5. push / deploy（Human が手動実行）
+# 5. push / deploy（Human の明示判断で実行）
 git push origin main
 # → Vercel が自動デプロイ
 ```
@@ -781,4 +799,4 @@ repo: ~/Desktop/aisoukai-media
 | build 確認 | `repo:... / validate:posts → build して結果を報告` |
 | Telegram 送信 | `repo:... / notify:pending-review を実行` |
 
-AGENTS.md の禁止事項（自動approve・自動push 等）は明示しなくても常に適用される。
+AGENTS.md の禁止事項（自動approve・明示依頼のない push 等）は明示しなくても常に適用される。

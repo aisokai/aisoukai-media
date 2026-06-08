@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   Smile,
   Sparkles,
-  Stethoscope,
   Calendar,
   Gift,
   Plus,
@@ -830,4 +829,3 @@ export default function HomeWhiteningCampaignPage() {
     </div>
   )
 }
-

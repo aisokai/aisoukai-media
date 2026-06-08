@@ -1,21 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 const STORAGE_KEY = 'reviewer_name'
 
-export default function ReviewerNameClient() {
-  const [name, setName] = useState('')
-  const [editing, setEditing] = useState(false)
-  const [input, setInput] = useState('')
+function getStoredReviewerName() {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem(STORAGE_KEY)?.trim() ?? ''
+}
 
-  // localStorage から読み込み
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) ?? ''
-    setName(saved)
-    setInput(saved)
-    if (!saved) setEditing(true) // 未設定なら即編集モード
-  }, [])
+export default function ReviewerNameClient() {
+  const [name, setName] = useState(getStoredReviewerName)
+  const [editing, setEditing] = useState(() => !getStoredReviewerName())
+  const [input, setInput] = useState(getStoredReviewerName)
 
   const save = () => {
     const trimmed = input.trim()
@@ -55,7 +52,10 @@ export default function ReviewerNameClient() {
         {name && (
           <button
             type="button"
-            onClick={() => { setInput(name); setEditing(false) }}
+            onClick={() => {
+              setInput(name)
+              setEditing(false)
+            }}
             className="text-xs text-gray-400 hover:text-gray-600"
           >
             キャンセル
@@ -71,7 +71,10 @@ export default function ReviewerNameClient() {
       <span className="text-sm font-semibold text-gray-800">{name || '未設定'}</span>
       <button
         type="button"
-        onClick={() => { setInput(name); setEditing(true) }}
+        onClick={() => {
+          setInput(name)
+          setEditing(true)
+        }}
         className="text-sm text-gray-400 hover:text-gray-600"
         aria-label="承認者名を編集"
       >

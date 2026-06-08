@@ -28,6 +28,16 @@
   .prose a {
     @apply text-[#1e3a5f] underline underline-offset-2;
   }
+  .prose img {
+    @apply block h-auto w-full;
+  }
+  .prose a:has(> img) {
+    @apply block no-underline;
+  }
+  .prose p:has(> img),
+  .prose p:has(> a > img) {
+    @apply my-0 leading-none;
+  }
   .prose ul {
     @apply list-disc pl-6 space-y-1;
   }
@@ -35,4 +45,3 @@
     @apply list-decimal pl-6 space-y-1;
   }
 }
-

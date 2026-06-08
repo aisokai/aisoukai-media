@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { Search, Menu, X } from "lucide-react"
 import { useState } from "react"
 
@@ -39,8 +40,15 @@ export function Header() {
         <div className="mx-auto flex h-[70px] max-w-[1100px] items-center justify-between px-4">
           {/* ロゴ左側 */}
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#1e3a5f]">
-              <span className="text-xl font-bold text-white">藍</span>
+            <div className="relative h-11 w-11 overflow-hidden rounded-lg border border-gray-100 bg-white shadow-sm">
+              <Image
+                src="/images/clinic-logo.png"
+                alt="三谷ファミリー歯科クリニックのロゴ"
+                fill
+                sizes="44px"
+                className="object-contain p-1"
+                priority
+              />
             </div>
             <div className="flex flex-col">
               <span className="text-[18px] font-bold tracking-wide text-[#1e3a5f]">医療法人藍想会</span>

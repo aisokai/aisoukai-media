@@ -14,7 +14,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "親知らずの抜歯": "#ec4899",
   "インプラント治療": "#0ea5e9",
   "訪問歯科": "#14b8a6",
-  "医院からのお知らせ": "#8b5cf6",
+  "お知らせ": "#8b5cf6",
 }
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {

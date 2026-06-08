@@ -22,9 +22,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - 自動publish禁止
 - `reviewed:false` の公開禁止
 - Telegram からの approve / publish 禁止
-- approve API / publish API の実装禁止
+- publish API の実装禁止
+- approve API は原則禁止。ただし `/admin/pending-review` の認証済み Human 操作に限り、reviewed/frontmatter と review log を更新する管理画面アクションを許可する
 - cron完全自動化は現段階では禁止
-- `git push` 禁止。push は人間が手動実行する
+- `git push` は原則禁止。人間から明示依頼がある場合のみ実行する
 
 ## 公開条件
 
@@ -36,8 +37,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## review 運用
 
-- approve / reject は CLI コマンドで実行する
-- 管理画面は command copy まで
+- approve / reject は認証済み `/admin/pending-review` の Human 操作、または Human が明示実行する CLI コマンドで行う
+- 管理画面は publish しない。reviewed/frontmatter と review history の更新のみ許可する
 - review history は append-only
 - 誰が・いつ・何を approve / reject したかを残す
 

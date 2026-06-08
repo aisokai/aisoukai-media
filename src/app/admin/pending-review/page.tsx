@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
 import { getPendingReviewPosts } from '@/lib/posts'
 import { getRecentReviewLog } from '@/lib/reviewLog'
 import { NOINDEX_METADATA } from '@/lib/seo'
-import CopyButton from './CopyButton'
+import { isAdminAuthenticated } from '@/lib/adminAuth'
 import PostBodyPreview from './PostBodyPreview'
 import ReviewerNameClient from './ReviewerNameClient'
+import ReviewActionButtons from './ReviewActionButtons'
 
 export const metadata: Metadata = {
   title: 'Pending Review | Admin',
@@ -16,6 +18,8 @@ function formatLogDatetime(datetime: string) {
 }
 
 export default async function PendingReviewPage() {
+  if (!(await isAdminAuthenticated())) redirect('/admin/login')
+
   const today = new Date().toISOString().slice(0, 10)
   const allPosts = await getPendingReviewPosts()
   const pending = allPosts.filter((p) => !p.rejectionReason)
@@ -52,10 +56,7 @@ export default async function PendingReviewPage() {
 
         {/* 操作ガイド */}
         <p className="mt-3 text-sm text-gray-500">
-          コマンドをコピーして Terminal で実行してください。
-          <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono text-gray-600">
-            承認者名は自動で差し込まれます
-          </span>
+          内容を確認し、スマホから承認・却下できます。操作はGitHub commitとして記録されます。
         </p>
 
         {/* バッジ凡例 */}
@@ -81,9 +82,6 @@ export default async function PendingReviewPage() {
               const effectiveDate     = post.publishAt ?? post.date
               const isFutureScheduled = effectiveDate > today
               const isDuplicate       = duplicateSlugs.has(post.slug)
-              const approveCmd = `npm run approve:post -- ${post.slug} --reviewed-by "氏名"`
-              const rejectCmd  = `npm run reject:post  -- ${post.slug} --reason "差し戻し理由"`
-
               return (
                 <div
                   key={post.slug}
@@ -160,19 +158,7 @@ export default async function PendingReviewPage() {
                       </div>
                     )}
 
-                    {/* 承認ボタン（大・フルワイド） */}
-                    <div className="mt-4 grid gap-2">
-                      <CopyButton
-                        text={approveCmd}
-                        label="✅ 承認コマンドをコピー"
-                        variant="approve"
-                      />
-                      <CopyButton
-                        text={rejectCmd}
-                        label="❌ 却下コマンドをコピー"
-                        variant="reject"
-                      />
-                    </div>
+                    <ReviewActionButtons slug={post.slug} title={post.title} />
 
                     {/* 折りたたみ: 本文プレビュー + メタ情報 */}
                     <details className="mt-3 text-xs">
@@ -204,16 +190,6 @@ export default async function PendingReviewPage() {
                           </div>
                         </dl>
 
-                        {/* コマンド全文（参照用） */}
-                        <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2">
-                          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-green-700">approve</p>
-                          <code className="break-all font-mono text-[11px] text-green-800">{approveCmd}</code>
-                        </div>
-                        <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                          <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gray-600">reject</p>
-                          <code className="break-all font-mono text-[11px] text-gray-600">{rejectCmd}</code>
-                        </div>
-
                         {/* 本文プレビュー */}
                         {post.contentHtml && (
                           <PostBodyPreview contentHtml={post.contentHtml} />
@@ -238,11 +214,10 @@ export default async function PendingReviewPage() {
             </span>
           </h2>
           <p className="mb-4 text-xs text-gray-400">
-            修正後に <code>generate:draft --force</code> または <code>approve:post</code> で再処理してください。
+            内容を確認し、問題なければこの画面から再承認できます。
           </p>
           <div className="space-y-2">
             {rejected.map((post) => {
-              const approveCmd = `npm run approve:post -- ${post.slug} --reviewed-by "氏名"`
               return (
                 <div
                   key={post.slug}
@@ -259,12 +234,7 @@ export default async function PendingReviewPage() {
                       理由: {post.rejectionReason}
                     </p>
                   )}
-                  <div className="mt-2 flex items-center gap-3 rounded border border-gray-200 bg-white px-3 py-2">
-                    <code className="flex-1 break-all font-mono text-xs text-gray-400">
-                      {approveCmd}
-                    </code>
-                    <CopyButton text={approveCmd} label="📋 コピー" variant="default" />
-                  </div>
+                  <ReviewActionButtons slug={post.slug} title={post.title} />
                 </div>
               )
             })}

@@ -18,7 +18,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "親知らずの抜歯": "#ec4899",
   "インプラント治療": "#0ea5e9",
   "訪問歯科": "#14b8a6",
-  "医院からのお知らせ": "#8b5cf6",
+  "お知らせ": "#8b5cf6",
 }
 
 export async function generateStaticParams() {
@@ -140,7 +140,6 @@ export default async function ArticlePage({
                 )}
 
                 {/* Article body */}
-                {/* eslint-disable-next-line react/no-danger */}
                 <div
                   className="prose max-w-none"
                   dangerouslySetInnerHTML={{ __html: post.contentHtml }}

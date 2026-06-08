@@ -29,7 +29,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   "インプラント治療": "#0ea5e9",
   "インプラント": "#0ea5e9",
   "訪問歯科": "#14b8a6",
-  "医院からのお知らせ": "#8b5cf6",
+  "お知らせ": "#8b5cf6",
 }
 
 function rankColor(rank: number): string {
@@ -175,8 +175,14 @@ export function Sidebar() {
       {/* この記事を書いた人 */}
       <SidebarSection icon={User} title="この記事を書いた人">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-3 flex h-20 w-20 items-center justify-center rounded-full bg-[#1e3a5f]">
-            <span className="text-3xl font-bold text-white">藍</span>
+          <div className="relative mb-3 h-24 w-24 overflow-hidden rounded-full border border-gray-100 bg-white shadow-sm">
+            <Image
+              src="/images/clinic-logo.png"
+              alt="三谷ファミリー歯科クリニックのロゴ"
+              fill
+              sizes="96px"
+              className="object-contain p-2"
+            />
           </div>
           <p className="mb-1 text-[13px] text-gray-500">医療法人藍想会</p>
           <p className="mb-3 text-[15px] font-bold text-gray-800">三谷ファミリー歯科クリニック</p>

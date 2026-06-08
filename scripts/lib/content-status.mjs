@@ -249,6 +249,8 @@ export function formatContentStatusLines(status, {
   lines.push('')
   lines.push('承認・却下はこちら:')
   lines.push(dashboardUrl)
+  lines.push('')
+  lines.push('スマホで本文確認 → 承認/却下できます。')
 
   return lines
 }
