@@ -72,8 +72,8 @@
       "from": "カエルス",
       "text": "CAD CAMによるデジタル技工物についてのブログを書いて",
       "received_at": "2026-05-14T07:30:54.866+09:00",
-      "status": "drafted",
-      "status_updated_at": "2026-05-14T07:30:54.866+09:00",
+      "status": "archived",
+      "status_updated_at": "2026-06-09T21:10:17.529+09:00",
       "draft_slug": "2026-05-14-req-145026175",
       "history": [
         {
@@ -84,8 +84,14 @@
           "action": "drafted",
           "at": "2026-05-14T07:30:54.866+09:00",
           "draft_slug": "2026-05-14-req-145026175"
+        },
+        {
+          "action": "archived",
+          "at": "2026-06-09T21:10:17.529+09:00",
+          "reason": "重複整理 (drafted -> archived)"
         }
-      ]
+      ],
+      "archive_reason": "重複整理により公開対象外へ移動"
     },
     {
       "update_id": 145026178,
@@ -112,8 +118,8 @@
       "from": "カエルス",
       "text": "ブログ書いて",
       "received_at": "2026-05-14T23:14:56.098+09:00",
-      "status": "drafted",
-      "status_updated_at": "2026-05-14T23:14:56.098+09:00",
+      "status": "archived",
+      "status_updated_at": "2026-06-09T21:10:17.529+09:00",
       "draft_slug": "2026-05-14-req-145026183",
       "history": [
         {
@@ -124,16 +130,22 @@
           "action": "drafted",
           "at": "2026-05-14T23:14:56.098+09:00",
           "draft_slug": "2026-05-14-req-145026183"
+        },
+        {
+          "action": "archived",
+          "at": "2026-06-09T21:10:17.529+09:00",
+          "reason": "重複整理 (drafted -> archived)"
         }
-      ]
+      ],
+      "archive_reason": "重複整理により公開対象外へ移動"
     },
     {
       "update_id": 145026184,
       "from": "カエルス",
       "text": "ブログ書いて",
       "received_at": "2026-05-15T15:50:43.900+09:00",
-      "status": "drafted",
-      "status_updated_at": "2026-05-15T15:50:43.900+09:00",
+      "status": "archived",
+      "status_updated_at": "2026-06-09T21:10:17.529+09:00",
       "draft_slug": "2026-05-15-req-145026184",
       "history": [
         {
@@ -144,16 +156,22 @@
           "action": "drafted",
           "at": "2026-05-15T15:50:43.900+09:00",
           "draft_slug": "2026-05-15-req-145026184"
+        },
+        {
+          "action": "archived",
+          "at": "2026-06-09T21:10:17.529+09:00",
+          "reason": "重複整理 (drafted -> archived)"
         }
-      ]
+      ],
+      "archive_reason": "重複整理により公開対象外へ移動"
     },
     {
       "update_id": 145026186,
       "from": "カエルス",
       "text": "ブログ書いて",
       "received_at": "2026-05-15T16:53:41.131+09:00",
-      "status": "drafted",
-      "status_updated_at": "2026-05-15T16:53:41.131+09:00",
+      "status": "archived",
+      "status_updated_at": "2026-06-09T21:10:17.529+09:00",
       "draft_slug": "2026-05-15-req-145026186",
       "history": [
         {
@@ -164,16 +182,22 @@
           "action": "drafted",
           "at": "2026-05-15T16:53:41.131+09:00",
           "draft_slug": "2026-05-15-req-145026186"
+        },
+        {
+          "action": "archived",
+          "at": "2026-06-09T21:10:17.529+09:00",
+          "reason": "重複整理 (drafted -> archived)"
         }
-      ]
+      ],
+      "archive_reason": "重複整理により公開対象外へ移動"
     },
     {
       "update_id": 145026187,
       "from": "カエルス",
       "text": "ブログ書いて",
       "received_at": "2026-05-15T17:03:11.880+09:00",
-      "status": "drafted",
-      "status_updated_at": "2026-05-15T17:03:11.880+09:00",
+      "status": "archived",
+      "status_updated_at": "2026-06-09T21:10:17.529+09:00",
       "draft_slug": "2026-05-15-req-145026187",
       "history": [
         {
@@ -184,8 +208,14 @@
           "action": "drafted",
           "at": "2026-05-15T17:03:11.880+09:00",
           "draft_slug": "2026-05-15-req-145026187"
+        },
+        {
+          "action": "archived",
+          "at": "2026-06-09T21:10:17.529+09:00",
+          "reason": "重複整理 (drafted -> archived)"
         }
-      ]
+      ],
+      "archive_reason": "重複整理により公開対象外へ移動"
     },
     {
       "update_id": 145026188,
