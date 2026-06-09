@@ -783,7 +783,7 @@ async function runApprovePipeline({ slug, by, build, botToken, replyId }) {
 }
 
 // ── draft → validate → git add/commit/push パイプライン ──────────────────
-// Next.js build は行わない（reviewed:false なので公開には出ない）
+// Next.js build は行わない（reviewed:false / auto_approved:false なので公開には出ない）
 
 async function runDraftPipeline({ slug }) {
   const steps = []

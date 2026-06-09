@@ -168,7 +168,7 @@ tags:
 | `npm run new:post -- --title "..." --category "..." --excerpt "..." --tags "..."` | 空の記事ファイルを新規作成する |
 | `npm run validate:posts` | `content/posts/` の全記事 frontmatter を検証する |
 | `npm run research:trends` | AIトレンド調査の記事候補を `data/research/` に出力する（dry-run） |
-| `npm run validate:publish-ready` | 公開承認状態を確認する（reviewed: true / 必須項目充足チェック） |
+| `npm run validate:publish-ready` | 公開承認状態を確認する（reviewed: true または auto_approved: true / 必須項目充足チェック） |
 | `npm run list:pending-review` | Human review 待ちの記事一覧を表示する |
 | `npm run request:article -- --title "..." --category "..." --date YYYY-MM-DD` | テーマを手動指定して記事ネタ CSV に追加する（generate:draft の前段） |
 | `npm run notify:pending-review` | pending review 記事の一覧を console 出力し、Telegram Bot に通知する（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
@@ -196,7 +196,12 @@ tags:
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
-| `npm run approve:post -- <slug> --reviewed-by "氏名"` | 記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
+| `npm run article:scheduled -- --auto-publish` | 定期提案フロー後に Auto Publish Policy を実行し、low risk 記事だけ自動承認する |
+| `npm run article:auto-scheduled` | 定期自動運用向けの短縮コマンド。`article:scheduled -- --auto-publish` と同じ |
+| `npm run article:auto-review -- <slug>` | 指定記事を Auto Publish Policy でチェックし、条件を満たす場合だけ `auto_approved:true` にする |
+| `npm run article:auto-review -- <slug> --dry-run` | 指定記事の Auto Publish Policy 判定だけを確認し、ファイルや監査ログは更新しない |
+| `npm run article:auto-review -- --all` | pending review 記事を一括で Auto Publish Policy チェックする |
+| `npm run approve:post -- <slug> --reviewed-by "氏名"` | Human として記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
 | `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason と review log を記録。--reviewed-by も指定可） |
 | `npm run resubmit:post -- <slug> --reviewed-by "氏名" --reason "理由"` | 差し戻し済み記事を pending-review に戻す。元の差し戻し履歴は logs/ に保持。自動 approve しない |
 | `npm run status:content` | 公開中・公開予定・review待ち・差し戻し済みの件数と一覧を表示する（読み取り専用） |
@@ -209,7 +214,7 @@ tags:
 3. 記事本文・画像・注意事項を確認する
 4. 「承認」または「却下」を押す
 5. GitHub に Human 操作として commit される
-6. `reviewed:true` の記事のみ Vercel の通常デプロイで公開対象になる
+6. `reviewed:true` または Auto Publish Policy を通過した `auto_approved:true` の記事のみ Vercel の通常デプロイで公開対象になる
 
 Telegram から直接承認しない。publish API は作らない。
 
@@ -234,12 +239,13 @@ Telegram から直接承認しない。publish API は作らない。
 
 6. npm run approve:post -- SLUG --reviewed-by "氏名"
    → reviewed:true になり公開対象に入る（--reviewed-by は必須）
+   → 低リスク記事は `npm run article:auto-review -- SLUG` で auto_approved:true にできる
 
 7. npm run validate:publish-ready
    → publish-ready 件数を確認（exit 0 なら全承認済み）
 
 8. npm run build → Human が push / deploy を判断・実行
-   → reviewed:true の記事のみ静的生成・sitemap 収録
+   → reviewed:true または auto_approved:true の記事のみ静的生成・sitemap 収録
 ```
 
 ### パターン B — 手動テーマ指定起点
@@ -641,7 +647,8 @@ jobs:
 
 **注意:** cron 自動化を有効にする前に、以下を確認する:
 - `git push` 権限の scope を明示的に制限する
-- `approve` / `publish` の自動実行が混入しないこと
+- `approve:post` / `reject:post` / publish API の自動実行が混入しないこと
+- 自動承認は `article:auto-review` の Auto Publish Policy に限定すること
 - AGENTS.md の禁止事項を CI 側でも周知する
 
 ---
@@ -660,11 +667,11 @@ npm run approve:post -- <slug> --reviewed-by "氏名"
 
 - `rejection_reason` を削除することで pending-review に復帰する
 - 元の差し戻し理由は `logs/review-history.md` に保持（append-only）
-- 再提出後も `reviewed: false` のまま — 自動 approve / 自動 publish はしない
+- 再提出後も `reviewed: false` のまま。Human approval または Auto Publish Policy 通過までは公開しない
 
 ## generate:draft の使い方
 
-AI（Claude）が記事本文を自動生成します。生成した記事は必ず `reviewed: false` のドラフト扱いです。
+AI（Claude）が記事本文を自動生成します。生成した記事は `reviewed: false` / `auto_approved: false` のドラフト扱いです。
 
 ### セットアップ
 
@@ -684,7 +691,7 @@ npm run validate:topics
 # 指定した topic_id の AI 下書きを生成
 npm run generate:draft -- TOPIC-20260511-007
 
-# 生成された下書きを確認・修正する（本文は必ず手動レビュー）
+# 生成された下書きを確認・修正する
 npm run validate:posts
 npm run build
 ```
@@ -692,8 +699,9 @@ npm run build
 生成先: `content/posts/YYYY-MM-DD-topic-id.md`
 
 注意:
-- 生成記事は `reviewed: false` のまま公開しないこと（Human approval が必須）
-- 生成後は必ず本文を読み、医療情報の正確性を確認すること
+- 生成記事は Human approval または Auto Publish Policy 通過まで公開しないこと
+- 低リスク記事は `npm run article:auto-review -- <slug>` で自動承認できる
+- 中・高リスク記事、blocker あり、画像ライセンス未確認の記事は Human review に回す
 - `ANTHROPIC_API_KEY` が未設定の場合はエラーで終了します（API は呼びません）
 - 同名ファイルが既に存在する場合は上書きせずエラー終了します
 

@@ -2,8 +2,8 @@
 // scheduled-article-flow.mjs
 // 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 候補から補充）
 // → AI 下書き生成 → Telegram 通知。
-// cron 化の前段として手動実行できるスクリプト。approve/publish/push は一切行わない。
-// AI が自動実行してはならない。
+// --auto-publish 指定時は Auto Publish Policy に基づく自動レビューまで実行する。
+// Human approval の reviewed:true / publish / push は実行しない。
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -40,6 +40,20 @@ function slugify(id) {
   return id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
 }
 
+function parseArgs(argv) {
+  const args = { _: [] }
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i].startsWith('--')) {
+      const key = argv[i].slice(2).replace(/-/g, '_')
+      const next = argv[i + 1]
+      args[key] = next && !next.startsWith('--') ? argv[++i] : true
+    } else {
+      args._.push(argv[i])
+    }
+  }
+  return args
+}
+
 function csvEscape(value) {
   const str = String(value ?? '')
   return `"${str.replace(/"/g, '""')}"`
@@ -60,6 +74,18 @@ function run(scriptPath, args = []) {
     })
   } catch {
     process.exit(1)
+  }
+}
+
+function runAllowFailure(scriptPath, args = []) {
+  try {
+    execFileSync(process.execPath, [scriptPath, ...args], {
+      stdio: 'inherit',
+      env:   process.env,
+    })
+    return 0
+  } catch (err) {
+    return typeof err.status === 'number' ? err.status : 1
   }
 }
 
@@ -165,6 +191,9 @@ function importResearchCandidate(candidates, existingRows) {
 }
 
 async function main() {
+  const args = parseArgs(process.argv.slice(2))
+  const autoPublish = args.auto_publish === true
+
   loadEnv()
 
   console.log('━'.repeat(56))
@@ -218,9 +247,22 @@ async function main() {
 
   run(join(__dirname, 'generate-draft.mjs'), [topicId])
 
-  // ── STEP 3: pending-review 通知 ──
+  // ── STEP 3: Auto Publish Policy review（任意） ──
+  if (autoPublish) {
+    console.log()
+    console.log(`[ STEP 3/4 ]  Auto Publish Policy review (${topicId}) ...`)
+    console.log()
+
+    const status = runAllowFailure(join(__dirname, 'auto-review-post.mjs'), [slugify(topicId)])
+    if (status !== 0) {
+      console.warn()
+      console.warn('Auto Publish Policy を通過しませんでした。記事は pending review に残します。')
+    }
+  }
+
+  // ── STEP 4: pending-review 通知 ──
   console.log()
-  console.log('[ STEP 3/3 ]  pending-review Telegram 通知 ...')
+  console.log(`[ STEP ${autoPublish ? '4/4' : '3/3'} ]  pending-review Telegram 通知 ...`)
   console.log()
 
   run(join(__dirname, 'notify-pending-review.mjs'))
@@ -230,11 +272,18 @@ async function main() {
   console.log('✅ 定期提案フロー完了')
   console.log('━'.repeat(56))
   console.log()
-  console.log('次のステップ（Human が実行）:')
-  console.log('  1. content/posts/ の下書きを目視確認')
-  console.log('  2. npm run dev → http://localhost:3000/admin/pending-review で確認')
-  console.log(`  3. npm run approve:post -- <slug> --reviewed-by "氏名"`)
-  console.log('  4. npm run build → git push → deploy')
+  if (autoPublish) {
+    console.log('次のステップ:')
+    console.log('  1. npm run validate:publish-ready')
+    console.log('  2. npm run build')
+    console.log('  3. blocked 記事があれば /admin/pending-review で Human review')
+  } else {
+    console.log('次のステップ（Human が実行）:')
+    console.log('  1. content/posts/ の下書きを目視確認')
+    console.log('  2. npm run dev → http://localhost:3000/admin/pending-review で確認')
+    console.log(`  3. npm run approve:post -- <slug> --reviewed-by "氏名"`)
+    console.log('  4. npm run build → git push → deploy')
+  }
 }
 
 main().catch((e) => {

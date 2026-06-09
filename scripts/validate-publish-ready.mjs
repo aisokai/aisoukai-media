@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // validate-publish-ready.mjs
 // publish-ready 判定チェッカー。記事ごとに承認状態・必須項目を検査し、
-// Human approval が済んでいない記事を明示する。ファイルは変更しない。
+// Human approval または Auto Publish Policy が済んでいない記事を明示する。ファイルは変更しない。
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -66,18 +66,42 @@ function checkPost(filename) {
   }
 
   // ── 承認状態 ──
-  if (data.reviewed !== true) {
-    blockers.push('reviewed: false — Human approval が未完了です')
-  }
+  const humanApproved = data.reviewed === true
+  const autoApproved = data.auto_approved === true
 
   // reviewed:true なのに承認メタデータがない場合は blocker
-  if (data.reviewed === true) {
+  if (humanApproved) {
     if (!data.reviewed_at || String(data.reviewed_at).trim() === '') {
       blockers.push('reviewed_at がありません（approved:post 経由で承認してください）')
     }
     if (!data.reviewed_by || String(data.reviewed_by).trim() === '') {
       blockers.push('reviewed_by がありません（--reviewed-by オプションで承認者名を指定してください）')
     }
+  }
+
+  if (autoApproved) {
+    if (data.publication_status !== 'auto_approved') {
+      blockers.push('auto_approved:true ですが publication_status が auto_approved ではありません')
+    }
+    if (data.legal_check_status !== 'passed') {
+      blockers.push('auto_approved:true ですが legal_check_status が passed ではありません')
+    }
+    if (data.image_check_status !== 'passed') {
+      blockers.push('auto_approved:true ですが image_check_status が passed ではありません')
+    }
+    if (data.medical_risk !== 'low') {
+      blockers.push(`auto_approved:true ですが medical_risk が low ではありません: "${data.medical_risk ?? '未設定'}"`)
+    }
+    if (!data.auto_approved_at || String(data.auto_approved_at).trim() === '') {
+      blockers.push('auto_approved_at がありません')
+    }
+    if (!data.auto_approved_by || String(data.auto_approved_by).trim() === '') {
+      blockers.push('auto_approved_by がありません')
+    }
+  }
+
+  if (!humanApproved && !autoApproved) {
+    blockers.push('reviewed:false / auto_approved:false — approval が未完了です')
   }
 
   if (data.draft === true) {
@@ -104,7 +128,7 @@ function checkPost(filename) {
 
   // ── AI生成フラグ（warning: 内容確認を促す） ──
   if (data.ai_generated === true) {
-    warnings.push('ai_generated: true — 医療情報の正確性を必ず人間が確認してください')
+    warnings.push('ai_generated: true — Human review または Auto Publish Policy の記録を確認してください')
   }
 
   // ── 必須フィールド ──
@@ -199,7 +223,7 @@ if (ready.length > 0) {
 console.log()
 console.log(BAR)
 console.log(`  publish-ready    : ${ready.length} 件`)
-console.log(`  要 Human approval: ${notReady.length} 件`)
+console.log(`  要 approval      : ${notReady.length} 件`)
 console.log(BAR)
 
 if (ready.length > 0) {
@@ -210,7 +234,8 @@ if (ready.length > 0) {
 } else {
   console.log()
   console.log('publish-ready な記事はありません。')
-  console.log('  → npm run approve:post -- <slug> --reviewed-by "氏名"  で承認後に再確認してください')
+  console.log('  → Human 承認: npm run approve:post -- <slug> --reviewed-by "氏名"')
+  console.log('  → 自動承認: npm run article:auto-review -- <slug>')
   console.log('  → npm run status:content  でコンテンツ全体の状態を確認できます')
 }
 

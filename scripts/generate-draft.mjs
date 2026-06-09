@@ -224,7 +224,14 @@ tags:
 ${tagsYaml}
 author: 藍想会メディア編集部
 reviewed: false
+review_mode: auto
+auto_approved: false
+publication_status: draft
+legal_check_status: pending
+image_check_status: pending
+medical_risk: "${esc(medicalRisk || 'medium')}"
 image: ""
+image_alt: ""
 ai_generated: true
 source_topic_id: "${esc(topicId)}"
 source_notes: "${esc(notes)}"

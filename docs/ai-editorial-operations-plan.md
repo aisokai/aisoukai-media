@@ -1,202 +1,154 @@
-# 承認制 AI 編集部 運用設計
+# AI 編集部 運用設計
 
 > 共通ルールは [../CLAUDE.md](../CLAUDE.md) / [../AGENTS.md](../AGENTS.md) を正本とする。
-> この文書は、運用設計と将来拡張の詳細を記す。
+> 自動公開の詳細は [dmp/auto-publish-agent-system-plan.md](dmp/auto-publish-agent-system-plan.md) を参照する。
 
-AI が記事候補を生成し、Human が確認・承認してから公開する「承認制 AI 編集部」の運用設計。
-自動公開・自動承認は行わず、AI は常に **下書き生成** と **通知** のみ担う。
+AI が記事候補を生成し、Human review または Auto Publish Policy に基づく自動レビューを通過した記事だけを公開する運用設計。
+低リスク記事は自動承認を許可し、中・高リスク記事や blocker のある記事は Human review に回す。
 
 ---
 
 ## 全体コンセプト
 
 ```
-外部入力（LINE / Telegram / cron）
+外部入力（Telegram / cron / CLI）
     ↓
-AI が情報収集・記事下書きを生成（reviewed: false）
+AI が情報収集・記事下書きを生成
     ↓
-/admin/pending-review に表示
+Auto Publish Policy で low risk 記事を自動レビュー
     ↓
-LINE / Telegram で通知（「確認してください」）
-    ↓
-Human が記事本文を確認・判断
-    ↓
-CLI で approve / reject
+passed: auto_approved:true / failed: pending review
     ↓
 approved 記事のみ次回ビルド時に公開
 ```
 
-**不変ルール（どのフェーズでも変えない）:**
-- AI が `reviewed: true` にすることは絶対禁止
-- AI が `publish_at` を過去日付に操作することは禁止
-- `reviewed: false` の記事はビルドに含まれず公開されない
-- approve 操作は Human が CLI または明示的 UI 操作でのみ実行する
+## 不変ルール
+
+- AI が `reviewed: true` にすることは禁止。Human 承認と自動承認を混ぜない。
+- 自動承認は `auto_approved: true` / `publication_status: auto_approved` として記録する。
+- AI が `publish_at` を過去日付に操作することは禁止。
+- `reviewed: true` または `auto_approved: true` 以外の記事はビルドに含まれず公開されない。
+- Auto Publish Policy を満たさない記事は Human review に回す。
+- `approve:post` / `reject:post` は Human 操作用 CLI として維持する。
+- Telegram からの approve / publish は引き続き禁止する。
 
 ---
 
 ## フロー 1: 手動依頼型
 
-Human が LINE / Telegram でテーマを指定し、AI が下書きを生成する。
+Human が Telegram や CLI でテーマを指定し、AI が下書きを生成する。
 
 ```
-[Human] LINE/Telegram でテーマを送信
-        例: 「親知らずの抜歯後ケアについて記事を書いて」
+[Human] Telegram / CLI でテーマを指定
 
-[Bot]   テーマを受信 → topic ID を生成
+[Bot]   テーマを受信
+        → topic ID を生成
         → article-topics.sample.csv に追記
-        → generate:draft を実行（reviewed: false）
-        → /admin/pending-review に記事が追加される
+        → generate:draft を実行
 
-[Bot]   LINE/Telegram に通知
-        「下書きが完成しました。確認してください」
-        「記事タイトル: 親知らず抜歯後のケア…」
-        「確認URL: https://aisoukai-media.vercel.app/admin/pending-review」
+[Auto]  article:auto-review を実行
+        → low risk かつ blocker なしなら auto_approved
+        → 条件未達なら pending review に残す
 
-[Human] ブラウザで記事を確認
+[Bot]   Telegram に通知
+        「自動承認: n件 / Human review: n件」
 
-[Human] 問題なければ CLI で承認:
-        npm run approve:post -- <slug> --reviewed-by "三谷"
-
-[System] 次回ビルド時に公開
+[System] approved 記事のみ次回ビルド時に公開
 ```
-
----
 
 ## フロー 2: 定期提案型
 
 スケジュール（月・水・金など）で AI が自動的に記事候補を収集・生成する。
 
 ```
-[Cron]  設定時刻に起動（例: 毎週月・水・金 9:00 JST）
+[Cron]  設定時刻に起動
 
 [AI]    research:trends を実行
         → 歯科テーマ・季節テーマ・患者FAQ から候補を収集
         → data/research/YYYY-MM-DD-trends.json に保存
 
-[AI]    優先度・medical_risk を評価し、採用候補を1〜2件に絞る
-        → article-topics.sample.csv に追記（status: idea）
-        → generate:draft を実行（reviewed: false）
+[AI]    優先度・medical_risk を評価
+        → article-topics.sample.csv に追記
+        → generate:draft を実行
 
-[Bot]   LINE/Telegram に通知
-        「今週の記事候補が届きました」
-        「1. 〇〇についての記事（虫歯治療・low risk）」
-        「確認URL: https://aisoukai-media.vercel.app/admin/pending-review」
+[Auto]  Auto Publish Policy で自動レビュー
+        → low risk + blocker なし + 画像確認済みなら auto_approved
+        → それ以外は pending review
 
-[Human] 不要なら reject、問題なければ approve
+[Bot]   Telegram に通知
+        「自動承認: n件 / Human review: n件」
 
-[System] 次回ビルド時に approved 記事のみ公開
+[System] approved 記事のみ次回ビルド時に公開
 ```
 
 ---
 
-## Human Approval 必須ルール
+## Approval ルール
 
-すべての記事は以下の条件を満たさなければ公開されない（コードレベルで保証済み）:
+すべての記事は以下のどちらかを満たさなければ公開されない。
 
-| 条件 | 内容 |
+| 種別 | 条件 |
 |------|------|
-| `reviewed: true` | Human が明示的に承認した証明 |
-| `reviewed_at` | 承認日（`approve:post` CLI が自動付与） |
-| `reviewed_by` | 承認者名（`--reviewed-by` 引数が必須） |
-| `draft: true` でない | ドラフト明示記事は除外 |
-| `publish_at` が現在日以前 | スケジュール公開の場合 |
+| Human approval | `reviewed: true` / `reviewed_at` / `reviewed_by` |
+| Auto approval | `auto_approved: true` / `auto_approved_at` / `auto_approved_by` / `legal_check_status: passed` / `image_check_status: passed` / `medical_risk: low` |
+| 共通 | `draft: true` でない / `publish_at` が現在日以前 |
 
-**AI が直接これらを書き換えることは禁止。**  
-`approve:post` スクリプトは「Human が実行する CLI」として設計されており、
-AI エージェントによる自動実行は禁止事項としてコメントに明記されている。
+`approve:post` スクリプトは「Human が実行する CLI」として維持する。
+AI エージェントは `auto-review-post.mjs` だけを使い、Human 承認メタデータを書き換えない。
 
 ---
 
-## LINE / Telegram 連携の将来構成
+## LINE / Telegram 連携
 
-### 通知のみ（Phase 4C）
+Telegram は通知とダイジェストに使う。
 
-```
-generate:draft 完了後
-    ↓
-Webhook 送信スクリプト（scripts/notify-pending.mjs）
-    ↓
-LINE Messaging API / Telegram Bot API
-    ↓
-「下書き完了・確認してください」メッセージ
-```
+- 下書き生成完了
+- 自動承認成功
+- Auto Publish Policy 失敗
+- Human review 待ち件数
+- build 失敗
 
-実装は1スクリプト追加のみ。既存フローへの影響なし。
-
-### 手動依頼受付（Phase 4B → 4D）
-
-```
-LINE/Telegram からのメッセージ受信
-    ↓
-Webhook エンドポイント（Vercel Function / 外部サーバー）
-    ↓
-テーマを解析 → topic CSV に追記 → generate:draft 実行
-    ↓
-完了通知を返信
-```
-
-Webhook エンドポイントの実装が必要。Vercel Edge Function または
-外部 Node.js サーバー（例: Railway / Fly.io）を使う。
+Telegram から直接 approve / publish する機能は作らない。
 
 ---
 
-## 実装フェーズ案
+## 実装フェーズ
 
-### Phase 4A: docs（今回）
-- 運用設計ドキュメント作成
-- 不変ルールの明文化
-- コード変更なし
+### Phase 0: ルール変更
 
-### Phase 4B: 手動依頼 CLI 拡張
-- `scripts/request-article.mjs` を追加
-  - テーマ文字列を受け取り、topic CSV 追記 → `generate:draft` を実行する
-  - CLI から呼べる形にする（将来の Webhook 呼び出しに備える）
-- ローカルで `node scripts/request-article.mjs "テーマ"` で動作確認
+- AGENTS.md / README / DMP 文書を条件付き自動公開へ更新
+- `reviewed:true` と `auto_approved:true` の責務を分離
 
-### Phase 4C: 通知のみ（最小 LINE/Telegram 連携）
-- `scripts/notify-pending.mjs` を追加
-  - pending review の件数・タイトル・URL を LINE または Telegram に送信
-  - 環境変数: `LINE_CHANNEL_ACCESS_TOKEN` / `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`
-- `generate:draft` の完了後に呼び出す or 単独で実行
-- Human approval フローは変更しない
+### Phase 1: 自動レビュー CLI
 
-### Phase 4D: 手動依頼・定期提案フロー CLI（今回）
+- `scripts/auto-review-post.mjs` を追加
+- low risk / blocker / 画像 / 必須 frontmatter を検査
+- `logs/auto-publish-history.md` と `data/auto-publish-reviews/*.json` に結果を保存
 
-**手動依頼フロー（`article:manual`）:**
-- `scripts/manual-article-flow.mjs` を追加
-  - `--title` / `--category` / `--date` を受け取り、topic 登録 → generate:draft → notify を一括実行
-  - `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` で呼べる
-  - Human が必ずトリガーする。AI の自動実行は禁止
+### Phase 2: 定期フロー接続
 
-**定期提案フロー（`article:scheduled`）:**
-- `scripts/scheduled-article-flow.mjs` を追加
-  - 承認済みで下書き未生成の topic を優先度順に 1 件選択
-  - なければ `research:trends` で候補を補充して approved で登録
-  - generate:draft → notify を実行
-  - cron 化前の手動実行版（`npm run article:scheduled`）
-  - approve / publish は一切行わない
+- `article:scheduled -- --auto-publish` で下書き生成後に自動レビュー
+- 条件未達の記事は pending review に残す
 
-### Phase 4E: Approval UX 改善
-- `/admin/pending-review` に記事本文プレビューを追加
-- approve / reject ボタンを追加（**サーバーサイド Action 経由**、API なしで実行）
-- ボタン押下は「CLI コマンドをサーバーサイドで実行」と同等の扱いにし、
-  審査フローの本質（Human による明示的操作）を維持する
+### Phase 3: 本番スケジュール
 
-### Phase 4F: 定期提案型（cron 本番化）
-- GitHub Actions の schedule trigger または Vercel Cron を使用
-- `article:scheduled` を定期実行する
-- Human approval なしには公開されないことをワークフローで保証する
-- cron が直接 approve / deploy しないことを明示する
+- GitHub Actions または Vercel Cron で定期実行
+- `approve:post` / deploy / push は直接実行しない
+
+### Phase 4: 週次監査
+
+- 公開済み記事の再チェック
+- 医療広告ガイドライン変更、古い情報、画像ライセンス、重複を監査
 
 ---
 
-## 環境変数（将来追加予定）
+## 環境変数
 
-| 変数名 | 追加フェーズ | 説明 |
-|--------|------------|------|
-| `LINE_CHANNEL_ACCESS_TOKEN` | 4C | LINE Messaging API トークン |
-| `TELEGRAM_BOT_TOKEN` | 4C | Telegram Bot トークン |
-| `TELEGRAM_CHAT_ID` | 4C | 通知先チャット ID |
-| `WEBHOOK_SECRET` | 4D | Webhook 受信時の署名検証用 |
+| 変数名 | 説明 |
+|--------|------|
+| `ANTHROPIC_API_KEY` | AI 下書き生成に使用 |
+| `TELEGRAM_BOT_TOKEN` | Telegram 通知に使用 |
+| `TELEGRAM_CHAT_ID` | 通知先チャット ID |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | Telegram 操作元制限 |
 
-すべて `.env.local` に記述し、絶対に commit しないこと。
+すべて `.env.local` に記述し、commit しない。

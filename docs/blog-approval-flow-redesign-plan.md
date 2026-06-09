@@ -55,7 +55,7 @@
 | 「承認」単独で直近 draft を自動採用する挙動を継続 | 複数 pending 時に意図しない記事が承認される |
 | 大規模 DB 導入 | 現在のファイルベース運用で十分 |
 | SNS/LINE/YouTube 連携 | スコープ外 |
-| 承認の完全自動化 | reviewed:false の公開禁止・Human review 必須 |
+| 無条件の完全自動化 | Auto Publish Policy を満たさない記事の誤公開リスク |
 
 ---
 
@@ -296,8 +296,9 @@ git status --short
 
 ## 7. 禁止事項
 
-- `reviewed:false` の公開禁止（絶対）
-- AI による自動承認禁止
+- `reviewed:false` かつ `auto_approved:false` の公開禁止
+- AI による Human 承認メタデータの書き換え禁止
+- 自動承認は `article:auto-review` の Auto Publish Policy に限定
 - Telegram からの承認禁止（Phase 4 移行後）
 - `git push` は Human のみ
 - launchd の本番変更（install/uninstall）は Human 確認後

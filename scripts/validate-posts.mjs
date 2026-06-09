@@ -16,6 +16,9 @@ const VALID_CATEGORIES = [
 const REQUIRED_FIELDS = ['title', 'date', 'category', 'tags', 'author', 'reviewed', 'image']
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-.+\.md$/
+const VALID_MEDICAL_RISK = ['low', 'medium', 'high']
+const VALID_CHECK_STATUS = ['pending', 'passed', 'failed']
+const VALID_PUBLICATION_STATUS = ['draft', 'pending_review', 'auto_approved', 'human_approved']
 
 function toDateStr(val) {
   if (val instanceof Date) return val.toISOString().slice(0, 10)
@@ -87,6 +90,26 @@ function validatePost(filename) {
 
   if (data.reviewed !== undefined && typeof data.reviewed !== 'boolean') {
     errors.push(`reviewed が boolean ではありません (実際の型: ${typeof data.reviewed})`)
+  }
+
+  if (data.auto_approved !== undefined && typeof data.auto_approved !== 'boolean') {
+    errors.push(`auto_approved が boolean ではありません (実際の型: ${typeof data.auto_approved})`)
+  }
+
+  if (data.medical_risk !== undefined && !VALID_MEDICAL_RISK.includes(data.medical_risk)) {
+    errors.push(`medical_risk が無効です: "${data.medical_risk}"`)
+  }
+
+  if (data.legal_check_status !== undefined && !VALID_CHECK_STATUS.includes(data.legal_check_status)) {
+    errors.push(`legal_check_status が無効です: "${data.legal_check_status}"`)
+  }
+
+  if (data.image_check_status !== undefined && !VALID_CHECK_STATUS.includes(data.image_check_status)) {
+    errors.push(`image_check_status が無効です: "${data.image_check_status}"`)
+  }
+
+  if (data.publication_status !== undefined && !VALID_PUBLICATION_STATUS.includes(data.publication_status)) {
+    errors.push(`publication_status が無効です: "${data.publication_status}"`)
   }
 
   if (data.tags !== undefined && !Array.isArray(data.tags)) {

@@ -6,11 +6,22 @@ import remarkHtml from 'remark-html';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
-// reviewed: true かつ draft でない記事のみ公開対象とする。
+// Human reviewed または Auto Publish Policy 通過済み、かつ draft でない記事のみ公開対象とする。
 // publish_at または date が今日より未来の場合は公開しない（スケジュール公開）。
-// AI生成記事は生成時 reviewed: false で作られ、Human approval 後に reviewed: true へ変更する。
+// AI生成記事は生成時 reviewed/auto_approved とも false で作られ、
+// Human approval 後に reviewed: true、Auto Publish Policy 通過後に auto_approved: true へ変更する。
 function isPublishReady(data: Record<string, unknown>): boolean {
-  if (data['reviewed'] !== true || data['draft'] === true) return false
+  if (data['draft'] === true) return false
+
+  const humanApproved = data['reviewed'] === true
+  const autoApproved =
+    data['auto_approved'] === true &&
+    data['publication_status'] === 'auto_approved' &&
+    data['legal_check_status'] === 'passed' &&
+    data['image_check_status'] === 'passed' &&
+    data['medical_risk'] === 'low'
+
+  if (!humanApproved && !autoApproved) return false
 
   const today = new Date().toISOString().slice(0, 10)
 
@@ -43,6 +54,11 @@ export type PostMeta = {
   publishAt?: string;        // スケジュール公開日（省略時は date を公開日とする）
   reviewedAt?: string;       // Human approval 日
   reviewedBy?: string;       // 承認者名
+  autoApproved?: boolean;     // Auto Publish Policy 通過済み
+  autoApprovedAt?: string;
+  autoApprovedBy?: string;
+  publicationStatus?: string;
+  medicalRisk?: string;
   aiGenerated?: boolean;
 };
 
@@ -74,12 +90,17 @@ export function getAllPosts(): PostMeta[] {
         excerpt: (data.excerpt ?? data.description) as string,
         category: data.category as string,
         tags: (data.tags as string[]) ?? [],
-        reviewed: true,
+        reviewed: data.reviewed === true,
         image:    (data.image as string) || undefined,
         imageAlt: (data.image_alt as string) || undefined,
         publishAt: data.publish_at as string | undefined,
         reviewedAt: data.reviewed_at as string | undefined,
         reviewedBy: data.reviewed_by as string | undefined,
+        autoApproved: data.auto_approved === true,
+        autoApprovedAt: data.auto_approved_at as string | undefined,
+        autoApprovedBy: data.auto_approved_by as string | undefined,
+        publicationStatus: data.publication_status as string | undefined,
+        medicalRisk: data.medical_risk as string | undefined,
         aiGenerated: data.ai_generated === true,
       };
     });
@@ -169,6 +190,15 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
     reviewed: data.reviewed === true,
     image:    (data.image as string) || undefined,
     imageAlt: (data.image_alt as string) || undefined,
+    publishAt: data.publish_at as string | undefined,
+    reviewedAt: data.reviewed_at as string | undefined,
+    reviewedBy: data.reviewed_by as string | undefined,
+    autoApproved: data.auto_approved === true,
+    autoApprovedAt: data.auto_approved_at as string | undefined,
+    autoApprovedBy: data.auto_approved_by as string | undefined,
+    publicationStatus: data.publication_status as string | undefined,
+    medicalRisk: data.medical_risk as string | undefined,
+    aiGenerated: data.ai_generated === true,
     contentHtml,
   };
 }

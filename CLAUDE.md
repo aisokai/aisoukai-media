@@ -9,7 +9,7 @@
 ## 実装前の確認
 
 - 計画を示してから実装を開始する（`superpowers:writing-plans` 活用）
-- 公開条件・絶対禁止リストは AGENTS.md を確認する
+- 公開条件・絶対禁止リスト・Auto Publish Policy は AGENTS.md を確認する
 
 ## コーディング制約
 
@@ -32,7 +32,7 @@ DMP = Dental Media Project。以下の短縮形でタスクを指示できる。
 | `dmp:research` | 記事候補調査 | research:trends |
 | `dmp:status` | コンテンツ状態確認 | status:content |
 | `dmp:pending` | 承認待ち一覧 | list:pending-review |
-| `dmp:review <slug>` | 医療広告リスクチェック | validate:publish-ready + 手動確認 |
+| `dmp:review <slug>` | 医療広告リスクチェック | article:auto-review または validate:publish-ready + 手動確認 |
 
 **SNS / Website / YouTube 指示（Phase 2〜4 以降）**:
 - `dmp:sns <テーマ>` — SNS投稿ドラフトを依頼（Phase 2 で実装予定）

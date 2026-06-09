@@ -86,8 +86,8 @@ npm run generate:draft -- TOPIC-20260512-032
 ```
 
 - 生成先: `content/posts/YYYY-MM-DD-topic-id.md`
-- frontmatter に `reviewed: false` / `ai_generated: true` が自動付与される
-- **`reviewed: false` のままでは絶対に公開されない**（ビルド時に除外）
+- frontmatter に `reviewed: false` / `auto_approved: false` / `ai_generated: true` が自動付与される
+- **Human approval または Auto Publish Policy 通過までは公開されない**（ビルド時に除外）
 
 既存ファイルを上書きする場合（再生成）:
 ```bash
@@ -174,7 +174,7 @@ git push origin main
 |------|------|
 | Telegram から approve を実行する | 通知は読み専用。CLI 操作は端末から行う |
 | Telegram から publish / push を実行する | 同上 |
-| AI が自動で approve:post を呼ぶ | reviewed:false の記事が誤公開するリスク |
+| AI が自動で approve:post を呼ぶ | Human 承認と自動承認が混ざるリスク。自動承認は `article:auto-review` に限定する |
 | AI が自動で git push / deploy を実行する | 未承認コンテンツがデプロイされるリスク |
 | `.env.local` を commit する | API キー・Telegram トークンの漏洩リスク |
 

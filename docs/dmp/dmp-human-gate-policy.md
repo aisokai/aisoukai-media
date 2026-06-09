@@ -5,17 +5,18 @@
 
 ---
 
-## 絶対ルール（変更禁止）
+## 絶対ルール
 
-以下は DMP のどのフェーズ・どのチャンネルにおいても変更してはならない。
+以下は DMP のどのフェーズ・どのチャンネルでも守る。
 
 | ルール | 根拠 |
 |-------|------|
 | AI が `reviewed: true` を書き換えることは禁止 | AGENTS.md・ai-editorial-operations-plan.md |
-| AI による自動公開は禁止 | AGENTS.md |
+| AI の自動承認は `auto_approved: true` として Human 承認と区別する | AGENTS.md・auto-publish-agent-system-plan.md |
+| Auto Publish Policy を満たさない自動公開は禁止 | AGENTS.md・auto-publish-agent-system-plan.md |
 | AI による `publish_at` の過去日付操作は禁止 | AGENTS.md |
-| `reviewed: false` の記事はビルドに含まれない | 実装レベルで保証済み |
-| `reviewed: true` でも `publish_at` または `date` が未来の場合は即時公開しない | dmp-content-lifecycle.md |
+| `reviewed: true` または `auto_approved: true` 以外の記事はビルドに含まれない | 実装レベルで保証 |
+| 承認済みでも `publish_at` または `date` が未来の場合は即時公開しない | dmp-content-lifecycle.md |
 | approve 操作は Human が CLI または明示的 UI 操作でのみ実行 | AGENTS.md |
 | git push は Human が手動実行 | AGENTS.md・CLAUDE.md |
 | 外部 API（Meta/YouTube/LINE）への自動投稿は禁止 | AGENTS.md |
@@ -30,6 +31,7 @@
 |------|-------|---------|
 | 承認 | Human のみ | `npm run approve:post -- <slug> --reviewed-by "氏名"` |
 | 差し戻し | Human のみ | `npm run reject:post -- <slug>` |
+| 自動承認 | Auto Publish Agent | `npm run article:auto-review -- <slug>` |
 | ビルド | Human のみ | `npm run build` |
 | デプロイ | Human のみ | `git push origin main` |
 | 再提出 | Human のみ | `npm run resubmit:post -- <slug> --reviewed-by "氏名" --reason "理由"` |
@@ -68,6 +70,7 @@
 | 操作 | 条件 |
 |------|------|
 | 記事ドラフト生成（`reviewed: false`） | API キーが設定済み |
+| low risk 記事の自動承認（`auto_approved: true`） | Auto Publish Policy を全通過 |
 | 調査候補 JSON/CSV 生成（dry-run） | 外部 API 不使用 |
 | Telegram 通知送信 | `TELEGRAM_BOT_TOKEN` 設定済み |
 | 医療広告リスク評価レポート生成 | dry-run のみ |
@@ -89,7 +92,7 @@
 - `approve:post` / `reject:post` の AI 自動実行
 - `git push` の AI 実行
 - `firebase deploy` / `vercel deploy` の AI 実行
-- 承認ステータス（`reviewed`）の AI 書き換え
+- Human 承認ステータス（`reviewed`）の AI 書き換え
 - 公開日時（`publish_at`）の AI による過去日付設定
 
 ---

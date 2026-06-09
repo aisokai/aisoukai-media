@@ -170,7 +170,7 @@ function main() {
   console.log(`  category    : ${category}`)
   console.log(`  date        : ${date}`)
   console.log(`  ファイル    : content/posts/${filename}`)
-  console.log(`  reviewed    : false（公開対象外 — Human approval が必須）`)
+  console.log(`  reviewed    : false（公開対象外 — Human approval または Auto Publish Policy が必要）`)
   console.log(BAR)
 
   if (!yes) {
