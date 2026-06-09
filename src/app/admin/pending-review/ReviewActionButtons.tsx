@@ -1,5 +1,6 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { approvePostAction, rejectPostAction, type ReviewActionResult } from './actions'
 
@@ -16,6 +17,7 @@ type Props = {
 }
 
 export default function ReviewActionButtons({ slug, title }: Props) {
+  const router = useRouter()
   const [reviewerName, setReviewerName] = useState(getStoredReviewerName)
   const [reason, setReason] = useState('')
   const [result, setResult] = useState<ReviewActionResult | null>(null)
@@ -37,6 +39,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
     startTransition(async () => {
       const next = await approvePostAction({ slug, reviewedBy: reviewerName })
       setResult(next)
+      if (next.ok) router.refresh()
     })
   }
 
@@ -55,6 +58,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
     startTransition(async () => {
       const next = await rejectPostAction({ slug, reviewedBy: reviewerName, reason })
       setResult(next)
+      if (next.ok) router.refresh()
     })
   }
 
