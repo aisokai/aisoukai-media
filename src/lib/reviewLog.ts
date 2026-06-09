@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { readGitHubFile } from './githubContents'
 
 export type ReviewLogEntry = {
   datetime: string
@@ -15,11 +16,7 @@ export type ReviewLogEntry = {
 
 const LOG_PATH = path.join(process.cwd(), 'logs', 'review-history.md')
 
-/** logs/review-history.md から最新 N 件のエントリを返す（新しい順）。ファイル不在時は空配列。 */
-export function getRecentReviewLog(limit = 10): ReviewLogEntry[] {
-  if (!fs.existsSync(LOG_PATH)) return []
-
-  const raw = fs.readFileSync(LOG_PATH, 'utf8')
+function parseReviewLog(raw: string, limit: number): ReviewLogEntry[] {
   const blocks = raw.split(/^## /m).filter(Boolean)
 
   const entries: ReviewLogEntry[] = blocks.map((block) => {
@@ -45,4 +42,22 @@ export function getRecentReviewLog(limit = 10): ReviewLogEntry[] {
   })
 
   return entries.reverse().slice(0, limit)
+}
+
+/** logs/review-history.md から最新 N 件のエントリを返す（新しい順）。ファイル不在時は空配列。 */
+export function getRecentReviewLog(limit = 10): ReviewLogEntry[] {
+  if (!fs.existsSync(LOG_PATH)) return []
+  return parseReviewLog(fs.readFileSync(LOG_PATH, 'utf8'), limit)
+}
+
+export async function getRecentReviewLogForAdmin(limit = 10): Promise<ReviewLogEntry[]> {
+  if (!process.env.GITHUB_REVIEW_TOKEN) return getRecentReviewLog(limit)
+
+  try {
+    const file = await readGitHubFile('logs/review-history.md')
+    return parseReviewLog(file.content, limit)
+  } catch (error) {
+    console.error('GitHub review log read failed; falling back to local file', error)
+    return getRecentReviewLog(limit)
+  }
 }

@@ -3,6 +3,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
+import { readGitHubDirectory, readGitHubFile } from './githubContents';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
@@ -126,42 +127,74 @@ function toDateString(val: unknown): string {
   return String(val ?? '');
 }
 
+async function buildPendingReviewPost(fileName: string, raw: string): Promise<PendingReviewPost | null> {
+  const { data, content } = matter(raw);
+
+  if (data['reviewed'] === true) return null;
+
+  const processed = await remark()
+    .use(remarkHtml, { sanitize: true })
+    .process(content);
+
+  const publishAtRaw = data['publish_at'];
+  return {
+    slug:            fileName.replace(/\.md$/, ''),
+    title:           String(data['title'] ?? '（タイトル未設定）'),
+    date:            toDateString(data['date']),
+    publishAt:       publishAtRaw ? toDateString(publishAtRaw) : undefined,
+    category:        String(data['category'] ?? '未分類'),
+    aiGenerated:     data['ai_generated'] === true,
+    excerpt:         String(data['excerpt'] ?? data['description'] ?? ''),
+    contentHtml:     processed.toString(),
+    rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
+    image:           data['image'] ? String(data['image']) : undefined,
+  };
+}
+
+function sortPendingReviewPosts(posts: PendingReviewPost[]) {
+  return posts.sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
 /** reviewed !== true の記事をすべて返す（Human review 待ち一覧用）。本文 HTML を含む。 */
 export async function getPendingReviewPosts(): Promise<PendingReviewPost[]> {
   if (!fs.existsSync(POSTS_DIR)) return [];
 
   const fileNames = fs.readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'));
-
   const results = await Promise.all(
-    fileNames.map(async (fileName): Promise<PendingReviewPost | null> => {
+    fileNames.map((fileName) => {
       const fullPath = path.join(POSTS_DIR, fileName);
-      const { data, content } = matter(fs.readFileSync(fullPath, 'utf8'));
-
-      if (data['reviewed'] === true) return null;
-
-      const processed = await remark()
-        .use(remarkHtml, { sanitize: true })
-        .process(content);
-
-      const publishAtRaw = data['publish_at'];
-      return {
-        slug:            fileName.replace(/\.md$/, ''),
-        title:           String(data['title'] ?? '（タイトル未設定）'),
-        date:            toDateString(data['date']),
-        publishAt:       publishAtRaw ? toDateString(publishAtRaw) : undefined,
-        category:        String(data['category'] ?? '未分類'),
-        aiGenerated:     data['ai_generated'] === true,
-        excerpt:         String(data['excerpt'] ?? data['description'] ?? ''),
-        contentHtml:     processed.toString(),
-        rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
-        image:           data['image'] ? String(data['image']) : undefined,
-      };
+      return buildPendingReviewPost(fileName, fs.readFileSync(fullPath, 'utf8'));
     }),
   );
 
-  return (results.filter(Boolean) as PendingReviewPost[]).sort((a, b) =>
-    a.date < b.date ? 1 : -1,
+  return sortPendingReviewPosts(results.filter(Boolean) as PendingReviewPost[]);
+}
+
+async function getPendingReviewPostsFromGitHub(): Promise<PendingReviewPost[]> {
+  const entries = await readGitHubDirectory('content/posts');
+  const postFiles = entries
+    .filter((entry) => entry.type === 'file' && entry.name.endsWith('.md'))
+    .map((entry) => entry.name);
+
+  const results = await Promise.all(
+    postFiles.map(async (fileName) => {
+      const file = await readGitHubFile(`content/posts/${fileName}`);
+      return buildPendingReviewPost(fileName, file.content);
+    }),
   );
+
+  return sortPendingReviewPosts(results.filter(Boolean) as PendingReviewPost[]);
+}
+
+export async function getPendingReviewPostsForAdmin(): Promise<PendingReviewPost[]> {
+  if (!process.env.GITHUB_REVIEW_TOKEN) return getPendingReviewPosts();
+
+  try {
+    return await getPendingReviewPostsFromGitHub();
+  } catch (error) {
+    console.error('GitHub pending review read failed; falling back to local files', error);
+    return getPendingReviewPosts();
+  }
 }
 
 // contentHtml は remark-html(sanitize:true) で処理済みの信頼済みHTML。

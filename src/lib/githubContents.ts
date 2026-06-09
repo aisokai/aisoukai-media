@@ -9,6 +9,12 @@ export type GitHubFile = {
   sha: string
 }
 
+export type GitHubDirectoryEntry = {
+  name: string
+  path: string
+  type: 'file' | 'dir' | string
+}
+
 export type GitHubCommitFile = {
   path: string
   content: string
@@ -55,6 +61,17 @@ export async function readGitHubFile(path: string): Promise<GitHubFile> {
     content: Buffer.from(json.content, 'base64').toString('utf8'),
     sha: json.sha,
   }
+}
+
+export async function readGitHubDirectory(path: string): Promise<GitHubDirectoryEntry[]> {
+  const { token, repo, branch } = getGitHubConfig()
+  const json = await readJson<GitHubDirectoryEntry[]>(
+    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(branch)}`,
+    { headers: githubHeaders(token) },
+    `GitHub read directory ${path}`,
+  )
+
+  return json
 }
 
 export async function commitGitHubFiles(message: string, files: GitHubCommitFile[]) {

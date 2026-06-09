@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { getPendingReviewPosts } from '@/lib/posts'
-import { getRecentReviewLog } from '@/lib/reviewLog'
+import { getPendingReviewPostsForAdmin } from '@/lib/posts'
+import { getRecentReviewLogForAdmin } from '@/lib/reviewLog'
 import { NOINDEX_METADATA } from '@/lib/seo'
 import { isAdminAuthenticated } from '@/lib/adminAuth'
 import PostBodyPreview from './PostBodyPreview'
@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   ...NOINDEX_METADATA,
 }
 
+export const dynamic = 'force-dynamic'
+
 function formatLogDatetime(datetime: string) {
   return datetime.slice(0, 19).replace('T', ' ')
 }
@@ -21,10 +23,10 @@ export default async function PendingReviewPage() {
   if (!(await isAdminAuthenticated())) redirect('/admin/login')
 
   const today = new Date().toISOString().slice(0, 10)
-  const allPosts = await getPendingReviewPosts()
+  const allPosts = await getPendingReviewPostsForAdmin()
   const pending = allPosts.filter((p) => !p.rejectionReason)
   const rejected = allPosts.filter((p) =>  p.rejectionReason)
-  const recentLog = getRecentReviewLog(8)
+  const recentLog = await getRecentReviewLogForAdmin(8)
 
   // 簡易重複検出: タイトルが完全一致する slug の組
   const titleToSlugs = new Map<string, string[]>()
