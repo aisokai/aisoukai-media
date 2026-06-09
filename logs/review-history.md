@@ -187,3 +187,13 @@ reject_reason: 重複
 date: 2026-05-15
 publish_at: 2026-05-15
 
+## 2026-06-09T18:30:48.729+09:00
+datetime: 2026-06-09T18:30:48.729+09:00
+action: reject
+slug: 2026-05-15-req-145026187
+reviewed_by: 三谷
+reason: 着服
+reject_reason: 着服
+date: 2026-05-15
+publish_at: 2026-05-15
+
