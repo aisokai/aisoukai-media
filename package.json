@@ -55,6 +55,10 @@
     "resubmit:post": "node scripts/resubmit-post.mjs",
     "status:content": "node scripts/status-content.mjs",
     "status:publish-ready": "node scripts/validate-publish-ready.mjs || true",
+    "topic-candidates:generate": "node scripts/generate-monthly-topic-candidates.mjs",
+    "topic-candidates:validate": "node scripts/validate-monthly-topic-candidates.mjs",
+    "topic-candidates:convert": "node scripts/convert-selected-topics.mjs",
+    "notify:topic-candidates": "node scripts/notify-topic-candidates.mjs",
     "ops:mwf:install": "node scripts/setup-launchd-mwf.mjs --install",
     "ops:mwf:uninstall": "node scripts/setup-launchd-mwf.mjs --uninstall",
     "ops:mwf:status": "node scripts/setup-launchd-mwf.mjs --status"
