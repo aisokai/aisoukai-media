@@ -1,0 +1,50 @@
+name: Monthly Topic Candidates
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-and-notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate monthly topic candidates
+        run: npm run topic-candidates:generate -- --yes
+
+      - name: Validate monthly topic candidates
+        run: npm run topic-candidates:validate
+
+      - name: Commit generated candidates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/monthly-topic-candidates
+          if git diff --cached --quiet; then
+            echo "No monthly topic candidate changes to commit."
+          else
+            git commit -m "chore: generate monthly topic candidates"
+            git push
+          fi
+
+      - name: Notify Telegram
+        env:
+          NEXT_PUBLIC_SITE_URL: ${{ vars.NEXT_PUBLIC_SITE_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run notify:topic-candidates
