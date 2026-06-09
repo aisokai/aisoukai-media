@@ -10,7 +10,7 @@ import {
   existsSync, mkdirSync, readdirSync,
   readFileSync, renameSync, writeFileSync,
 } from 'node:fs'
-import { basename, dirname, extname, join } from 'node:path'
+import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
 
@@ -162,8 +162,6 @@ function main() {
     ?? (isAltDefault ? (CATEGORY_ALT[newCat] ?? '') : img.alt)
 
   const altChanged = newAlt !== img.alt
-  const tagsChanged = true  // 常に新カテゴリのデフォルトタグに更新
-
   // 記事参照確認
   const usingArticles = findArticlesUsingPath(img.path)
 

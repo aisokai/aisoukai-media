@@ -21,5 +21,5 @@ export async function loginAdmin(_: LoginState, formData: FormData): Promise<Log
   }
 
   await setAdminSession()
-  redirect('/admin/pending-review')
+  redirect('/admin')
 }

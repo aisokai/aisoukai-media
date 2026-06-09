@@ -17,7 +17,7 @@ export type GitHubDirectoryEntry = {
 
 export type GitHubCommitFile = {
   path: string
-  content: string
+  content: string | null
 }
 
 function getGitHubConfig(): GitHubConfig {
@@ -93,6 +93,15 @@ export async function commitGitHubFiles(message: string, files: GitHubCommitFile
 
   const treeItems = await Promise.all(
     files.map(async (file) => {
+      if (file.content === null) {
+        return {
+          path: file.path,
+          mode: '100644',
+          type: 'blob',
+          sha: null,
+        }
+      }
+
       const blob = await readJson<{ sha: string }>(
         `${baseUrl}/git/blobs`,
         {

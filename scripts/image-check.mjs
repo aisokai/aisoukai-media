@@ -30,11 +30,15 @@ const CATEGORY_ALT = {
 }
 
 function main() {
+  const auditLicenses = process.argv.includes('--audit-licenses')
   const BAR = '═'.repeat(62)
   const DIV = '─'.repeat(62)
 
   console.log(BAR)
   console.log('  image:check — 画像ライブラリ 整合性チェック')
+  if (auditLicenses) {
+    console.log('  license audit: on')
+  }
   console.log(BAR)
 
   // ── library 読み込み ──
@@ -119,7 +123,7 @@ function main() {
     const note = img.license_note ?? ''
     if (!note.trim()) {
       warnings.push(`${label} license_note が空です`)
-    } else if (note.includes('ライセンス詳細を確認して更新すること') || note.includes('TODO')) {
+    } else if (auditLicenses && (note.includes('ライセンス詳細を確認して更新すること') || note.includes('TODO'))) {
       const pixtaId = img.id.slice(img.id.indexOf('-') + 1)
       licenseTodos.push({ id: img.id, pixtaId, category: img.category, note })
     }
@@ -245,6 +249,9 @@ function main() {
   // 警告のみ
   const totalWarn = warnings.length + catWarnings.length + licenseTodos.length
   console.log(`⚠️  警告 ${totalWarn} 件あり。エラーなし。`)
+  if (!auditLicenses) {
+    console.log('  license_note の未入力監査は npm run image:license:list または image:check -- --audit-licenses で確認')
+  }
   console.log(BAR)
   process.exit(0)
 }

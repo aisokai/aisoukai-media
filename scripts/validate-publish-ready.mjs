@@ -47,10 +47,11 @@ function toDateStr(val) {
 function checkPost(filename) {
   const blockers = []
   const warnings = []
+  let rejected = false
 
   if (!FILENAME_RE.test(filename)) {
     blockers.push('ファイル名が YYYY-MM-DD-slug.md 形式ではありません')
-    return { blockers, warnings }
+    return { blockers, warnings, rejected }
   }
 
   const filePath = join(POSTS_DIR, filename)
@@ -62,7 +63,12 @@ function checkPost(filename) {
     content = parsed.content
   } catch (e) {
     blockers.push(`frontmatter のパースに失敗しました: ${e.message}`)
-    return { blockers, warnings, content: '' }
+    return { blockers, warnings, rejected, content: '' }
+  }
+
+  rejected = !!data.rejection_reason
+  if (rejected) {
+    return { blockers, warnings, rejected, content: content ?? '' }
   }
 
   // ── 承認状態 ──
@@ -126,8 +132,8 @@ function checkPost(filename) {
     }
   }
 
-  // ── AI生成フラグ（warning: 内容確認を促す） ──
-  if (data.ai_generated === true) {
+  // ── AI生成フラグ（warning: 未承認の AI 生成物だけ内容確認を促す） ──
+  if (data.ai_generated === true && !humanApproved && !autoApproved) {
     warnings.push('ai_generated: true — Human review または Auto Publish Policy の記録を確認してください')
   }
 
@@ -187,8 +193,10 @@ if (files.length === 0) {
 }
 
 const results = files.map((file) => ({ file, ...checkPost(file) }))
-const ready     = results.filter((r) => r.blockers.length === 0)
-const notReady  = results.filter((r) => r.blockers.length > 0)
+const rejected  = results.filter((r) => r.rejected)
+const active    = results.filter((r) => !r.rejected)
+const ready     = active.filter((r) => r.blockers.length === 0)
+const notReady  = active.filter((r) => r.blockers.length > 0)
 
 // 医療広告チェック — publish-ready 記事の本文のみをスキャンし warning を追加する
 for (const r of ready) {
@@ -220,10 +228,18 @@ if (ready.length > 0) {
   }
 }
 
+if (rejected.length > 0) {
+  console.log()
+  for (const { file } of rejected) {
+    console.log(`↩️  ${file}（差し戻し済み / 公開対象外）`)
+  }
+}
+
 console.log()
 console.log(BAR)
 console.log(`  publish-ready    : ${ready.length} 件`)
 console.log(`  要 approval      : ${notReady.length} 件`)
+console.log(`  差し戻し済み     : ${rejected.length} 件`)
 console.log(BAR)
 
 if (ready.length > 0) {
@@ -242,8 +258,9 @@ if (ready.length > 0) {
 console.log()
 console.log('exit コードについて:')
 console.log('  exit 0  = publish-ready のみ（blocker なし）')
-console.log('  exit 1  = review待ち記事あり（ビルドエラーではありません）')
+console.log('  exit 1  = review待ち・未来日付など active な blocker あり（ビルドエラーではありません）')
 console.log('  日常確認には status:content / status:publish-ready が便利です')
 
-// blocker が1件でもある記事が存在する場合は exit 1（CI ゲートとして維持）
+// active な blocker が1件でもある場合は exit 1（CI ゲートとして維持）。
+// 差し戻し済み記事は公開対象外として集計から分離する。
 process.exit(notReady.length > 0 ? 1 : 0)

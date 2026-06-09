@@ -16,6 +16,7 @@ export type MonthlyTopicCandidate = {
   recommendedReason: string
   targetKeyword: string
   sourceType: 'trend' | 'news' | 'seasonal' | 'clinic' | 'seo' | 'patient_question'
+  sourceUrl?: string
   medicalRisk: RiskLevel
   duplicateRisk: RiskLevel
   priority: PriorityLevel

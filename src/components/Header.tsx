@@ -32,6 +32,9 @@ export function Header() {
           <Link href="/contact" className="text-[11px] text-gray-500 hover:text-[#1e3a5f]">
             お問い合わせ
           </Link>
+          <Link href="/admin" className="text-[11px] text-gray-400 hover:text-[#1e3a5f]">
+            管理
+          </Link>
         </div>
       </div>
 
@@ -149,6 +152,13 @@ export function Header() {
                 {item.name}
               </Link>
             ))}
+            <Link
+              href="/admin"
+              className="flex items-center gap-3 rounded-lg px-4 py-3 text-[14px] font-medium text-gray-500 transition-colors hover:bg-gray-50"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              管理
+            </Link>
           </nav>
           {/* モバイル用検索 input */}
           <div className="mt-4 border-t border-gray-100 pt-4">

@@ -179,10 +179,7 @@ function trimTitle(title) {
 
 export function formatContentStatusLines(status, {
   dashboardUrl,
-  heading = 'コンテンツ状態サマリー',
   maxItems = 5,
-  noPendingText = '承認待ちはありません',
-  showNextAction = true,
 } = {}) {
   const reviewQueue = [...status.pending, ...status.pendingFuture]
   const reviewCount = reviewQueue.length

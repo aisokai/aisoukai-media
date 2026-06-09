@@ -13,6 +13,7 @@ const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 // Human approval 後に reviewed: true、Auto Publish Policy 通過後に auto_approved: true へ変更する。
 function isPublishReady(data: Record<string, unknown>): boolean {
   if (data['draft'] === true) return false
+  if (data['archived'] === true) return false
 
   const humanApproved = data['reviewed'] === true
   const autoApproved =
@@ -130,6 +131,7 @@ function toDateString(val: unknown): string {
 async function buildPendingReviewPost(fileName: string, raw: string): Promise<PendingReviewPost | null> {
   const { data, content } = matter(raw);
 
+  if (data['archived'] === true) return null;
   if (data['reviewed'] === true) return null;
 
   const processed = await remark()

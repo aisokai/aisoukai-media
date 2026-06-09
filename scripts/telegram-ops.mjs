@@ -679,11 +679,10 @@ function filterSensitive(files) {
 
 // ── approve → validate → build → git add/commit/push パイプライン ─────────
 
-async function runApprovePipeline({ slug, by, build, botToken, replyId }) {
+async function runApprovePipeline({ slug, by, build }) {
 
   const steps = []    // { name, ok, output }
   let postSlug = ''
-  let postFilePath = ''
 
   // ─ 1. approve ─────────────────────────────────────────────────────────────
 
@@ -692,7 +691,6 @@ async function runApprovePipeline({ slug, by, build, botToken, replyId }) {
     return { ok: false, failedAt: 'approve', error: ar.error, steps }
   }
   postSlug     = ar.slug
-  postFilePath = ar.filePath
   steps.push({ name: 'approve', ok: true, output: `reviewed_by: ${ar.reviewedBy}, date: ${ar.today}` })
 
   // ─ 2. validate:posts ──────────────────────────────────────────────────────

@@ -1,12 +1,15 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { isAdminAuthenticated } from '@/lib/adminAuth'
 import { NOINDEX_METADATA } from '@/lib/seo'
 import {
+  type MonthlyTopicCandidate,
   buildTopicCandidateSummary,
   getDefaultTopicCandidateMonth,
   getMonthlyTopicCandidatesForAdmin,
 } from '@/lib/monthlyTopicCandidates'
+import FinalizeTopicCandidatesButton from './FinalizeTopicCandidatesButton'
 import TopicCandidateActionButtons from './TopicCandidateActionButtons'
 
 export const metadata: Metadata = {
@@ -17,7 +20,14 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic'
 
 type PageProps = {
-  searchParams?: Promise<{ month?: string }>
+  searchParams?: Promise<{
+    month?: string
+    status?: string
+    risk?: string
+    duplicate?: string
+    priority?: string
+    sort?: string
+  }>
 }
 
 const STATUS_LABELS = {
@@ -42,11 +52,26 @@ const RISK_STYLES = {
   high: 'bg-red-100 text-red-700',
 }
 
+function sortTopicCandidatesForAdmin(topics: MonthlyTopicCandidate[], sort: string) {
+  return [...topics].sort((a, b) => {
+    if (sort === 'title') return a.title.localeCompare(b.title, 'ja')
+    if (sort === 'status') return a.status.localeCompare(b.status)
+    if (sort === 'risk') return a.medicalRisk.localeCompare(b.medicalRisk)
+    if (sort === 'priority') return b.priority.localeCompare(a.priority)
+    return a.recommendedPublishDate.localeCompare(b.recommendedPublishDate) || a.id.localeCompare(b.id)
+  })
+}
+
 export default async function TopicCandidatesPage({ searchParams }: PageProps) {
   if (!(await isAdminAuthenticated())) redirect('/admin/login')
 
   const params = await searchParams
   const month = params?.month ?? getDefaultTopicCandidateMonth()
+  const statusFilter = params?.status ?? 'all'
+  const riskFilter = params?.risk ?? 'all'
+  const duplicateFilter = params?.duplicate ?? 'all'
+  const priorityFilter = params?.priority ?? 'all'
+  const sort = params?.sort ?? 'date'
   const file = await getMonthlyTopicCandidatesForAdmin(month)
 
   if (!file) {
@@ -63,6 +88,16 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
 
   const summary = buildTopicCandidateSummary(file)
   const selectedProgress = `${summary.selectedCount} / ${summary.targetPostCount}`
+  const visibleTopics = sortTopicCandidatesForAdmin(
+    file.topics.filter((topic) => {
+      if (statusFilter !== 'all' && topic.status !== statusFilter) return false
+      if (riskFilter !== 'all' && topic.medicalRisk !== riskFilter) return false
+      if (duplicateFilter !== 'all' && topic.duplicateRisk !== duplicateFilter) return false
+      if (priorityFilter !== 'all' && topic.priority !== priorityFilter) return false
+      return true
+    }),
+    sort,
+  )
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -73,12 +108,12 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
             PCで月次ネタ候補を確認し、スマホでは簡易承認だけ行う想定です。
           </p>
         </div>
-        <a
+        <Link
           href={`/admin/topic-candidates?month=${file.month}`}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-bold text-white"
         >
           PCで確認する
-        </a>
+        </Link>
       </div>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -94,8 +129,58 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
         <SummaryTile label="重複注意" value={summary.duplicateWarningCount} tone="amber" />
       </section>
 
+      <section className="mt-4">
+        <FinalizeTopicCandidatesButton
+          month={file.month}
+          selectedCount={summary.selectedCount}
+          targetPostCount={summary.targetPostCount}
+        />
+      </section>
+
+      <form method="get" className="mt-6 grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-6">
+        <input type="hidden" name="month" value={file.month} />
+        <FilterSelect label="状態" name="status" value={statusFilter}>
+          <option value="all">すべて</option>
+          <option value="pending">未判断</option>
+          <option value="selected">今月採用</option>
+          <option value="backup">予備</option>
+          <option value="hold">保留</option>
+          <option value="rejected">却下</option>
+        </FilterSelect>
+        <FilterSelect label="医療リスク" name="risk" value={riskFilter}>
+          <option value="all">すべて</option>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </FilterSelect>
+        <FilterSelect label="重複" name="duplicate" value={duplicateFilter}>
+          <option value="all">すべて</option>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </FilterSelect>
+        <FilterSelect label="優先度" name="priority" value={priorityFilter}>
+          <option value="all">すべて</option>
+          <option value="high">high</option>
+          <option value="medium">medium</option>
+          <option value="low">low</option>
+        </FilterSelect>
+        <FilterSelect label="並び順" name="sort" value={sort}>
+          <option value="date">推奨公開日順</option>
+          <option value="priority">優先度順</option>
+          <option value="status">状態順</option>
+          <option value="risk">リスク順</option>
+          <option value="title">タイトル順</option>
+        </FilterSelect>
+        <div className="flex items-end">
+          <button className="w-full rounded-md bg-gray-900 px-3 py-2 text-sm font-bold text-white hover:bg-gray-800">
+            絞り込む
+          </button>
+        </div>
+      </form>
+
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
-        {file.topics.map((topic) => (
+        {visibleTopics.map((topic) => (
           <article key={topic.id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_STYLES[topic.status]}`}>
@@ -134,8 +219,34 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
             </details>
           </article>
         ))}
+        {visibleTopics.length === 0 && (
+          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500 lg:col-span-2">
+            条件に合うネタ候補はありません。
+          </div>
+        )}
       </section>
     </main>
+  )
+}
+
+function FilterSelect({
+  label,
+  name,
+  value,
+  children,
+}: {
+  label: string
+  name: string
+  value: string
+  children: React.ReactNode
+}) {
+  return (
+    <label className="text-xs font-bold text-gray-600">
+      {label}
+      <select name={name} defaultValue={value} className="mt-1 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800">
+        {children}
+      </select>
+    </label>
   )
 }
 

@@ -186,7 +186,6 @@ function main() {
   // ── 各ファイルの処理計画を作成 ──
   const plans = []
   const categoryCount = {}
-  let skippedCount = 0
 
   for (const srcPath of imageFiles) {
     const ext         = extname(srcPath).toLowerCase()
@@ -203,7 +202,6 @@ function main() {
 
     // 既にライブラリに登録済みのパスはスキップ
     if (existingPaths.has(publicPath)) {
-      skippedCount++
       plans.push({ skip: true, srcPath, publicPath, category, reason: '登録済み' })
       continue
     }
