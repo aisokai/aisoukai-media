@@ -181,7 +181,7 @@ tags:
 | `npm run request:archive -- <update_id>` | リクエストを archived にする（最終状態。一覧から省略表示） |
 | `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
-| `npm run ops:mwf` | 月水金 定期運用チェックを一括実行（status→fetch→list→通知×3）。月水金以外は警告。`--force` で強制実行 |
+| `npm run ops:mwf` | 月水金 定期運用を一括実行（status→fetch→list→定期記事生成→通知×3）。月水金以外は警告。`--force` で強制実行 |
 | `npm run image:import-inbox` | `public/images/library/inbox/` を再帰走査して画像を自動分類・コピー・JSON 登録する（デフォルト dry-run / `--apply` で実行 / `--apply --move` で移動） |
 | `npm run image:list` | 画像ライブラリのサマリーを表示する（カテゴリ別件数 / alt未カスタマイズ / license未更新 / 未使用画像。`--all` で全件表示） |
 | `npm run image:check` | `data/image-library.json` の整合性を検証する（path実在 / id重複 / category妥当性 / alt・license確認 / 記事参照整合） |
@@ -278,13 +278,28 @@ npm run ops:mwf               # 月・水・金のみ実行
 npm run ops:mwf -- --force    # 曜日に関わらず実行
 ```
 
-`ops:mwf` が順に実行すること（destructive 操作なし）:
+`ops:mwf` が順に実行すること（approve / publish / request:draft 自動実行なし）:
 1. `status:content` — 公開中/予定/review待ちの件数確認
 2. `telegram:requests --apply` — 新着リクエストを取得・保存
 3. `request:list` — リクエスト一覧とトリアージコマンドを表示
-4. `notify:posting-reminder` — 投稿確認リマインドを Telegram に送信
-5. `notify:requests` — リクエスト状態サマリーを Telegram に送信
-6. `notify:pending-review` — review待ち記事一覧を Telegram に送信
+4. `article:scheduled` — review待ちがなく、APIキーがある場合に定期記事下書きを1件生成
+5. `notify:posting-reminder` — 投稿確認リマインドを Telegram に送信
+6. `notify:requests` — リクエスト状態サマリーを Telegram に送信
+7. `notify:pending-review` — review待ち記事一覧を Telegram に送信
+
+記事生成ステップの制御:
+
+```bash
+npm run ops:mwf -- --no-generate    # 従来どおり状態確認・通知のみ
+npm run ops:mwf -- --auto-publish   # article:scheduled -- --auto-publish を使用
+```
+
+記事生成は次の場合にスキップされる:
+
+- `--no-generate` 指定
+- `ANTHROPIC_API_KEY` 未設定
+- 既に review 待ち記事がある
+- `article:scheduled` 側で生成可能な topic がない、または生成に失敗した
 
 **ops:mwf 後に Human が実行するアクション:**
 
@@ -305,6 +320,7 @@ npm run request:archive -- --all-done
 ```
 
 > `approve / publish / request:draft` は `ops:mwf` が自動実行しない。Human 判断が必要。
+> 定期記事生成は下書き作成までで、標準では Human review 待ちに残る。
 
 #### launchd による自動実行（macOS）
 
@@ -319,6 +335,7 @@ npm run ops:mwf:uninstall  # 解除
 - plist: `~/Library/LaunchAgents/com.mitani.aisoukai-media-ops-mwf.plist`
 - ログ: `logs/ops-mwf.log` / `logs/ops-mwf-error.log`
 - 内部では `--force` フラグで `ops:mwf.mjs` を直接起動する
+- 生成を止めたい場合は手動運用で `npm run ops:mwf -- --force --no-generate` を使う
 - Mac がスリープ中は実行されない（起動後に次の実行時刻まで待機）
 
 ### 毎朝の確認（所要 1〜2 分）

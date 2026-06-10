@@ -24,9 +24,12 @@ AIが単独でコンテンツを公開することはない。
 
 [3] Draft Generation
     npm run generate:draft -- TOPIC-XXXX
+    または月水金運用:
+    npm run ops:mwf
     → ANTHROPIC_API_KEY が必要
     → content/posts/YYYY-MM-DD-TOPIC-XXXX.md を生成
     → reviewed: false / ai_generated: true で出力
+    → ops:mwf では既存の review 待ちがある場合、追加生成をスキップする
 
 [4] Human Review (記事内容)
     npm run list:pending-review で一覧確認
