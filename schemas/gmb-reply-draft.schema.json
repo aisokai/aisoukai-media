@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gmb-reply-draft.schema.json",
+  "title": "GMB Reply Draft",
+  "description": "口コミ返信の下書き。v0では送信しない。raw_text を含めてはならない。replied_at / external_result は送信実装後にのみ埋まる。",
+  "type": "object",
+  "required": ["review_id", "job_id", "template_id", "draft_text", "risk_level", "gate_policy", "created_at"],
+  "properties": {
+    "review_id": { "type": "string" },
+    "job_id": { "type": "string" },
+    "template_id": {
+      "enum": ["thanks_no_text", "thanks_short", "thanks_normal", "apology_low_rating", "calm_hostile"]
+    },
+    "draft_text": { "type": "string", "maxLength": 400 },
+    "risk_level": { "enum": ["low", "medium", "high"] },
+    "gate_policy": { "enum": ["auto", "auto_after_notify", "auto_when_enabled", "human_gate", "forbidden"] },
+    "external_result": { "type": ["object", "null"], "description": "返信ID等。v0では常にnull" },
+    "replied_at": { "type": ["string", "null"] },
+    "created_at": { "type": "string" }
+  },
+  "not": { "required": ["raw_text"] }
+}

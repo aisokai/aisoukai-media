@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "comment": "type × channel → gate_policy の固定表。flags の ON は先生のみが行う (Human Gate)。AIはこのファイルを変更してはならない。ファイルが無い場合は全て human_gate に倒れる。",
+  "fallback": "human_gate",
+  "flags": {
+    "gmb_post_auto": false,
+    "gmb_post_auto_all": false,
+    "gmb_reply_auto_template": false,
+    "gmb_reply_auto": false,
+    "x_auto": false,
+    "instagram_auto": false,
+    "lineworks_internal_auto": false
+  },
+  "gate_table": {
+    "blog_article": {
+      "blog": "human_gate",
+      "obsidian": "auto"
+    },
+    "sns_repurpose": {
+      "instagram": "auto_when_enabled",
+      "x": "auto_when_enabled",
+      "line_official": "human_gate",
+      "obsidian": "auto"
+    },
+    "gmb_update": {
+      "gmb": "auto_when_enabled",
+      "obsidian": "auto"
+    },
+    "gmb_emergency_notice": {
+      "gmb": "auto_when_enabled",
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "gmb_campaign": {
+      "gmb": "human_gate",
+      "obsidian": "auto"
+    },
+    "temporary_closure_notice": {
+      "gmb": "auto_when_enabled",
+      "website_notice": "human_gate",
+      "line_official": "human_gate",
+      "instagram": "auto_when_enabled",
+      "x": "auto_when_enabled",
+      "internal_print": "auto",
+      "lineworks_internal": "auto_when_enabled",
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "schedule_change_notice": {
+      "gmb": "auto_when_enabled",
+      "website_notice": "human_gate",
+      "line_official": "human_gate",
+      "instagram": "auto_when_enabled",
+      "x": "auto_when_enabled",
+      "internal_print": "auto",
+      "lineworks_internal": "auto_when_enabled",
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "review_reply": {
+      "gmb": "auto_when_enabled",
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "internal_notice": {
+      "internal_print": "auto",
+      "lineworks_internal": "auto_when_enabled",
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "lineworks_instruction": {
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "telegram_instruction": {
+      "telegram_internal": "auto",
+      "obsidian": "auto"
+    }
+  },
+  "flag_bindings": {
+    "gmb_update:gmb": ["gmb_post_auto_all"],
+    "gmb_emergency_notice:gmb": ["gmb_post_auto"],
+    "temporary_closure_notice:gmb": ["gmb_post_auto"],
+    "schedule_change_notice:gmb": ["gmb_post_auto"],
+    "temporary_closure_notice:instagram": ["instagram_auto"],
+    "temporary_closure_notice:x": ["x_auto"],
+    "schedule_change_notice:instagram": ["instagram_auto"],
+    "schedule_change_notice:x": ["x_auto"],
+    "sns_repurpose:instagram": ["instagram_auto"],
+    "sns_repurpose:x": ["x_auto"],
+    "review_reply:gmb": ["gmb_reply_auto"],
+    "review_reply:gmb:template_only": ["gmb_reply_auto_template"],
+    "review_reply:gmb:short_positive": ["gmb_reply_auto_template"],
+    "review_reply:gmb:normal": ["gmb_reply_auto"],
+    "temporary_closure_notice:lineworks_internal": ["lineworks_internal_auto"],
+    "schedule_change_notice:lineworks_internal": ["lineworks_internal_auto"],
+    "internal_notice:lineworks_internal": ["lineworks_internal_auto"]
+  }
+}

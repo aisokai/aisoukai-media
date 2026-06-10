@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gmb-post-draft.schema.json",
+  "title": "GMB Post Draft",
+  "description": "Google Business Profile 投稿の下書き。v1ではAPIを呼ばない。external_result は送信後にのみ埋まる (v1では常にnull)。",
+  "type": "object",
+  "required": ["id", "job_id", "post_type", "draft_text", "gate_policy", "created_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "job_id": { "type": "string" },
+    "post_type": {
+      "enum": ["update", "emergency_notice", "schedule_change", "campaign", "blog_summary", "oral_care_tip"]
+    },
+    "draft_text": { "type": "string", "maxLength": 1500 },
+    "cta_url": { "type": ["string", "null"], "description": "ブログ紹介時のリンク先" },
+    "source_post": { "type": ["string", "null"] },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "gate_policy": { "enum": ["auto", "auto_after_notify", "auto_when_enabled", "human_gate", "forbidden"] },
+    "external_result": { "type": ["object", "null"], "description": "投稿ID等。v1では常にnull" },
+    "created_at": { "type": "string" }
+  }
+}

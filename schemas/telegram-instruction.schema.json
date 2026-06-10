@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "telegram-instruction.schema.json",
+  "title": "Telegram Instruction",
+  "description": "Telegramコマンド文字列の解釈結果。許可コマンドは固定allowlist。/approve /post /publish 等の実行系はblocked (本Batch対象外)。送信機能は存在しない。",
+  "type": "object",
+  "required": ["command", "allowed", "received_at"],
+  "properties": {
+    "command": { "enum": ["notice", "gmb", "review", "sns", "status", "approve", "reject", "post", "publish", "unknown"] },
+    "allowed": { "type": "boolean", "description": "allowlist (/notice /gmb /review /sns /status) に含まれるか" },
+    "payload": { "type": "string" },
+    "mapped_job_type": {
+      "type": ["string", "null"],
+      "description": "queue job に変換する場合の type (固定enum)。queryコマンドや blocked は null"
+    },
+    "job_id": { "type": ["string", "null"] },
+    "blocked_reason": { "type": ["string", "null"] },
+    "received_at": { "type": "string" }
+  }
+}

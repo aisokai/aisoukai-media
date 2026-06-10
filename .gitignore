@@ -55,3 +55,13 @@ logs/*.log
 
 # internal superpowers planning docs (not version-controlled)
 docs/superpowers/plans/
+
+# Media Automation runtime artifacts (generated locally, not version-controlled)
+content/media-queue/mj-*.json
+content/gmb-drafts/mj-*
+content/gmb-reviews/snapshots/
+content/gmb-reviews/replies/
+content/gmb-reviews/processed-ids.json
+content/emergency-drafts/mj-*
+content/lineworks-requests/lw-*.json
+logs/media-automation.jsonl

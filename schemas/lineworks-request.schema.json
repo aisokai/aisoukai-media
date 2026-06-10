@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "lineworks-request.schema.json",
+  "title": "LINE WORKS Instruction Request",
+  "description": "LINE WORKS経由の制作指示 (v1はmock受信のみ。送信機能は存在しない)。",
+  "type": "object",
+  "required": ["id", "job_id", "text", "received_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "job_id": { "type": "string", "description": "変換先 media queue job の id" },
+    "sender_display": { "type": "string", "description": "表示名のみ。アカウントID等は保存しない" },
+    "text": { "type": "string" },
+    "received_at": { "type": "string" },
+    "intake_mode": { "const": "mock", "description": "v1ではmockのみ。実API受信は将来adapter差し替え" }
+  }
+}

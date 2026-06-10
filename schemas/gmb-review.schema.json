@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gmb-review.schema.json",
+  "title": "GMB Review Snapshot",
+  "description": "口コミスナップショット。raw_text はこのファイル内にのみ保持し、console / list / log には masked_text のみ出す。",
+  "type": "object",
+  "required": ["review_id", "rating", "raw_text", "masked_text", "classification", "matched_rule", "detected_at"],
+  "properties": {
+    "review_id": { "type": "string" },
+    "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+    "raw_text": { "type": "string", "description": "原文。表示・ログ出力禁止" },
+    "masked_text": { "type": "string", "description": "個人情報マスク済み。表示はこちらのみ" },
+    "reviewer_display": { "type": "string", "description": "表示名のみ。他の個人特定情報は保存しない" },
+    "has_reply": { "type": "boolean" },
+    "classification": {
+      "enum": ["low_template_only", "low_short_positive", "low_normal", "high"]
+    },
+    "matched_rule": { "type": "integer", "description": "分類表のどの優先順位でマッチしたか (監査用)" },
+    "risk_level": { "enum": ["low", "medium", "high"] },
+    "detected_at": { "type": "string" },
+    "processed": { "type": "boolean" }
+  }
+}

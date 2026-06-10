@@ -1,0 +1,51 @@
+[
+  {
+    "review_id": "mock-review-001",
+    "rating": 5,
+    "text": "",
+    "reviewer_display": "サンプル太郎",
+    "has_reply": false
+  },
+  {
+    "review_id": "mock-review-002",
+    "rating": 5,
+    "text": "スタッフの方がとても丁寧で安心しました。",
+    "reviewer_display": "サンプル花子",
+    "has_reply": false
+  },
+  {
+    "review_id": "mock-review-003",
+    "rating": 4,
+    "text": "院内が清潔で待ち時間も少なく、説明もわかりやすかったです。子どもも嫌がらずに通えています。これからもお世話になります。",
+    "reviewer_display": "サンプル次郎",
+    "has_reply": false
+  },
+  {
+    "review_id": "mock-review-004",
+    "rating": 2,
+    "text": "受付の対応に不満があります。改善してほしいです。",
+    "reviewer_display": "サンプル三郎",
+    "has_reply": false
+  },
+  {
+    "review_id": "mock-review-005",
+    "rating": 5,
+    "text": "親知らずの抜歯をお願いしました。とても良かったです。",
+    "reviewer_display": "サンプル四郎",
+    "has_reply": false
+  },
+  {
+    "review_id": "mock-review-006",
+    "rating": 5,
+    "text": "予約の確認は 03-1234-5678 に電話しました。良い医院です。",
+    "reviewer_display": "サンプル五郎",
+    "has_reply": false
+  },
+  {
+    "review_id": "mock-review-007",
+    "rating": 5,
+    "text": "返信済みのサンプルです。",
+    "reviewer_display": "サンプル六郎",
+    "has_reply": true
+  }
+]

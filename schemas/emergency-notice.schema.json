@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "emergency-notice.schema.json",
+  "title": "Emergency Notice Draft",
+  "description": "急な休診・診療時間変更などの緊急お知らせ。1入力から媒体別文面を一括生成する。外部投稿はしない (Human Gate)。",
+  "type": "object",
+  "required": ["id", "job_id", "notice_type", "input_text", "date", "drafts", "created_at"],
+  "properties": {
+    "id": { "type": "string" },
+    "job_id": { "type": "string", "description": "対応する media queue job の id" },
+    "notice_type": {
+      "enum": ["temporary_closure_notice", "schedule_change_notice", "gmb_emergency_notice"]
+    },
+    "input_text": { "type": "string" },
+    "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "drafts": {
+      "type": "object",
+      "description": "channel名 → 生成文面。channelは固定enum",
+      "propertyNames": {
+        "enum": ["website_notice", "gmb", "line_official", "instagram", "x", "internal_print"]
+      },
+      "additionalProperties": { "type": "string" }
+    },
+    "warnings": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string" }
+  }
+}
