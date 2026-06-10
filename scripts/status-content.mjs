@@ -5,6 +5,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildReviewSummary, loadContentStatus } from './lib/content-status.mjs'
+import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const POSTS_DIR = join(__dirname, '..', 'content', 'posts')
@@ -32,9 +33,7 @@ function main() {
   console.log(BAR)
   console.log()
   console.log(buildReviewSummary(status, {
-    dashboardUrl: process.env.NEXT_PUBLIC_SITE_URL
-      ? `${process.env.NEXT_PUBLIC_SITE_URL}/admin/pending-review`
-      : 'https://aisoukai-media.vercel.app/admin/pending-review',
+    dashboardUrl: `${resolveNotificationSiteUrl()}/admin/pending-review`,
     heading: 'コンテンツ状態ダッシュボード',
     maxItems: 5,
     noPendingText: '承認待ちはありません',

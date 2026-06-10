@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { buildReviewSummary, loadContentStatus } from './lib/content-status.mjs'
+import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
@@ -39,9 +40,7 @@ async function sendTelegram(botToken, chatId, text) {
 async function main() {
   loadEnv()
 
-  const dashboardUrl = process.env.NEXT_PUBLIC_SITE_URL
-    ? `${process.env.NEXT_PUBLIC_SITE_URL}/admin/pending-review`
-    : 'https://aisoukai-media.vercel.app/admin/pending-review'
+  const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
 
   const status = loadContentStatus(POSTS_DIR)
   const text   = buildReviewSummary(status, {

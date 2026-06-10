@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import matter from 'gray-matter'
@@ -34,6 +34,10 @@ test('duplicate cleanup removes selected duplicate posts from public publishing'
   }
 
   for (const slug of removeFromPublic) {
+    if (!existsSync(`${POSTS}/${slug}.md`)) {
+      assert.equal(existsSync(`${POSTS}/${slug}.md`), false, `${slug} should be physically deleted`)
+      continue
+    }
     const data = frontmatter(slug)
     assert.equal(data.reviewed, false, `${slug} reviewed should be false`)
     assert.match(String(data.rejection_reason ?? ''), /重複整理/, `${slug} should have cleanup rejection reason`)

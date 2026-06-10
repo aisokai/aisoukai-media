@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -34,8 +35,7 @@ function nextMonth(today = new Date()) {
 }
 
 function siteUrl() {
-  const raw = process.env.NEXT_PUBLIC_SITE_URL ?? process.env.SITE_URL ?? 'https://aisoukai-media.vercel.app'
-  return raw.replace(/\/$/, '')
+  return resolveNotificationSiteUrl()
 }
 
 function buildText(file) {
