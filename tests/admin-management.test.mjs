@@ -68,6 +68,7 @@ test('article topic management exposes editable csv fields', () => {
 test('topic candidates and pending review expose status filters and rejected body previews', () => {
   const topicCandidates = readFileSync('src/app/admin/topic-candidates/page.tsx', 'utf8')
   const pendingReview = readFileSync('src/app/admin/pending-review/page.tsx', 'utf8')
+  const rejectedDeleteButton = readFileSync('src/app/admin/pending-review/RejectedPostDeleteButton.tsx', 'utf8')
 
   assert.match(topicCandidates, /statusFilter/)
   assert.match(topicCandidates, /riskFilter/)
@@ -78,4 +79,7 @@ test('topic candidates and pending review expose status filters and rejected bod
   assert.match(pendingReview, /renderReviewPostCard/)
   assert.match(pendingReview, /差し戻し理由/)
   assert.match(pendingReview, /PostBodyPreview/)
+  assert.match(pendingReview, /RejectedPostDeleteButton/)
+  assert.match(rejectedDeleteButton, /deletePostAction/)
+  assert.match(rejectedDeleteButton, /差し戻し記事を削除/)
 })

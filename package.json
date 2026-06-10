@@ -51,6 +51,7 @@
     "article:manual": "node scripts/manual-article-flow.mjs",
     "article:scheduled": "node scripts/scheduled-article-flow.mjs",
     "article:auto-scheduled": "node scripts/scheduled-article-flow.mjs --auto-publish",
+    "article:batch-scheduled": "node scripts/generate-scheduled-drafts.mjs",
     "article:auto-review": "node scripts/auto-review-post.mjs",
     "resubmit:post": "node scripts/resubmit-post.mjs",
     "status:content": "node scripts/status-content.mjs",

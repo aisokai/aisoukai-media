@@ -8,6 +8,7 @@ import { isAdminAuthenticated } from '@/lib/adminAuth'
 import { ArrowLeft } from 'lucide-react'
 import PostBodyPreview from './PostBodyPreview'
 import ReviewerNameClient from './ReviewerNameClient'
+import RejectedPostDeleteButton from './RejectedPostDeleteButton'
 import ReviewActionButtons from './ReviewActionButtons'
 
 export const metadata: Metadata = {
@@ -117,6 +118,7 @@ function renderReviewPostCard({
         )}
 
         <ReviewActionButtons slug={post.slug} title={post.title} />
+        {isRejected && <RejectedPostDeleteButton slug={post.slug} />}
 
         <details className="mt-3 text-xs" open={isRejected}>
           <summary className="cursor-pointer select-none text-gray-500 hover:text-gray-700">

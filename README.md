@@ -198,6 +198,7 @@ tags:
 | `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
 | `npm run article:scheduled -- --auto-publish` | 定期提案フロー後に Auto Publish Policy を実行し、low risk 記事だけ自動承認する |
 | `npm run article:auto-scheduled` | 定期自動運用向けの短縮コマンド。`article:scheduled -- --auto-publish` と同じ |
+| `npm run article:batch-scheduled -- --month YYYY-MM --limit N` | 指定月の approved かつ未生成 topic をまとめて下書き生成する（Human が明示実行 / approve・publish はしない） |
 | `npm run article:auto-review -- <slug>` | 指定記事を Auto Publish Policy でチェックし、条件を満たす場合だけ `auto_approved:true` にする |
 | `npm run article:auto-review -- <slug> --dry-run` | 指定記事の Auto Publish Policy 判定だけを確認し、ファイルや監査ログは更新しない |
 | `npm run article:auto-review -- --all` | pending review 記事を一括で Auto Publish Policy チェックする |
@@ -370,6 +371,20 @@ npm run build                     # エラーがないか確認
 git push origin main
 # → Vercel が自動デプロイ
 ```
+
+### 今月分の記事をまとめて下書き生成
+
+月次候補から採用済みになっている記事を、まとめて review 待ちへ積む場合:
+
+```bash
+npm run article:batch-scheduled -- --month 2026-06 --dry-run
+npm run article:batch-scheduled -- --month 2026-06 --limit 5
+```
+
+- 対象は `status: approved` かつ指定月の `publish_date` を持つ topic
+- 既に `content/posts/<publish_date>-<topic-id>.md` がある topic はスキップ
+- 実行後の記事は `reviewed:false` の下書きで、承認・公開は行わない
+- 生成後は `npm run validate:posts` と `/admin/pending-review` で確認する
 
 ### Telegram digest 確認
 
