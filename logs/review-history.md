@@ -230,3 +230,11 @@ reviewed_by: 三谷
 date: 2026-06-26
 publish_at: 2026-06-26
 
+## 2026-06-10T16:37:20.462+09:00
+datetime: 2026-06-10T16:37:20.462+09:00
+action: approve
+slug: 2026-06-19-monthly-202606topic005
+reviewed_by: 三谷
+date: 2026-06-19
+publish_at: 2026-06-19
+
