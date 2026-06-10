@@ -214,3 +214,11 @@ slug: 2026-01-15-ai-dental-diagnosis
 reviewed_by: 三谷
 date: 2026-01-15
 
+## 2026-06-10T16:37:07.278+09:00
+datetime: 2026-06-10T16:37:07.278+09:00
+action: approve
+slug: 2026-06-29-monthly-202606topic009
+reviewed_by: 三谷
+date: 2026-06-29
+publish_at: 2026-06-29
+
