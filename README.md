@@ -61,6 +61,16 @@ npm run dev
 この repo の作業ルールは [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) を正本とする。  
 ここでは主に使い方を案内し、公開条件・review・Telegram・完了報告の共通ルールはそちらに集約する。
 
+## DMP横展開
+
+DMPブログ自動更新システムは、Instagram / X / LINE / YouTube / Website へ横展開するための雛形として扱う。
+
+- 共通テンプレート: [docs/dmp/dmp-channel-template.md](docs/dmp/dmp-channel-template.md)
+- SNS展開計画: [docs/dmp/dmp-sns-expansion-plan.md](docs/dmp/dmp-sns-expansion-plan.md)
+
+共通方針は `ネタ候補 -> AI下書き -> review待ち -> Telegram通知 -> Human承認 -> 手動公開`。
+SNSについては当面、外部APIによる自動投稿は行わず、手動投稿用Markdownを生成する。
+
 ## ディレクトリ構成
 
 ```
@@ -205,6 +215,8 @@ tags:
 | `npm run approve:post -- <slug> --reviewed-by "氏名"` | Human として記事を承認する（reviewed: true / reviewed_at・reviewed_by を設定。--reviewed-by は必須） |
 | `npm run reject:post -- <slug>` | 記事を差し戻す（rejection_reason と review log を記録。--reviewed-by も指定可） |
 | `npm run resubmit:post -- <slug> --reviewed-by "氏名" --reason "理由"` | 差し戻し済み記事を pending-review に戻す。元の差し戻し履歴は logs/ に保持。自動 approve しない |
+| `npm run sns:validate` | `content/sns-drafts/` のSNSドラフトfrontmatterを検証する。`publish_mode: manual_only` のみ許可 |
+| `npm run sns:list-pending-review` | SNSドラフトのreview待ち一覧を表示する（読み取り専用） |
 | `npm run status:content` | 公開中・公開予定・review待ち・差し戻し済みの件数と一覧を表示する（読み取り専用） |
 | `npm run status:publish-ready` | publish-ready 判定チェック（exit 1 でも CI エラー扱いしない確認用コマンド） |
 

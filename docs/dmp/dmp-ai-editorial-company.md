@@ -85,9 +85,10 @@ DMP は藍想会の **外向けコンテンツ全体** を管理する。
 ### SNS部（SNS）
 
 - **役割**: Instagram / X / LINE の投稿ドラフト、カルーセルアウトライン、短文キャプション
-- **現状**: 未実装（Phase 2 で着手）
-- **出力**: `data/dmp/sns-drafts/` 配下の Markdown ドラフト（将来）
+- **現状**: Phase 2 設計着手。ブログ自動更新システムを雛形として横展開する
+- **出力**: `content/sns-drafts/` または `data/dmp/<channel>/drafts/` 配下の Markdown ドラフト
 - **制約**: Meta Graph API / Twitter API による自動投稿禁止。Human がコピー&ペーストで手動投稿
+- **設計資料**: [dmp-channel-template.md](./dmp-channel-template.md), [dmp-sns-expansion-plan.md](./dmp-sns-expansion-plan.md)
 
 ### ウェブサイト部（Website）
 
