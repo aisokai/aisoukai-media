@@ -10,3 +10,9 @@ action: delete-rejected
 slug: 2026-05-15-req-145026187
 reason: physical delete from pending review
 
+## 2026-06-10T16:45:26.362+09:00
+datetime: 2026-06-10T16:45:26.362+09:00
+action: delete-rejected
+slug: 2026-05-15-req-145026186
+reason: physical delete from pending review
+
