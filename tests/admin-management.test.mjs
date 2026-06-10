@@ -80,6 +80,7 @@ test('topic candidates and pending review expose status filters and rejected bod
   assert.match(pendingReview, /差し戻し理由/)
   assert.match(pendingReview, /PostBodyPreview/)
   assert.match(pendingReview, /RejectedPostDeleteButton/)
-  assert.match(rejectedDeleteButton, /deletePostAction/)
+  assert.match(rejectedDeleteButton, /deleteRejectedPostAction/)
   assert.match(rejectedDeleteButton, /差し戻し記事を削除/)
+  assert.doesNotMatch(rejectedDeleteButton, /slug を入力/)
 })

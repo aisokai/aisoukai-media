@@ -206,3 +206,30 @@ export async function deletePostAction(slug: string, confirmation: string): Prom
     return { ok: false, message: sanitizeError(error) }
   }
 }
+
+export async function deleteRejectedPostAction(slug: string): Promise<AdminPostActionResult> {
+  try {
+    await requireAdmin()
+    validateSlug(slug)
+
+    const { postPath, raw } = await readPost(slug)
+    const parsed = matter(raw)
+    if (!parsed.data.rejection_reason) {
+      throw new Error('差し戻し済みの記事だけ削除できます')
+    }
+
+    const log = appendLog(await loadAdminLog(), 'delete-rejected', slug, 'physical delete from pending review')
+    const result = await writeFiles(`delete rejected post: ${slug}`, [
+      { path: postPath, content: null },
+      { path: LOG_PATH, content: log },
+    ])
+
+    revalidatePath('/admin/posts')
+    revalidatePath('/admin/pending-review')
+    revalidatePath('/blog')
+    revalidatePath(`/blog/${slug}`)
+    return { ok: true, message: `削除しました。${result}` }
+  } catch (error) {
+    return { ok: false, message: sanitizeError(error) }
+  }
+}
