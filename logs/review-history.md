@@ -222,3 +222,11 @@ reviewed_by: 三谷
 date: 2026-06-29
 publish_at: 2026-06-29
 
+## 2026-06-10T16:37:14.433+09:00
+datetime: 2026-06-10T16:37:14.433+09:00
+action: approve
+slug: 2026-06-26-monthly-202606topic008
+reviewed_by: 三谷
+date: 2026-06-26
+publish_at: 2026-06-26
+
