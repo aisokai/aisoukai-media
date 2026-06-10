@@ -429,7 +429,9 @@ npm run telegram:ops:uninstall  # 解除
 ```
 
 - 実行間隔: 3分おき
-- 実行コマンド: `cd ~/Desktop/aisoukai-media && npm run telegram:ops -- --apply --build`
+- 実行コマンド: `cd ~/Desktop/aisoukai-media && npm run telegram:ops -- --apply`
+- Telegramリクエスト確認と承認処理までは自動。`build` / `push` は行わない
+- `build` / `push` は Human Gate とし、先生の明示操作だけで実行する
 - ログ: `logs/telegram-ops.log`
 - エラーログ: `logs/telegram-ops-error.log`
 - Wi-Fi 切断や API 失敗時はエラー終了してよい。次回実行で再取得する

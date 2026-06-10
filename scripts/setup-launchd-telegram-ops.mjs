@@ -37,7 +37,7 @@ function generatePlist() {
   <array>
     <string>/bin/bash</string>
     <string>-lc</string>
-    <string>cd ${ROOT} && npm run telegram:ops -- --apply --build</string>
+    <string>cd ${ROOT} && npm run telegram:ops -- --apply</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -106,7 +106,8 @@ function install() {
   console.log()
   console.log('  実行間隔: 3分おき')
   console.log('  実行コマンド:')
-  console.log(`    cd ${ROOT} && npm run telegram:ops -- --apply --build`)
+  console.log(`    cd ${ROOT} && npm run telegram:ops -- --apply`)
+  console.log('  build / push は実行しません（Human Gate）')
   console.log(`  ログ     : ${LOG_PATH}`)
   console.log(`  エラーログ: ${ERROR_LOG_PATH}`)
   console.log()
