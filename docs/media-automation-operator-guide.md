@@ -79,9 +79,10 @@
 
 ## 4. 緊急停止手順 (emergency stop)
 
-1. `config/media-gate.json` の `flags` をすべて `false` にする(これだけで自動実行系は全停止。v1では元々外部送信機能が無いため、これは将来版向けの手順)。
-2. launchd を導入済みの場合: `npm run telegram:ops:uninstall` 等で該当ジョブをunload。
-3. 確認: `npm run media:health` で「全てOFF」表示を確認。
+1. `config/media-gate.json` の `flags` をすべて `false` にする(自動apply・通知系は即停止)。
+2. Media Automation launchd を導入済みの場合: `npm run media:launchd:uninstall` で常駐jobをunload。
+3. GMB API接続自体を遮断する場合: `.env.local` から `GMB_*` 行を削除する(秘密値は画面・チャットに貼らない)。
+4. 確認: `npm run media:health` と `npm run media:activation` でOFF/未接続状態を確認。
 
 ## 5. Rollback方針
 

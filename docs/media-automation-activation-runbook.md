@@ -28,11 +28,13 @@
 | 1-3 | location ID取得 | `npm run media:gmb:discover` |
 | 1-4 | 実API読み取りテスト | `npm run media:gmb:reviews:check -- --source api` |
 | 1-5 | launchd登録(**read-only/dry-runジョブのみ**) | `npm run media:launchd:install` |
-| 1-6 | 翌朝、日次稼働を確認 | `npm run media:launchd:status` / `npm run media:status` |
+| 1-6 | 登録状態を確認(plist存在 + launchctl load済み) | `npm run media:launchd:status` / `npm run media:activation` |
 | 1-7 | 記録確認 | `~/Desktop/mybrain/media-automation/` と `data/media-status.json` |
 | 1-8 | (任意) Telegram digest解禁 | `telegram_notify: true` + `launchd_apply_jobs: true` + `media:launchd:install-apply`。executor-applyも登録されるがauto系フラグOFFのため毎回no-op |
 
 完了条件: 実口コミが毎朝検出され、返信案が `content/gmb-reviews/replies/` に溜まり、queueに `review_pending / human_required` が並ぶ。
+
+Stage 1の途中で止まった場合は、必ず `npm run media:activation` で再開位置を確認する。OAuth client secret / refresh token は `.env.local` にだけ保存し、画面・チャット・Markdown・ログには出さない。
 
 ## Stage 2: 先生承認付きapply開放 (1〜2週間の運用)
 
