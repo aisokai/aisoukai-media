@@ -41,7 +41,7 @@ const EVENT_LABELS = Object.freeze({
 })
 
 // 日次Markdownを組み立てる (純関数: テスト可能)
-export function buildDailyMarkdown({ date, events, statusCounts }) {
+export function buildDailyMarkdown({ date, events, statusCounts, pending = [] }) {
   const lines = [
     `# Media Automation 日次記録 ${date}`,
     '',
@@ -62,6 +62,13 @@ export function buildDailyMarkdown({ date, events, statusCounts }) {
     ].filter(Boolean).join(' ')
     lines.push(`- ${e.ts.slice(11, 16)} ${label} ${detail}`)
   }
+  // 承認待ち (返信案・投稿案)。summaryはマスク/redact済みの値のみ。
+  lines.push('', '## 承認待ち (Human Gate)')
+  if (pending.length === 0) lines.push('- (なし)')
+  for (const p of pending) {
+    const mark = p.status === 'human_required' ? '🔴' : '🟡'
+    lines.push(`- ${mark} \`${p.id}\` ${p.type} — ${String(p.summary ?? '').slice(0, 80)}`)
+  }
   lines.push('', '## queue更新ログ')
   const saved = events.filter((e) => e.event === 'job_saved')
   lines.push(saved.length === 0 ? '- (なし)' : `- ${saved.length} 件 (詳細は logs/media-automation.jsonl)`)
@@ -78,7 +85,10 @@ export function exportDaily({ date = getTodayJst(), dryRun = false } = {}) {
     human_required: jobs.filter((j) => j.status === 'human_required').length,
     failed: jobs.filter((j) => j.status === 'failed').length,
   }
-  const markdown = buildDailyMarkdown({ date, events, statusCounts })
+  const pending = jobs
+    .filter((j) => ['review_pending', 'human_required'].includes(j.status))
+    .map((j) => ({ id: j.id, type: j.type, status: j.status, summary: String(j.source_text ?? '') }))
+  const markdown = buildDailyMarkdown({ date, events, statusCounts, pending })
   const outDir = join(getVaultDir(), 'media-automation')
   const outPath = join(outDir, `${date}.md`)
   if (!dryRun) {

@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 // Media Queue の review_pending / human_required digest 通知。
-// デフォルトは console 表示のみ (外部通信なし)。--apply 指定時のみ Telegram に送信する。
+// デフォルトは console 表示のみ (外部通信なし)。--apply 指定時のみ送信する。
+// 送信先別の二重ゲート:
+//   Telegram   : --apply + telegram_notify flag ON
+//   LINE WORKS : --apply + --lineworks + lineworks_internal_auto flag ON (院内チャンネル限定)
 // 通知のみ。approve / reject / 外部実行とは接続しない。
 //
 // 使い方:
-//   node scripts/notify-media-pending.mjs           # console のみ
-//   node scripts/notify-media-pending.mjs --apply   # Telegram 送信 (launchd 運用用)
+//   node scripts/notify-media-pending.mjs                      # console のみ
+//   node scripts/notify-media-pending.mjs --apply              # Telegram 送信 (launchd 運用用)
+//   node scripts/notify-media-pending.mjs --apply --lineworks  # LINE WORKS 院内チャンネルにも送信
 
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -88,6 +92,21 @@ async function main() {
   } catch (err) {
     console.error(`❌ Telegram 送信失敗: ${err.message}`)
     process.exit(1)
+  }
+
+  // LINE WORKS 院内チャンネルへのdigest (任意。flag OFFならno-op)
+  if (process.argv.includes('--lineworks')) {
+    if (loadGateConfig()?.flags?.lineworks_internal_auto !== true) {
+      console.log('⏭ lineworks_internal_auto flag がOFFのため LINE WORKS送信はスキップします')
+      return
+    }
+    try {
+      const { sendInternalMessage } = await import('./lib/lineworks-adapter.mjs')
+      await sendInternalMessage({ text })
+      console.log('✅ LINE WORKS 院内チャンネルへ送信しました')
+    } catch (err) {
+      console.warn(`⚠️ LINE WORKS送信失敗 (Telegram送信は成功済み): ${err.message}`)
+    }
   }
 }
 

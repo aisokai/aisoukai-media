@@ -48,6 +48,7 @@
 | `npm run media:lineworks:dry-run -- --input "指示"` | LINE WORKS指示受付(mock) |
 | `npm run media:telegram:dry-run -- --input "/notice 本日午後休診"` | Telegramコマンド解釈(mock) |
 | `npm run media:queue:list` / `media:queue:validate` | queue一覧・検証 |
+| `npm run media:activation` | **本番Activationの進行状況と次の1手を表示**(認証中断後の再開ガイド。秘密値は表示しない) |
 | `npm run media:status` / `media:health` | 状態サマリ・health check |
 | `npm run media:approve -- <mj-id> --by "氏名"` | queue itemをCLIで承認(状態遷移のみ) |
 | `npm run media:approve -- <mj-id> --reject --reason "理由" --by "氏名"` | CLIで差し戻し |
@@ -59,7 +60,8 @@
 | `npm run media:gmb:apply -- <mj-id>` | **唯一の外部送信コマンド**。approved jobのみ。デフォルトdry-run、送信は `--apply` |
 | `npm run media:gmb:apply -- --request-delete-reply <review_id> --by 氏名` | **削除リクエスト作成**(直接削除は不可)。承認後 `gmb-apply <mj-id> --apply --by 氏名` で実行。`--request-delete-post` も同様 |
 | `npm run media:executor` | 自動実行器のdry-run(フラグON時のみ対象が出る)。default launchdもdry-run。apply常駐は `media:launchd:install-apply` + flag ON時のみ |
-| `npm run media:lineworks:notify -- --from-notice <mj-id>` | 院内通知。`lineworks_internal_auto` ON + `--apply` の二重ゲート |
+| `npm run media:lineworks:notify -- --from-notice <mj-id>` | 院内通知。**承認済みjob + `lineworks_internal_auto` ON + `--apply` の三重ゲート**(自由文`--text`はプレビュー専用で送信不可) |
+| `npm run media:notify:pending -- --apply --lineworks` | 承認待ちdigestをLINE WORKS院内チャンネルにも送信(同flagゲート) |
 | `npm run media:export:obsidian` / `media:export:status` | mybrain日次記録 / MitaniOS向けJSON |
 | `npm run media:launchd:install` / `uninstall` / `status` | 常駐ジョブ管理(**installは先生のみ**)。**デフォルトinstallは read-only / dry-run のみで、apply / post / send / reply / publish / notify は一切実行しない** |
 | `npm run media:launchd:install-apply` | apply/notify系jobの登録。`launchd_apply_jobs` flag(初期OFF)がONでなければ拒否される |

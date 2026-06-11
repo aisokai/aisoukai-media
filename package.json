@@ -79,6 +79,7 @@
     "media:gmb:reviews:validate": "node scripts/validate-gmb-reviews.mjs",
     "media:lineworks:dry-run": "node scripts/lineworks-intake-dry-run.mjs",
     "media:telegram:dry-run": "node scripts/telegram-instruction-dry-run.mjs",
+    "media:activation": "node scripts/media-activation-status.mjs",
     "media:status": "node scripts/media-status.mjs",
     "media:health": "node scripts/media-health.mjs",
     "media:approve": "node scripts/media-approve.mjs",
