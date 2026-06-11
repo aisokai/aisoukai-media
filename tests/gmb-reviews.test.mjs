@@ -40,8 +40,27 @@ test('返信案には raw_text が含まれず、snapshotのmasked_textは原文
   assert.equal(snapshot.risk_level, 'high', '個人情報を含むためhigh')
 })
 
-test('GMB adapter の実API・送信系は blocked', async () => {
-  await assert.rejects(() => fetchReviews({ source: 'api' }), /blocked/)
+test('GMB adapter: api source は認証情報/location設定なしでは明示エラーで停止する', async () => {
+  const saved = {}
+  for (const key of ['GMB_CLIENT_ID', 'GMB_CLIENT_SECRET', 'GMB_REFRESH_TOKEN']) {
+    saved[key] = process.env[key]
+    process.env[key] = ''
+  }
+  try {
+    await assert.rejects(() => fetchReviews({ source: 'api' }), /GMB|gmb-location/)
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
+
+test('GMB adapter の直接送信経路は blocked のまま (送信は media-apply 経由のみ)', async () => {
   await assert.rejects(() => postToGmb(), /blocked/)
   await assert.rejects(() => replyToReview(), /blocked/)
+})
+
+test('不明な source は blocked', async () => {
+  await assert.rejects(() => fetchReviews({ source: 'ftp' }), /blocked/)
 })

@@ -42,6 +42,9 @@
 | GMB投稿（全タイプ） | mid | ✅ auto_when_enabled | フラグOFF時 | **投稿は編集・削除可能** | API/管理画面で編集・削除 |
 | GMB口コミ返信（low risk） | mid | ✅ auto_when_enabled | フラグOFF時 | **返信は編集・削除可能** | `reviews.deleteReply` |
 | GMB口コミ返信（high risk: 低評価・医療内容・個人情報） | high | ❌ | ✅ | 炎上・法務リスク。文面の事前確認価値が高い | 削除は可能だがスクショ拡散リスク |
+| GMB返信削除・投稿削除（delete_review_reply / delete_gmb_post） | high | ❌ | ✅ 3段階（リクエスト作成→承認→--apply --by） | 破壊的操作は必ずHuman Gate。auto化しない | 削除の取り消しは不可（再投稿のみ） |
+| launchdへのapply/notify系job登録 | high | ❌ | ✅ install-apply + launchd_apply_jobs flag | 常駐自動送信の解禁は二重Gate | uninstall + flag OFF |
+| Telegram digest / health通知の送信 | low-mid | ✅ auto_when_enabled | telegram_notify / health_notify flag OFF時 | 通知もenvだけでは送信されずflag必須 | flag OFF |
 | X投稿 | mid | ✅ auto_when_enabled | フラグOFF時 | 削除可能（拡散前なら実害小） | ポスト削除 |
 | Instagram投稿 | mid | ✅ auto_when_enabled | フラグOFF時 | 削除・編集可能 | 投稿削除 |
 | LINE公式一斉配信 | high | ❌ | ✅ | **受信者の端末から取り消せない** | 不可（訂正配信のみ） |
@@ -80,7 +83,7 @@
 
 ## 6. v1実装の現在地
 
-- v1では**外部送信は未実装・実API未接続**のため、本表のauto系はすべて「将来の動作仕様」。現時点で外部に出るものは何もない。
+- v1ではGMB/LINE WORKS/Telegramの実API接続コードは実装済み。ただし全flag初期OFFで、default launchdはread-only/dry-runのみ。実送信は明示apply + 承認済みjob + 該当flagの条件を満たす場合に限る。
 - GMB口コミ返信は dry-run / 下書きまで。low risk auto reply はフラグON後(§4)に初めて有効化される。
 - `review_reply:gmb` のflag bindingは variant 別(`:template_only` / `:short_positive` / `:normal`)に分離済みで、テンプレ返信のみ先行解禁できる。
 - 緊急停止は `config/media-gate.json` の全フラグOFF + launchd unload。rollbackは投稿ID/返信IDの保存と `logs/media-automation.jsonl` の append-only 履歴を前提とする(詳細は [operator-guide](./media-automation-operator-guide.md))。

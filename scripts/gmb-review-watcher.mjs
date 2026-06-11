@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-// GMB Review Watcher v0 (dry-run)。
-// 実APIは呼ばない。mock JSON (content/gmb-reviews/sample/mock-reviews.json) から
-// 未返信・未処理の口コミを検出し、ルールベース分類 → 返信案生成 → ローカル保存する。
-// 返信の送信は一切しない (gate_policyに従いHuman Gate)。
+// GMB Review Watcher。
+// source: mock (デフォルト・sample JSONから) または api (実GMB APIの**読み取り専用**取得)。
+// どちらのsourceでも、未返信・未処理の口コミを検出し、ルールベース分類 → 返信案生成 →
+// ローカル保存するだけで、**返信送信・投稿は一切行わない**
+// (送信は gmb-apply.mjs の approved job + --apply 経由のみ)。
 // console / log には masked_text のみ出す。raw_text は snapshot ファイル内にのみ保持する。
 //
 // 使い方:
-//   node scripts/gmb-review-watcher.mjs            # mockから検出し、下書きをローカル保存 (npm run media:gmb:reviews:check)
-//   node scripts/gmb-review-watcher.mjs --no-write # 表示のみ・ファイルも書かない (npm run media:gmb:reviews:dry-run)
+//   node scripts/gmb-review-watcher.mjs                 # mockから検出・下書き保存 (media:gmb:reviews:check)
+//   node scripts/gmb-review-watcher.mjs --source api    # 実APIから読み取り (要 認証情報+gmb-location.json)
+//   node scripts/gmb-review-watcher.mjs --no-write      # 表示のみ・ファイルも書かない (media:gmb:reviews:dry-run)
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -113,8 +115,10 @@ export async function runWatcher({ source = 'mock', write = true } = {}) {
 
 function main() {
   const write = !process.argv.includes('--no-write')
-  runWatcher({ source: 'mock', write }).then(({ total, newCount, results }) => {
-    console.log(`✅ GMB review watcher (dry-run / mock): 取得 ${total} 件, 新規未返信 ${newCount} 件 ${write ? '(下書き保存済み)' : '(表示のみ)'}`)
+  const sourceIdx = process.argv.indexOf('--source')
+  const source = sourceIdx >= 0 ? process.argv[sourceIdx + 1] : 'mock'
+  runWatcher({ source, write }).then(({ total, newCount, results }) => {
+    console.log(`✅ GMB review watcher (${source === 'api' ? '実API読み取り' : 'dry-run / mock'}): 取得 ${total} 件, 新規未返信 ${newCount} 件 ${write ? '(下書き保存済み)' : '(表示のみ)'}`)
     for (const { snapshot, job, error } of results) {
       if (error) {
         console.error(`   ❌ ${snapshot.review_id}: failed — ${error}`)
@@ -123,7 +127,7 @@ function main() {
       console.log(`   - ${snapshot.review_id} ★${snapshot.rating} [${snapshot.classification}] → ${job.status} gate=${job.gate_policy}`)
       console.log(`     "${snapshot.masked_text || '(本文なし)'}"`)
     }
-    console.log('   実APIは呼びません。返信送信は実装されていません (Human Gate)。')
+    console.log(`   ${source === 'api' ? '読み取り専用のAPI取得です。' : '実APIは呼んでいません (mock)。'}返信送信・投稿はこのスクリプトからは行えません (Human Gate)。`)
   }).catch((error) => {
     console.error(`❌ ${error.message}`)
     process.exit(1)

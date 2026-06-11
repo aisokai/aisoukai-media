@@ -16,17 +16,21 @@ export async function fetchReviews({ source = 'mock', mockPath = MOCK_REVIEWS_PA
     return JSON.parse(readFileSync(mockPath, 'utf8'))
   }
   if (source === 'api') {
-    throw new Error('blocked: GMB API読み取りはv1では未実装です (Batch 5以降・先生承認後)')
+    // 読み取り専用。認証情報・location設定が無ければ明示エラーで停止する。
+    const { listReviews } = await import('./gmb-api.mjs')
+    return listReviews()
   }
   throw new Error(`blocked: 不明なsourceです: "${source}"`)
 }
 
-// ── 以下は将来用プレースホルダ。実装してはならない (Human Gate対象の外部送信) ──
+// ── 直接送信の経路は封鎖したまま残す ─────────────────────────────────────
+// 外部送信は scripts/lib/media-apply.mjs (approved job + --apply 必須) 経由のみ。
+// このadapterから直接送信する経路は存在しない。
 
 export async function postToGmb() {
-  throw new Error('blocked: GMB投稿はHuman Gate対象です。v1では実装されていません')
+  throw new Error('blocked: GMB投稿は gmb-apply (approved job + --apply) 経由のみです')
 }
 
 export async function replyToReview() {
-  throw new Error('blocked: GMB口コミ返信送信はHuman Gate対象です。v1では実装されていません')
+  throw new Error('blocked: GMB口コミ返信は gmb-apply (approved job + --apply) 経由のみです')
 }

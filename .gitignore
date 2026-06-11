@@ -57,6 +57,10 @@ logs/*.log
 docs/superpowers/plans/
 
 # Media Automation runtime artifacts (generated locally, not version-controlled)
+tmp/
+data/media-status.json
+logs/archive/
+config/gmb-location.json
 content/media-queue/mj-*.json
 content/gmb-drafts/mj-*
 content/gmb-reviews/snapshots/

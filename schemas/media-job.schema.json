@@ -14,7 +14,8 @@
       "enum": [
         "blog_article", "sns_repurpose", "gmb_update", "gmb_emergency_notice",
         "gmb_campaign", "temporary_closure_notice", "schedule_change_notice",
-        "review_reply", "internal_notice", "lineworks_instruction", "telegram_instruction"
+        "review_reply", "internal_notice", "lineworks_instruction", "telegram_instruction",
+        "delete_review_reply", "delete_gmb_post"
       ]
     },
     "source": { "enum": ["telegram", "lineworks", "cron", "blog", "manual", "watcher"] },

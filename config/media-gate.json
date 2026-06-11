@@ -3,6 +3,10 @@
   "comment": "type × channel → gate_policy の固定表。flags の ON は先生のみが行う (Human Gate)。AIはこのファイルを変更してはならない。ファイルが無い場合は全て human_gate に倒れる。",
   "fallback": "human_gate",
   "flags": {
+    "telegram_media_approve": false,
+    "telegram_notify": false,
+    "health_notify": false,
+    "launchd_apply_jobs": false,
     "gmb_post_auto": false,
     "gmb_post_auto_all": false,
     "gmb_reply_auto_template": false,
@@ -74,6 +78,14 @@
     },
     "telegram_instruction": {
       "telegram_internal": "auto",
+      "obsidian": "auto"
+    },
+    "delete_review_reply": {
+      "gmb": "human_gate",
+      "obsidian": "auto"
+    },
+    "delete_gmb_post": {
+      "gmb": "human_gate",
       "obsidian": "auto"
     }
   },

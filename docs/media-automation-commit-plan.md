@@ -89,7 +89,7 @@ feat: add Media Automation Core v1 (local-only queue, generators, validators)
 - generators: emergency notice / SNS repurpose / GMB draft / review watcher (mock)
 - LINE WORKS / Telegram instruction intake stubs (送信機能なし)
 - config/media-gate.json: 自動実行フラグ全OFF (全外部送信Human Gate)
-- 外部API呼び出し・外部送信は未実装 (adapter送信系はblocked throw)
+- GMB/LINE WORKS/Telegramの実API接続コードは実装済み。ただし全flag初期OFFで、default launchdはread-only/dry-runのみ
 - 生成物 (mj-* / lw-* / snapshots / replies / jsonl) はgitignore
 ```
 

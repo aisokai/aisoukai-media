@@ -8,7 +8,7 @@
 // 使い方:
 //   node scripts/lineworks-intake-dry-run.mjs --input "来週の休診案内を作って" [--dry-run]
 
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import {
@@ -52,13 +52,46 @@ function getArg(name) {
   return idx >= 0 ? process.argv[idx + 1] : undefined
 }
 
+// inbox処理: content/lineworks-requests/inbox/*.json を取り込んでqueue化する。
+// 将来 webhook relay がここにJSONを置く設計 (受信に公開エンドポイントが必要なため)。
+export function intakeInbox({ dryRun = false } = {}) {
+  const inboxDir = join(LINEWORKS_REQUESTS_DIR, 'inbox')
+  if (!existsSync(inboxDir)) return []
+  const results = []
+  for (const file of readdirSync(inboxDir).filter((f) => f.endsWith('.json')).sort()) {
+    const path = join(inboxDir, file)
+    try {
+      const incoming = JSON.parse(readFileSync(path, 'utf8'))
+      const { job, request } = intakeLineworksRequest({
+        text: incoming.text ?? '', senderDisplay: incoming.sender_display ?? '院内ユーザー', dryRun,
+      })
+      if (!dryRun) renameSync(path, join(LINEWORKS_REQUESTS_DIR, `processed-${file}`))
+      results.push({ file, job, request, error: null })
+    } catch (err) {
+      results.push({ file, job: null, request: null, error: err.message })
+    }
+  }
+  return results
+}
+
 function main() {
-  const text = getArg('input') ?? '【mock】明日の午前は休診のお知らせを各媒体向けに作成してください'
   const dryRun = process.argv.includes('--dry-run')
+
+  if (process.argv.includes('--inbox')) {
+    const results = intakeInbox({ dryRun })
+    console.log(`✅ LINE WORKS inbox 取り込み: ${results.length} 件 (${dryRun ? 'dry-run' : '処理済み'})`)
+    for (const r of results) {
+      if (r.error) console.error(`   ❌ ${r.file}: ${r.error}`)
+      else console.log(`   - ${r.file} → job: ${r.job.id}`)
+    }
+    return
+  }
+
+  const text = getArg('input') ?? '【mock】明日の午前は休診のお知らせを各媒体向けに作成してください'
   const { job, request } = intakeLineworksRequest({ text, dryRun })
   console.log(`✅ LINE WORKS指示を受付けました (mock / ${dryRun ? 'dry-run・保存なし' : '保存済み'})`)
   console.log(`   request: ${request.id} → job: ${job.id} [${job.status}]`)
-  console.log('   実APIは呼びません。LINE WORKSへの送信機能は存在しません。')
+  console.log('   受信のみ。送信は lineworks-notify.mjs (フラグ + --apply の二重ゲート) 経由です。')
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()

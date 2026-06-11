@@ -48,13 +48,20 @@ export function buildHealthReport() {
   return { ok: checks.every((c) => c.ok), checks }
 }
 
-function main() {
+async function main() {
   const { ok, checks } = buildHealthReport()
   console.log(ok ? '✅ media health: OK' : '❌ media health: NG')
   for (const check of checks) {
     console.log(`   ${check.ok ? '✓' : '✗'} ${check.name}: ${check.detail}`)
   }
-  console.log('   外部通信は行っていません。')
+  // --notify 時のみ、NGならTelegram警告を送る (launchd朝チェック用)。
+  // health_notify flag (初期OFF) がONでなければ送信されない。
+  if (!ok && process.argv.includes('--notify')) {
+    const failed = checks.filter((c) => !c.ok).map((c) => `✗ ${c.name}: ${c.detail}`).join('\n')
+    const { notifyTelegramIfConfigured } = await import('./lib/telegram-notify.mjs')
+    await notifyTelegramIfConfigured(`🚨 media health NG\n${failed}`, { flag: 'health_notify' })
+  }
+  if (!process.argv.includes('--notify')) console.log('   外部通信は行っていません。')
   if (!ok) process.exit(1)
 }
 

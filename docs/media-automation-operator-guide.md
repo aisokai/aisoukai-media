@@ -16,21 +16,24 @@
 - GMB口コミのmockチェック・分類・返信案生成
 - queue / status / health の確認
 
-**できないこと(意図的に未実装):**
+**外部送信の現状(Phase 3以降実装済み・ただし全ゲートCLOSED):**
 
-- 外部送信は一切できない。GMB投稿・口コミ返信・SNS投稿・LINE WORKS送信・Telegram送信の実行コードは存在しないか、`blocked` エラーを投げる。
-- 実APIは未接続(GMB口コミはmockデータのみ。実API接続はBatch 5以降・先生承認後)。
-- GMB口コミ返信は現状 dry-run / 下書き生成まで。low risk auto reply は将来先生がフラグONにした後の機能。
+- 外部送信の経路は `media:gmb:apply`(approved job + `--apply` 明示)と `media:executor --apply`(フラグON時のみ)、`media:lineworks:notify --apply`(フラグON時のみ)、Telegram通知の4つだけ。それ以外の送信コードは存在しないか `blocked`。
+- 実APIは**認証情報を先生が設定するまで未接続**(GMB: [手順書](./gmb-oauth-setup-guide.md) / LINE WORKS: Bot登録)。未設定時は全て明示エラーで停止。
+- 自動実行フラグは全てOFF初期値のため、認証情報を入れても自動送信は始まらない(承認後の手動applyのみ)。
+- SNS投稿(Instagram/X/LINE公式)の送信機能は引き続き存在しない(手動投稿)。
 - push / deploy / publish は先生のみ。
 
 **生成物はcommitしない:**
 
 - queue実データ(`mj-*`)・口コミsnapshot/返信案・`logs/media-automation.jsonl` 等は `.gitignore` 済み。commit対象と手順は [media-automation-commit-plan.md](./media-automation-commit-plan.md) を参照。
 
-**Mac mini常駐化する場合の制約:**
+**Mac mini常駐化(launchd)の制約:**
 
-- launchd等で常駐させてよいのは watcher / validate / status / health などの読み取り・下書き生成系のみ。
-- apply / post / send / reply / publish 系のジョブを常駐登録することは禁止(そもそもv1に実行コードが存在しないが、将来版でも常駐化はHuman Gate対象)。
+- **デフォルトの `media:launchd:install` は read-only / dry-run / ローカル生成のジョブのみを登録し、apply / post / send / reply / publish / notify は実行しない。**
+- apply/notify系ジョブは `media:launchd:install-apply` + `launchd_apply_jobs` flag ON(先生のみ)の二重条件でのみ登録できる。登録後も実送信は各個別フラグ(`telegram_notify` / `health_notify` / auto系)に従う。
+- 通知系もフラグ初期OFF: env(BOT TOKEN等)が設定されていても、`telegram_notify` / `health_notify` / `lineworks_internal_auto` がOFFなら送信処理はno-op。
+- 破壊的操作(GMB返信削除・投稿削除)はlaunchd登録不可。必ず「削除リクエスト作成→承認→`--apply --by 氏名`」のHuman Gate 3段階を踏む。
 
 ## 2. コマンド表
 
@@ -46,6 +49,21 @@
 | `npm run media:telegram:dry-run -- --input "/notice 本日午後休診"` | Telegramコマンド解釈(mock) |
 | `npm run media:queue:list` / `media:queue:validate` | queue一覧・検証 |
 | `npm run media:status` / `media:health` | 状態サマリ・health check |
+| `npm run media:approve -- <mj-id> --by "氏名"` | queue itemをCLIで承認(状態遷移のみ) |
+| `npm run media:approve -- <mj-id> --reject --reason "理由" --by "氏名"` | CLIで差し戻し |
+| `npm run media:notify:pending` | 承認待ちdigest表示(`--apply` でTelegram送信) |
+| Telegram: `/notice` `/gmb` `/sns` `/review` `/status` | 指示・照会(telegram-ops経由) |
+| Telegram: `/approve <mj-id>` `/reject <mj-id> <理由>` | 承認・差し戻し。**AGENTS.md v2適用 + `telegram_media_approve` フラグON後に有効**(それまでは未解禁応答) |
+| `npm run media:gmb:auth` / `media:gmb:discover` | OAuth初回認可・location取得([手順書](./gmb-oauth-setup-guide.md)) |
+| `npm run media:gmb:reviews:check -- --source api` | 実APIで口コミ取得(読み取りのみ) |
+| `npm run media:gmb:apply -- <mj-id>` | **唯一の外部送信コマンド**。approved jobのみ。デフォルトdry-run、送信は `--apply` |
+| `npm run media:gmb:apply -- --request-delete-reply <review_id> --by 氏名` | **削除リクエスト作成**(直接削除は不可)。承認後 `gmb-apply <mj-id> --apply --by 氏名` で実行。`--request-delete-post` も同様 |
+| `npm run media:executor` | 自動実行器のdry-run(フラグON時のみ対象が出る)。default launchdもdry-run。apply常駐は `media:launchd:install-apply` + flag ON時のみ |
+| `npm run media:lineworks:notify -- --from-notice <mj-id>` | 院内通知。`lineworks_internal_auto` ON + `--apply` の二重ゲート |
+| `npm run media:export:obsidian` / `media:export:status` | mybrain日次記録 / MitaniOS向けJSON |
+| `npm run media:launchd:install` / `uninstall` / `status` | 常駐ジョブ管理(**installは先生のみ**)。**デフォルトinstallは read-only / dry-run のみで、apply / post / send / reply / publish / notify は一切実行しない** |
+| `npm run media:launchd:install-apply` | apply/notify系jobの登録。`launchd_apply_jobs` flag(初期OFF)がONでなければ拒否される |
+| `npm run media:logs:rotate` | 5MB超ログをlogs/archive/へ退避 |
 | 各 `media:*:validate` | 下書きの検証 |
 
 生成系は `--dry-run` を付けると保存せず表示のみ。

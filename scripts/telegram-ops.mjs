@@ -10,6 +10,8 @@
 //   "reject <slug> <理由>"        → 明示スラグ差し戻し（互換維持）
 //   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成 + validate + push（--build 時）
 //   publish / push / deploy 等     → スキップ
+//   /notice /gmb /sns /review /status → Media Automation コマンド（lib/telegram-media-commands.mjs）
+//   /approve <mj-id> /reject <mj-id>  → Media Queue承認（ALLOWED_CHAT_IDS + telegram_media_approve フラグの二重ゲート）
 //
 // フラグ:
 //   --dry-run         : コンソール表示のみ。書き込み・Git 操作・Telegram 返信なし（--apply がなければ暗黙 dry-run）
@@ -42,6 +44,7 @@ import matter from 'gray-matter'
 import Anthropic from '@anthropic-ai/sdk'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 import { buildSafeTemplateThemePrompt, classifyTelegramMessage } from './telegram-request-routing.mjs'
+import { handleMediaCommand } from './lib/telegram-media-commands.mjs'
 import { findCandidates, loadFeedback } from './lib/image-scoring.mjs'
 
 const __dirname      = dirname(fileURLToPath(import.meta.url))
@@ -976,6 +979,33 @@ async function main() {
 
     if (defaultChatId) {
       if (msgChatId !== String(defaultChatId) && msgFromId !== String(defaultChatId)) continue
+    }
+
+    // ── Media Automation スラッシュコマンド ──────────────────────────────
+    // /notice /gmb /sns /review /status /approve /reject のみ。
+    // /approve・/reject は ALLOWED_CHAT_IDS + telegram_media_approve フラグの二重ゲート。
+    // 実行系 (/post /publish /deploy 等) は lib 側で blocked。
+    if (/^\/[a-z]/i.test(msg.text.trim())) {
+      const mediaAuthorized = allowedChatIds.has(msgChatId) || allowedChatIds.has(msgFromId)
+      let mediaResult
+      try {
+        mediaResult = await handleMediaCommand(msg.text.trim(), {
+          authorized: mediaAuthorized, fromUser, dryRun,
+        })
+      } catch (err) {
+        mediaResult = { ok: false, summary: `エラー: ${err.message}`, reply: `❌ mediaコマンド失敗: ${err.message}` }
+      }
+      console.log()
+      console.log(`  ─ [${upd.update_id}] from:@${fromUser} chat:${msgChatId}`)
+      console.log(`    media: "${msg.text.slice(0, 60)}" → ${mediaResult.summary}`)
+      if (dryRun) {
+        if (mediaResult.reply) console.log(`    [dry-run] 返信案:\n${mediaResult.reply.split('\n').map((l) => '      ' + l).join('\n')}`)
+      } else if (mediaResult.reply) {
+        await sendTelegram(botToken, msgChatId || defaultChatId, mediaResult.reply).catch((e) => {
+          console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+        })
+      }
+      continue
     }
 
     const parsed = parseMessage(msg.text)

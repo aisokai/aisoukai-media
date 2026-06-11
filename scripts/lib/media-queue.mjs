@@ -38,6 +38,9 @@ export const JOB_TYPES = Object.freeze([
   'internal_notice',
   'lineworks_instruction',
   'telegram_instruction',
+  // 破壊的操作 (rollback)。常に human_gate。auto化しない。
+  'delete_review_reply',
+  'delete_gmb_post',
 ])
 
 export const TARGET_CHANNELS = Object.freeze([
@@ -140,7 +143,9 @@ const SECRET_PATTERNS = [
   /AIza[A-Za-z0-9_-]{10,}/g,
   /Bearer\s+[A-Za-z0-9._-]{8,}/g,
   /(token|secret|api[_-]?key|password|credential)\s*[=:]\s*[^\s"',}]{6,}/gi,
-  /[A-Za-z0-9+/]{40,}={0,2}/g,
+  // base64風の長い連続文字列。'/' は含めない (GMBリソース名 accounts/.../localPosts/...
+  // のようなパス形式IDを誤検知して削除jobを壊さないため。明示patternが主防御)。
+  /[A-Za-z0-9+]{40,}={0,2}/g,
 ]
 
 export function redactSecrets(text) {

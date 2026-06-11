@@ -19,7 +19,7 @@
 
 ## 現在地 (v1 の制約)
 
-- **外部送信は未実装。実APIは未接続。** すべてローカルのJSON/Markdown生成・dry-run・validator・status表示まで。
+- GMB/LINE WORKS/Telegramの実API接続コードは実装済み。ただし全flag初期OFFで、default launchdはread-only/dry-runのみ。実送信は明示apply + 承認済みjob + 該当flagの条件を満たす場合に限る。
 - GMB口コミ返信は dry-run / 下書き生成まで。low risk auto reply は将来、先生が `gmb_reply_auto_template` 等のフラグをONにした後に有効化される。
 - push / deploy は先生のみ。生成物(mj-* / snapshots / replies / jsonl)はcommitしない([commit-plan](./media-automation-commit-plan.md)参照)。
 - Mac mini常駐化する場合も、常駐してよいのは読み取り・下書き生成系のみで、apply / post / send 系の常駐登録は禁止。
@@ -28,21 +28,21 @@
 
 | Batch | 内容 | 状態 |
 |---|---|---|
-| 1 | Media Queue schema + validator + list/status | ✅ 実装済み (v1) |
-| 2 | emergency notice draft generator | ✅ 実装済み (v1) |
-| 3 | SNS repurpose generator | ✅ 実装済み (v1) |
-| 4 | GMB post draft generator | ✅ 実装済み (v1) |
-| 6(v0) | GMB review watcher dry-run (mock) + 返信案生成 | ✅ 実装済み (v1, mock) |
-| 9(v0) | LINE WORKS intake stub | ✅ 実装済み (v1, mock) |
-| 7(stub) | Telegram instruction dry-run | ✅ 実装済み (v1, mock) |
-| 5 | GMB account/location discovery (OAuth・先生承認後に接続テスト) | 未着手 |
-| 6(実API) | review watcher の adapter を実API読み取りに差し替え | 未着手 |
-| 7 | GMB reply apply v1 (Telegram承認後・先生明示コマンド) | 未着手 |
-| 8 | low risk auto reply (星5本文なし定型・dry-run→apply) | 未着手 |
-| 9 | LINE WORKS実受信・院内通知 | 未着手 |
-| 10 | MitaniOS/AI司令塔連携 (queue/承認待ち/履歴表示) | 未着手 |
-| 11 | launchd整備 (日次watcher / ログローテ / health) | 未着手 |
-| 12 | 運用ドキュメント拡充 (削除手順・緊急停止の実地確認) | 一部 (operator-guide作成済み) |
+| 1 | Media Queue schema + validator + list/status | ✅ 実装済み |
+| 2 | emergency notice draft generator | ✅ 実装済み |
+| 3 | SNS repurpose generator | ✅ 実装済み |
+| 4 | GMB post draft generator | ✅ 実装済み |
+| Phase 1 | Telegram承認ループ (/approve 二重ゲート・digest通知・CLI承認) | ✅ 実装済み |
+| 5 | GMB discovery + OAuthヘルパー (`media:gmb:auth` / `media:gmb:discover`) | ✅ 実装済み (**接続は先生の認証情報設定後**) |
+| 6 | review watcher 実API読み取り (`--source api`) | ✅ 実装済み (同上) |
+| 7 | GMB apply (`media:gmb:apply` — approved job + --apply のみ。削除は3段階Human Gate: リクエスト→承認→--apply --by) | ✅ 実装済み (**実送信は未疎通**) |
+| 8 | media executor (フラグON時のみ自動実行・variant別解禁・事後通知) | ✅ 実装済み (全フラグOFF) |
+| 9 | LINE WORKS adapter (JWT認証・院内通知・inbox受信) | ✅ 実装済み (**Bot登録は先生**) |
+| 10 | MitaniOS連携 (status JSONエクスポート + カード仕様書) | ✅ 実装済み (GUIカードは mitanios-gui 側タスク) |
+| 11 | launchd (デフォルト=read-only/dry-runのみ。apply/notify系は install-apply + flag の二重Gate) / ログローテ | ✅ 実装済み (**install実行は先生**) |
+| 12 | 運用ドキュメント (OAuth手順書・コマンド表・緊急停止・rollback) | ✅ 実装済み |
+
+**残り(先生側の作業 + 別repo)**: ①GBP API認証情報設定([手順書](./gmb-oauth-setup-guide.md)) ②AGENTS.md v2適用([提案](./agents-md-v2-proposal.md)) ③`media:launchd:install` 実行 ④フラグ段階ON ⑤LINE WORKS Bot登録 ⑥mitanios-gui カード追加([仕様](./mitanios-media-status-spec.md))
 
 ## AGENTS.md との関係 (将来改訂対象)
 
