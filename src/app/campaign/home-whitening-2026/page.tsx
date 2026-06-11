@@ -17,7 +17,7 @@ import {
 import { buildCanonicalUrl, SITE_NAME } from '@/lib/seo'
 
 const pagePath = '/campaign/home-whitening-2026'
-const ctaHref = '/contact'
+const ctaHref = 'https://haisha-yoyaku.jp/bun2sdental/detail/index/id/a000000011/tab/3/whitening/1/'
 
 const worryItems = [
   { title: '歯科医院で相談した方がいい？', desc: 'お口の健康状態や適性をプロの目で事前にしっかりと診査します。', icon: Smile },
@@ -184,7 +184,7 @@ export default function HomeWhiteningCampaignPage() {
                 </a>
               </div>
               <p className="text-[11px] text-slate-500">
-                ※「相談・予約」ボタンは現在仮の窓口としてお問い合わせページへ遷移します。
+                ※「相談・予約」ボタンからEPARK歯科のホワイトニング予約ページへ移動します。
               </p>
             </div>
 

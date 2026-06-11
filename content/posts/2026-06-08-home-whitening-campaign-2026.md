@@ -18,7 +18,7 @@ reviewed_at: '2026-06-08'
 reviewed_by: 氏名
 ---
 
-[![2026年ホームホワイトニングキャンペーン。自宅で、もっと白く自分らしい笑顔へ。](/images/campaign/home-whitening-2026/01.png)](/contact)
+[![2026年ホームホワイトニングキャンペーン。自宅で、もっと白く自分らしい笑顔へ。](/images/campaign/home-whitening-2026/01.png)](https://haisha-yoyaku.jp/bun2sdental/detail/index/id/a000000011/tab/3/whitening/1/)
 
 ![ホームホワイトニングキャンペーン内容。通常価格33,000円、キャンペーン価格28,000円。](/images/campaign/home-whitening-2026/02.png)
 
@@ -36,6 +36,6 @@ reviewed_by: 氏名
 
 ![ホームホワイトニングのご注意事項。効果の個人差、虫歯や歯周病、詰め物や被せ物、知覚過敏、妊娠中や授乳中の方について。](/images/campaign/home-whitening-2026/09.png)
 
-[![2026年ホームホワイトニングキャンペーン。カウンセリング予約はこちら。三谷ファミリー歯科クリニック。](/images/campaign/home-whitening-2026/10.png)](/contact)
+[![2026年ホームホワイトニングキャンペーン。カウンセリング予約はこちら。三谷ファミリー歯科クリニック。](/images/campaign/home-whitening-2026/10.png)](https://haisha-yoyaku.jp/bun2sdental/detail/index/id/a000000011/tab/3/whitening/1/)
 
-[カウンセリング予約・お問い合わせはこちら](/contact)
+[カウンセリング予約・お問い合わせはこちら](https://haisha-yoyaku.jp/bun2sdental/detail/index/id/a000000011/tab/3/whitening/1/)
