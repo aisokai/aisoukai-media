@@ -15,6 +15,8 @@ const LIBRARY_PATH = join(ROOT, 'data', 'image-library.json')
 const VALID_CATEGORIES = new Set([
   'cavity', 'root-canal', 'periodontal', 'preventive',
   'pediatric', 'wisdom-tooth', 'implant', 'announcement', 'general',
+  // ingest-image-library.mjs（images:ingest）で追加されるカテゴリ
+  'whitening', 'denture', 'prevention',
 ])
 
 const CATEGORY_ALT = {

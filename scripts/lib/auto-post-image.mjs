@@ -53,10 +53,13 @@ function imageDiskPath(imagePath) {
 
 function isUsableLibraryImage(image) {
   const imagePath = String(image?.path ?? '').trim()
+  // usage_status は images:ingest 由来の新フィールド。未設定（旧エントリ）は active 扱い
+  const usageStatus = String(image?.usage_status ?? 'active')
   return (
     imagePath.startsWith('/images/library/')
     && existsSync(imageDiskPath(imagePath))
     && String(image?.alt ?? '').trim() !== ''
+    && usageStatus === 'active'
   )
 }
 
