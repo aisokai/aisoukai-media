@@ -1,0 +1,11 @@
+{
+  "id": "req-20260613-sgzxma",
+  "source": "telegram",
+  "post_type": "blog",
+  "raw_instruction": "歯科健診を半年受けていない人向けに、受診の目安をやさしく説明する記事を作って。",
+  "title_hint": "",
+  "publish_at": "",
+  "status": "pending",
+  "requested_by": "cli",
+  "created_at": "2026-06-13T07:25:53.403+09:00"
+}

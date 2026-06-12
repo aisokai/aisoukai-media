@@ -18,9 +18,10 @@ import {
 import { classifyNoticeType, generateEmergencyNotice } from '../generate-emergency-notice.mjs'
 import { generateGmbDraft } from '../generate-gmb-draft.mjs'
 import { buildStatusSummary } from '../media-status.mjs'
+import { POST_TYPE_LABELS, createManualPostRequest } from './manual-post.mjs'
 
 // 受付可能コマンドの固定allowlist。これ以外は変換しない。
-export const COMMAND_ALLOWLIST = Object.freeze(['notice', 'gmb', 'review', 'sns', 'status', 'approve', 'reject'])
+export const COMMAND_ALLOWLIST = Object.freeze(['notice', 'gmb', 'review', 'sns', 'status', 'approve', 'reject', 'draft'])
 // 実行系は実装しない (gmb apply 等は別スクリプト・別Gate)
 export const BLOCKED_COMMANDS = Object.freeze(['post', 'publish', 'deploy', 'apply', 'send', 'push'])
 
@@ -46,6 +47,7 @@ export function parseInstruction(input) {
     status: null,  // 照会系: jobを作らない
     approve: null, // 操作系: 既存jobの遷移のみ
     reject: null,  // 操作系: 既存jobの遷移のみ
+    draft: null,   // 受付系: manual-post リクエスト保存のみ (Media Queue job は作らない)
   }[command]
   return { command, allowed: true, payload, mapped_job_type: mapped, job_id: null, blocked_reason: null, received_at }
 }
@@ -156,6 +158,30 @@ export async function handleMediaCommand(input, {
       }
     } catch (err) {
       return { ok: false, summary: `${command}失敗: ${err.message}`, reply: `❌ ${err.message}` }
+    }
+  }
+
+  if (command === 'draft') {
+    // ブログ/お知らせの下書き作成リクエスト受付のみ。
+    // 下書き生成・Human承認・commit は MitaniOS DMP 管理画面 / CLI 側で行う。
+    if (!payload) {
+      return { ok: false, summary: 'payloadなし', reply: '書式: /draft 6月20日午後は院内研修のため休診。お知らせを作って' }
+    }
+    try {
+      const request = createManualPostRequest({
+        source: 'telegram', rawInstruction: payload, requestedBy: fromUser, dryRun,
+      })
+      const reply = [
+        `📝 下書き作成リクエストを受け付けました${dryRun ? ' (dry-run・保存なし)' : ''}`,
+        `id: ${request.id}`,
+        `種別(推定): ${POST_TYPE_LABELS[request.post_type]}`,
+        '',
+        'MitaniOS DMP 画面の「手動投稿作成」に未処理リクエストとして表示されます。',
+        '下書き生成・Human承認・commit は管理画面から行います。Telegram からの公開・commit・push は行いません。',
+      ].join('\n')
+      return { ok: true, summary: `manual-post request ${request.id} (${request.post_type})`, reply, request }
+    } catch (err) {
+      return { ok: false, summary: `draft受付失敗: ${err.message}`, reply: `❌ ${err.message}` }
     }
   }
 

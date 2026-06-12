@@ -1,0 +1,11 @@
+{
+  "id": "req-20260613-z0ua1j",
+  "source": "telegram",
+  "post_type": "notice",
+  "raw_instruction": "6月20日午後は院内研修のため休診。午前は通常診療。6月21日から通常診療。患者さん向けに丁寧に。",
+  "title_hint": "",
+  "publish_at": "",
+  "status": "pending",
+  "requested_by": "cli",
+  "created_at": "2026-06-13T07:25:51.817+09:00"
+}
