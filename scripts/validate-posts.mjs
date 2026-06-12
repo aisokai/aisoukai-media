@@ -84,6 +84,26 @@ function validatePost(filename) {
     }
   }
 
+  if (data.publication_status === 'human_approved') {
+    const image = String(data.image ?? '').trim()
+    const imageAlt = String(data.image_alt ?? '').trim()
+
+    if (!image) {
+      errors.push('公開対象記事の image が空です')
+    } else if (!image.startsWith('/images/')) {
+      errors.push(`公開対象記事の image は "/images/" で始まる必要があります: "${image}"`)
+    } else {
+      const imageDiskPath = join(ROOT, 'public', image)
+      if (!existsSync(imageDiskPath)) {
+        errors.push(`公開対象記事の image ファイルが public/ に存在しません: "${image}"`)
+      }
+    }
+
+    if (!imageAlt) {
+      errors.push('公開対象記事の image_alt が空です')
+    }
+  }
+
   if (data.category !== undefined && !VALID_CATEGORIES.includes(data.category)) {
     errors.push(`category が無効です: "${data.category}"`)
   }

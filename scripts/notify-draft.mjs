@@ -6,6 +6,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
+import { imagePresenceStatus } from './lib/auto-post-image.mjs'
 
 const __dirname    = dirname(fileURLToPath(import.meta.url))
 const ROOT         = join(__dirname, '..')
@@ -118,6 +119,7 @@ function buildDraftNotification(slug, data, siteUrl) {
   const title    = String(data.title ?? slug)
   const category = String(data.category ?? '（未設定）')
   const excerpt  = String(data.excerpt ?? '（要約なし）')
+  const imageStatus = imagePresenceStatus(data)
 
   const reviewUrl = siteUrl ? `${siteUrl}/admin/pending-review` : null
   const linkHtml  = reviewUrl
@@ -129,6 +131,8 @@ function buildDraftNotification(slug, data, siteUrl) {
     ``,
     `スラグ: <code>${escHtml(slug)}</code>`,
     `カテゴリ: ${escHtml(category)}`,
+    `image: ${escHtml(imageStatus.image)}`,
+    `image_alt: ${escHtml(imageStatus.image_alt)}`,
     ``,
     escHtml(excerpt),
     ``,
@@ -190,6 +194,9 @@ async function main() {
   console.log(`  タイトル   : ${data.title ?? '（未設定）'}`)
   console.log(`  カテゴリ   : ${data.category ?? '（未設定）'}`)
   console.log(`  reviewed   : ${data.reviewed}`)
+  const imageStatus = imagePresenceStatus(data)
+  console.log(`  image      : ${imageStatus.image}`)
+  console.log(`  image_alt  : ${imageStatus.image_alt}`)
   console.log()
 
   if (data.reviewed === true) {

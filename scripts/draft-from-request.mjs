@@ -7,6 +7,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { pickArticleImage } from './lib/auto-post-image.mjs'
 
 const __dirname     = dirname(fileURLToPath(import.meta.url))
 const ROOT          = join(__dirname, '..')
@@ -147,6 +148,7 @@ function main() {
   const slug        = `${date}-${slugBase || `req-${updateId}`}`
   const filename    = `${slug}.md`
   const filePath    = join(POSTS_DIR, filename)
+  const excerpt     = request.text.slice(0, 80)
 
   if (existsSync(filePath)) {
     console.error(`エラー: ファイルが既に存在します: content/posts/${filename}`)
@@ -185,17 +187,34 @@ function main() {
     return
   }
 
+  let pickedImage
+  try {
+    pickedImage = pickArticleImage({
+      title,
+      category,
+      excerpt,
+      tags: [category],
+      sourceTopicId: String(updateId),
+      bodyContent: request.text,
+      filename,
+    })
+  } catch (e) {
+    console.error(`エラー: 記事画像を自動選択できませんでした: ${e.message}`)
+    process.exit(1)
+  }
+
   const frontmatter = {
     title,
     date,
     // リクエスト本文を仮 excerpt として設定（本文記入時に差し替えること）
-    excerpt:             request.text.slice(0, 80),
+    excerpt,
     category,
     tags:                [category],
     author:              '藍想会メディア編集部',
     reviewed:            false,
     draft:               false,
-    image:               '',
+    image:               pickedImage.image,
+    image_alt:           pickedImage.image_alt,
     source_request_id:   updateId,
     source_request_text: request.text.slice(0, 80),
   }
@@ -215,6 +234,8 @@ function main() {
 
   console.log()
   console.log('✅ 下書き生成完了（pending-review に追加されました）')
+  console.log(`   image     : ok (${pickedImage.image_id})`)
+  console.log('   image_alt : ok')
   console.log()
   console.log('次のステップ:')
   console.log(`  1. content/posts/${filename} を開いて本文を確認・記入する`)

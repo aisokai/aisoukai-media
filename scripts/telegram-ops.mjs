@@ -45,7 +45,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 import { buildSafeTemplateThemePrompt, classifyTelegramMessage } from './telegram-request-routing.mjs'
 import { handleMediaCommand } from './lib/telegram-media-commands.mjs'
-import { findCandidates, loadFeedback } from './lib/image-scoring.mjs'
+import { imagePresenceStatus, pickArticleImage } from './lib/auto-post-image.mjs'
 
 const __dirname      = dirname(fileURLToPath(import.meta.url))
 const ROOT           = join(__dirname, '..')
@@ -54,7 +54,6 @@ const REQUESTS_PATH  = join(ROOT, 'data', 'article-requests.json')
 const SESSION_PATH   = join(ROOT, 'data', 'telegram-session.json')
 const LOGS_DIR       = join(ROOT, 'logs')
 const LOG_PATH       = join(LOGS_DIR, 'review-history.md')
-const LIBRARY_PATH   = join(ROOT, 'data', 'image-library.json')
 
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
@@ -538,36 +537,20 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
     ? `${title}についてお知らせします。`
     : `${title}について、原因・受診目安・注意点を整理します。`
 
-  // ── 画像候補収集（自動割当なし — Humanが選択する） ──────────────────────
-  let imageCandidates = []
-
-  if (existsSync(LIBRARY_PATH)) {
-    try {
-      const lib = JSON.parse(readFileSync(LIBRARY_PATH, 'utf8'))
-
-      // 既存記事で使用中の画像IDを収集（候補から除外）
-      const usedImages = new Set()
-      for (const f of readdirSync(POSTS_DIR).filter((fn) => fn.endsWith('.md'))) {
-        try {
-          const { data: pd } = matter(readFileSync(join(POSTS_DIR, f), 'utf8'))
-          const imgId = (lib.images ?? []).find((img) => img.path === pd.image)?.id
-          if (imgId) usedImages.add(imgId)
-        } catch {}
-      }
-
-      imageCandidates = findCandidates({
-        images:      lib.images ?? [],
-        title,
-        category,
-        excerpt,
-        bodyContent,
-        usedImages,
-        limit:       3,
-        feedback:    loadFeedback(),
-      })
-    } catch (e) {
-      console.log(`    ⚠️ 画像候補収集スキップ（ライブラリ読込エラー）: ${e.message}`)
-    }
+  let pickedImage
+  try {
+    pickedImage = pickArticleImage({
+      title,
+      category,
+      excerpt,
+      tags: [category],
+      sourceTopicId: String(updateId),
+      bodyContent,
+      filename,
+    })
+    console.log(`    🖼 画像自動割当: ${pickedImage.image_id} (${pickedImage.image})`)
+  } catch (e) {
+    return { ok: false, reason: `画像自動割当失敗: ${e.message}` }
   }
 
   // frontmatter 組み立て
@@ -581,8 +564,8 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
     author:              '藍想会メディア編集部',
     reviewed:            false,
     draft:               false,
-    image:               '',
-    image_alt:           '',
+    image:               pickedImage.image,
+    image_alt:           pickedImage.image_alt,
     ai_generated:        aiUsed,
     request_mode:        requestMode,
     source_request_id:   String(updateId),
@@ -619,24 +602,16 @@ async function generateDraft(requestText, updateId, fromUser, requestMode = 'fre
   ]
   saveRequests(store)
 
-  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed, imageCandidates }
+  return { ok: true, slug, category, filename, title, bodyContent, excerpt, aiUsed, pickedImage }
 }
 
-// 画像候補リスト（Telegram 通知用）
-function formatCandidateLines(candidates, slug) {
-  if (candidates.length === 0) {
-    return [
-      `🖼 画像: 未割当（候補なし）`,
-      `  → npm run image:suggest -- ${slug} で確認`,
-    ]
-  }
+// 画像割当結果（Telegram 通知用）
+function formatAssignedImageLines(pickedImage) {
+  const status = imagePresenceStatus(pickedImage)
   return [
-    `🖼 画像候補（未割当 — 選択後に割当を実行）:`,
-    ...candidates.map((candidate, i) =>
-      `${i + 1}. [${candidate.img.id}]  ${(candidate.img.alt ?? '').slice(0, 30)}${candidate.notes?.[0] ? ` / ${candidate.notes[0]}` : ''}${candidate.concerns?.length ? ` / 懸念: ${candidate.concerns[0]}` : ''}`
-    ),
-    `次: 画像を選んで割当`,
-    `  npm run image:assign -- ${slug} --image <id>`,
+    `🖼 画像: ${status.image}`,
+    `image_alt: ${status.image_alt}`,
+    `image_id: ${pickedImage.image_id}`,
   ]
 }
 
@@ -1305,7 +1280,7 @@ async function main() {
               replyText = [
                 `📝 ${result.title}`,
                 ``,
-                ...formatCandidateLines(result.imageCandidates, result.slug),
+                ...formatAssignedImageLines(result.pickedImage),
                 ``,
                 `次: 承認`,
                 ...(reviewUrl ? [reviewUrl] : []),
@@ -1317,7 +1292,7 @@ async function main() {
             replyText = [
                 `📝 ${result.title}`,
                 ``,
-                ...formatCandidateLines(result.imageCandidates, result.slug),
+                ...formatAssignedImageLines(result.pickedImage),
                 ``,
                 `次: 承認`,
                 ...(reviewUrl ? [reviewUrl] : []),

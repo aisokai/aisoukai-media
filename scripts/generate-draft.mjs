@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import Anthropic from '@anthropic-ai/sdk'
 import { parseCsv } from './csv-parser.mjs'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
+import { pickArticleImage } from './lib/auto-post-image.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -213,6 +214,21 @@ async function main() {
 
   const tags = buildTags(row)
   const tagsYaml = tags.map((t) => `  - "${esc(t)}"`).join('\n')
+  let pickedImage
+  try {
+    pickedImage = pickArticleImage({
+      title,
+      category,
+      excerpt,
+      tags,
+      sourceTopicId: topicId,
+      bodyContent: body,
+      filename,
+    })
+  } catch (e) {
+    console.error(`エラー: 記事画像を自動選択できませんでした: ${e.message}`)
+    process.exit(1)
+  }
 
   const content = `---
 title: "${esc(title)}"
@@ -230,8 +246,8 @@ publication_status: draft
 legal_check_status: pending
 image_check_status: pending
 medical_risk: "${esc(medicalRisk || 'medium')}"
-image: ""
-image_alt: ""
+image: "${esc(pickedImage.image)}"
+image_alt: "${esc(pickedImage.image_alt)}"
 ai_generated: true
 source_topic_id: "${esc(topicId)}"
 source_notes: "${esc(notes)}"
@@ -250,6 +266,8 @@ ${body}
   console.log(`   出力先 : content/posts/${filename}`)
   console.log(`   モデル : claude-haiku-4-5-20251001`)
   console.log(`   トークン: 入力 ${response.usage.input_tokens} / 出力 ${response.usage.output_tokens}`)
+  console.log(`   image  : ok (${pickedImage.image_id})`)
+  console.log(`   image_alt: ok`)
   console.log()
   console.log('次のステップ:')
   console.log('  1. 生成Markdownを手動確認')

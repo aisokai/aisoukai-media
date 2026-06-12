@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseCsv } from './csv-parser.mjs'
+import { pickArticleImage } from './lib/auto-post-image.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -155,7 +156,7 @@ function buildExcerpt(title, category) {
   return `${title}について、原因・受診目安・注意点を整理します。`
 }
 
-function buildFrontmatter({ title, date, category, excerpt, tags }) {
+function buildFrontmatter({ title, date, category, excerpt, tags, image, imageAlt }) {
   const tagsYaml = tags.map((tag) => `  - "${esc(tag)}"`).join('\n')
   return `---
 title: "${esc(title)}"
@@ -166,7 +167,8 @@ tags:
 ${tagsYaml}
 author: 藍想会メディア編集部
 reviewed: false
-image: ""
+image: "${esc(image)}"
+image_alt: "${esc(imageAlt)}"
 ---`
 }
 
@@ -356,10 +358,36 @@ function main() {
 
   const excerpt = buildExcerpt(title, category)
   const tags = buildTags(row)
-  const content = `${buildFrontmatter({ title, date: publishDate, category, excerpt, tags })}\n${buildBody(row)}`
+  const body = buildBody(row)
+  let pickedImage
+  try {
+    pickedImage = pickArticleImage({
+      title,
+      category,
+      excerpt,
+      tags,
+      sourceTopicId: topicId,
+      bodyContent: body,
+      filename,
+    })
+  } catch (e) {
+    console.error(`エラー: 記事画像を自動選択できませんでした: ${e.message}`)
+    process.exit(1)
+  }
+  const content = `${buildFrontmatter({
+    title,
+    date: publishDate,
+    category,
+    excerpt,
+    tags,
+    image: pickedImage.image,
+    imageAlt: pickedImage.image_alt,
+  })}\n${body}`
 
   writeFileSync(filePath, content, 'utf8')
   console.log(`✅ 作成しました: content/posts/${filename}`)
+  console.log(`   image     : ok (${pickedImage.image_id})`)
+  console.log('   image_alt : ok')
 }
 
 main()
