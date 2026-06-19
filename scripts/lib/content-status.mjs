@@ -1,6 +1,7 @@
 // scripts/lib/content-status.mjs
 // コンテンツ状態の集計・通知文言・重複テーマ警告を共通化する。
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import matter from 'gray-matter'
 
@@ -20,9 +21,13 @@ export function resolvePostFileName(input) {
   return name
 }
 
-export function loadContentStatus(postsDir) {
-  if (!existsSync(postsDir)) {
-    return { live: [], scheduled: [], pending: [], pendingFuture: [], rejected: [] }
+function emptyContentStatus() {
+  return { live: [], scheduled: [], pending: [], pendingFuture: [], rejected: [] }
+}
+
+function buildContentStatus(entries) {
+  if (entries.length === 0) {
+    return emptyContentStatus()
   }
 
   const today = getTodayJst()
@@ -32,32 +37,34 @@ export function loadContentStatus(postsDir) {
   const pendingFuture = []
   const rejected = []
 
-  for (const file of readdirSync(postsDir).filter((f) => f.endsWith('.md'))) {
-    const raw = readFileSync(join(postsDir, file), 'utf8')
-    const { data } = matter(raw)
+  for (const entry of entries) {
+    const { data } = matter(entry.raw)
     const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
     const isFuture = publishAt > today
     const reviewed = data.reviewed === true
     const draft = data.draft === true
     const hasReject = !!data.rejection_reason
-    const entry = {
-      slug: file.replace(/\.md$/, ''),
+    const item = {
+      slug: entry.file.replace(/\.md$/, ''),
       title: String(data.title ?? '（タイトル未設定）'),
       publishAt,
       isFuture,
       category: String(data.category ?? ''),
       draft,
+      file: entry.file,
+      path: entry.path,
+      source: entry.source,
     }
 
     if (reviewed) {
-      if (!draft && !isFuture) live.push(entry)
-      else if (isFuture) scheduled.push(entry)
+      if (!draft && !isFuture) live.push(item)
+      else if (isFuture) scheduled.push(item)
     } else if (hasReject) {
-      rejected.push(entry)
+      rejected.push(item)
     } else if (isFuture) {
-      pendingFuture.push(entry)
+      pendingFuture.push(item)
     } else {
-      pending.push(entry)
+      pending.push(item)
     }
   }
 
@@ -69,6 +76,98 @@ export function loadContentStatus(postsDir) {
   rejected.sort(byDateDesc)
 
   return { live, scheduled, pending, pendingFuture, rejected }
+}
+
+export function loadContentStatus(postsDir) {
+  if (!existsSync(postsDir)) {
+    return { live: [], scheduled: [], pending: [], pendingFuture: [], rejected: [] }
+  }
+
+  const entries = readdirSync(postsDir)
+    .filter((f) => f.endsWith('.md'))
+    .map((file) => ({
+      file,
+      path: `content/posts/${file}`,
+      raw: readFileSync(join(postsDir, file), 'utf8'),
+      source: 'local',
+    }))
+
+  return buildContentStatus(entries)
+}
+
+function runGit(root, args) {
+  return execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+}
+
+function hasGitRef(root, ref) {
+  try {
+    runGit(root, ['rev-parse', '--verify', `${ref}^{commit}`])
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function loadContentStatusFromGitRef(root, ref = 'origin/main') {
+  if (!hasGitRef(root, ref)) {
+    return { ok: false, ref, status: emptyContentStatus(), error: `git ref not found: ${ref}` }
+  }
+
+  try {
+    const paths = runGit(root, ['ls-tree', '-r', '--name-only', ref, 'content/posts'])
+      .split('\n')
+      .filter((path) => path.endsWith('.md'))
+
+    const entries = paths.map((path) => ({
+      file: path.replace(/^content\/posts\//, ''),
+      path,
+      raw: runGit(root, ['show', `${ref}:${path}`]),
+      source: ref,
+    }))
+
+    return { ok: true, ref, status: buildContentStatus(entries) }
+  } catch (error) {
+    return { ok: false, ref, status: emptyContentStatus(), error: error.message }
+  }
+}
+
+function reviewQueue(status) {
+  return [...status.pending, ...status.pendingFuture]
+}
+
+function isLocalDashboardUrl(url) {
+  try {
+    const hostname = new URL(url).hostname
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+  } catch {
+    return false
+  }
+}
+
+export function buildNotificationReviewContext(postsDir, {
+  root = process.cwd(),
+  dashboardUrl = '',
+  originRef = 'origin/main',
+} = {}) {
+  const localStatus = loadContentStatus(postsDir)
+  const origin = loadContentStatusFromGitRef(root, originRef)
+  const useLocalDashboard = isLocalDashboardUrl(dashboardUrl)
+  const visibleStatus = useLocalDashboard || !origin.ok ? localStatus : origin.status
+  const visibleSlugs = new Set(reviewQueue(visibleStatus).map((item) => item.slug))
+  const localOnly = useLocalDashboard
+    ? []
+    : reviewQueue(localStatus).filter((item) => !visibleSlugs.has(item.slug))
+
+  return {
+    dashboardKind: useLocalDashboard ? 'local' : 'production',
+    dashboardUrl,
+    visibleStatus,
+    localStatus,
+    originRef,
+    originAvailable: origin.ok,
+    originError: origin.error,
+    localOnly,
+  }
 }
 
 function extractTokens(text) {
@@ -180,16 +279,34 @@ function trimTitle(title) {
 export function formatContentStatusLines(status, {
   dashboardUrl,
   maxItems = 5,
+  hiddenLocalItems = [],
+  dashboardKind = 'production',
+  originRef = 'origin/main',
+  originAvailable = true,
+  localReviewUrl = 'http://localhost:3000/admin/pending-review',
 } = {}) {
   const reviewQueue = [...status.pending, ...status.pendingFuture]
   const reviewCount = reviewQueue.length
 
   // --- 0件のシンプル表示 ---
   if (reviewCount === 0) {
-    return [
+    const lines = [
       '✅ review待ちはありません',
       `（公開中: ${status.live.length}件）`,
     ]
+    if (hiddenLocalItems.length > 0) {
+      lines.push('')
+      lines.push(`⚠️ ローカルのみ / needs-push ${hiddenLocalItems.length}件`)
+      lines.push('本番レビュー画面には未反映。push後に表示されます。')
+      for (const item of hiddenLocalItems.slice(0, 3)) {
+        lines.push(`- ${trimTitle(item.title)}（${item.publishAt}）`)
+      }
+      if (hiddenLocalItems.length > 3) {
+        lines.push(`- 他 ${hiddenLocalItems.length - 3}件`)
+      }
+      lines.push(`ローカル確認: ${localReviewUrl}`)
+    }
+    return lines
   }
 
   // --- 重複検出: どのインデックスが重複クラスタに属するか ---
@@ -244,8 +361,27 @@ export function formatContentStatusLines(status, {
 
   // --- 管理画面リンク ---
   lines.push('')
-  lines.push('承認・却下はこちら:')
+  lines.push(dashboardKind === 'local' ? '承認・却下はこちら（ローカル）:' : '承認・却下はこちら（本番）:')
   lines.push(dashboardUrl)
+
+  if (!originAvailable && dashboardKind === 'production') {
+    lines.push('')
+    lines.push(`⚠️ ${originRef} を確認できないため、本番反映状況は未検証です。`)
+  }
+
+  if (hiddenLocalItems.length > 0) {
+    lines.push('')
+    lines.push(`⚠️ ローカルのみ / needs-push ${hiddenLocalItems.length}件`)
+    lines.push('本番レビュー画面には未反映。push後に表示されます。')
+    for (const item of hiddenLocalItems.slice(0, 3)) {
+      lines.push(`- ${trimTitle(item.title)}（${item.publishAt}）`)
+    }
+    if (hiddenLocalItems.length > 3) {
+      lines.push(`- 他 ${hiddenLocalItems.length - 3}件`)
+    }
+    lines.push(`ローカル確認: ${localReviewUrl}`)
+  }
+
   lines.push('')
   lines.push('スマホで本文確認 → 承認/却下できます。')
 

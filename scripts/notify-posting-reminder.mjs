@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildReviewSummary, loadContentStatus } from './lib/content-status.mjs'
+import { buildNotificationReviewContext, buildReviewSummary } from './lib/content-status.mjs'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -39,10 +39,10 @@ async function sendTelegram(botToken, chatId, text) {
 }
 
 async function main() {
-  loadEnv()
-
   const args    = process.argv.slice(2)
   const force   = args.includes('--force')
+  const dryRun  = args.includes('--dry-run')
+  if (!dryRun) loadEnv()
 
   // JST の曜日判定
   const nowJst  = new Date(Date.now() + 9 * 3600 * 1000)
@@ -68,20 +68,29 @@ async function main() {
   }
 
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
+  const context = buildNotificationReviewContext(POSTS_DIR, { root: ROOT, dashboardUrl })
 
-  const status  = loadContentStatus(POSTS_DIR)
-  const text    = buildReviewSummary(status, {
+  const text    = buildReviewSummary(context.visibleStatus, {
     dashboardUrl,
     heading: `📅 ${dayName}曜日の投稿確認リマインド`,
     maxItems: 3,
     noPendingText: '承認待ちはありません',
     showNextAction: true,
+    hiddenLocalItems: context.localOnly,
+    dashboardKind: context.dashboardKind,
+    originRef: context.originRef,
+    originAvailable: context.originAvailable,
   })
 
   console.log()
   console.log(text)
   console.log()
   console.log(BAR)
+
+  if (dryRun) {
+    console.log('dry-run: Telegram送信なし / .env.local読み込みなし')
+    return
+  }
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId   = process.env.TELEGRAM_CHAT_ID

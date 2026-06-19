@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildReviewSummary, loadContentStatus } from './lib/content-status.mjs'
+import { buildNotificationReviewContext, buildReviewSummary } from './lib/content-status.mjs'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -38,17 +38,23 @@ async function sendTelegram(botToken, chatId, text) {
 }
 
 async function main() {
-  loadEnv()
+  const args = process.argv.slice(2)
+  const dryRun = args.includes('--dry-run')
+  if (!dryRun) loadEnv()
 
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
+  const context = buildNotificationReviewContext(POSTS_DIR, { root: ROOT, dashboardUrl })
 
-  const status = loadContentStatus(POSTS_DIR)
-  const text   = buildReviewSummary(status, {
+  const text   = buildReviewSummary(context.visibleStatus, {
     dashboardUrl,
     heading: '📊 review待ちサマリー',
     maxItems: 5,
     noPendingText: '承認待ちはありません',
     showNextAction: true,
+    hiddenLocalItems: context.localOnly,
+    dashboardKind: context.dashboardKind,
+    originRef: context.originRef,
+    originAvailable: context.originAvailable,
   })
 
   // ── console 出力 ──
@@ -57,6 +63,11 @@ async function main() {
   console.log('━'.repeat(56))
   console.log(text)
   console.log('━'.repeat(56))
+
+  if (dryRun) {
+    console.log('dry-run: Telegram送信なし / .env.local読み込みなし')
+    return
+  }
 
   // ── Telegram 送信 ──
   const botToken = process.env.TELEGRAM_BOT_TOKEN
