@@ -1486,6 +1486,30 @@
       "alt": "2026年ホームホワイトニングキャンペーンの案内と笑顔の女性",
       "license_source": "自院制作",
       "license_note": "2026年ホームホワイトニングキャンペーン用の自院制作画像"
+    },
+    {
+      "id": "prevention-bright-clean-studio-product-photography-scene-a",
+      "path": "/images/library/prevention/bright-clean-studio-product-photography-scene-a.png",
+      "category": "prevention",
+      "title": "bright-clean-studio-product-photography-scene-a",
+      "alt": "予防歯科・定期検診に関するイメージ",
+      "width": 1402,
+      "height": 1122,
+      "format": "png",
+      "sha256": "79933e28242f9989f56b43436026b797284a69daa6a6bc416bf2236363b4d7bf",
+      "source_filename": "bright-clean-studio-product-photography-scene-a.png",
+      "license_status": "assumed_approved",
+      "usage_status": "active",
+      "created_at": "2026-06-19T05:49:55.119Z",
+      "updated_at": "2026-06-19T05:49:55.119Z",
+      "tags": [
+        "予防",
+        "定期検診",
+        "クリーニング",
+        "歯科"
+      ],
+      "license_source": "院内提供",
+      "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）"
     }
   ]
 }
