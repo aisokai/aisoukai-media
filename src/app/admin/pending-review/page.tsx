@@ -208,6 +208,16 @@ export default async function PendingReviewPage({ searchParams }: PageProps) {
           内容を確認し、スマホから承認・却下できます。操作はGitHub commitとして記録されます。
         </p>
 
+        {/* DMP Core 状態基準の明示（MitaniOS DMP との表示一致のため）*/}
+        <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs leading-relaxed text-gray-600">
+          <p className="font-semibold text-gray-700">この画面は GitHub の本番ブランチ（origin/main）基準です。</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            <li>Mac mini ローカルのみ（未push）の記事は、ここには表示されません。</li>
+            <li>本番反映は先生のpush後です（この画面からは push しません）。</li>
+            <li>ローカルのみ / needs-push の件数は MitaniOS DMP ダッシュボードで確認できます。</li>
+          </ul>
+        </div>
+
         {/* バッジ凡例 */}
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           <span className="flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-orange-700">
