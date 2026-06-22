@@ -46,3 +46,9 @@ action: delete-rejected
 slug: 2026-06-13-topic-20260511-029
 reason: physical delete from pending review
 
+## 2026-06-22T18:09:25.142+09:00
+datetime: 2026-06-22T18:09:25.142+09:00
+action: delete-rejected
+slug: 2026-05-28-topic-20260512-032
+reason: physical delete from pending review
+
