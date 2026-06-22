@@ -169,7 +169,7 @@ publish_at: 2026-05-15
 
 ## 2026-06-09T18:10:10.280+09:00
 datetime: 2026-06-09T18:10:10.280+09:00
-action: reject
+action: archive_duplicate
 slug: 2026-05-15-req-145026186
 reviewed_by: 三谷
 reason: 重複候補のため却下
@@ -262,6 +262,14 @@ reviewed_by: 三谷
 date: 2026-07-01
 publish_at: 2026-07-01
 
+## 2026-06-15T16:12:13.143+09:00
+datetime: 2026-06-15T16:12:13.143+09:00
+action: approve
+slug: 2026-07-06-monthly-202606topic012
+reviewed_by: 三谷
+date: 2026-07-06
+publish_at: 2026-07-06
+
 ## 2026-06-22T18:08:49.683+09:00
 datetime: 2026-06-22T18:08:49.683+09:00
 action: reject
@@ -272,3 +280,22 @@ reject_reason: テーマが重複している
 date: 2026-05-28
 publish_at: 2026-05-28
 
+## 2026-06-22T19:20:15.000+09:00
+datetime: 2026-06-22T19:20:15.000+09:00
+action: reschedule
+slug: 2026-06-22-monthly-202606topic012
+previous_slug: 2026-07-06-monthly-202606topic012
+reviewed_by: 三谷
+date: 2026-06-22
+publish_at: 2026-06-22
+reason: 定期更新の公開対象確認のため、Human承認済み記事を当日公開枠へ移動
+
+## 2026-06-22T19:22:24.000+09:00
+datetime: 2026-06-22T19:22:24.000+09:00
+action: reject
+slug: 2026-06-12-monthly-202606topic012
+reviewed_by: Codex
+reason: 重複整理: 2026-06-22-monthly-202606topic012 に集約
+reject_reason: 重複整理: 2026-06-22-monthly-202606topic012 に集約
+date: 2026-06-12
+publish_at: 2026-07-06

@@ -6,13 +6,14 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, write
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
+import { getTodayJst } from './lib/post-publication-status.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
 const POSTS_DIR = join(ROOT, 'content', 'posts')
 
 function getTodayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return getTodayJst()
 }
 
 function getJstTimestamp() {

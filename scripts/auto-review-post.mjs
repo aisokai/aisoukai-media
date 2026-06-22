@@ -14,6 +14,7 @@ import { dirname, join, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
 import { findCandidates, loadFeedback } from './lib/image-scoring.mjs'
+import { getTodayJst } from './lib/post-publication-status.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -62,7 +63,7 @@ function parseArgs(argv) {
 }
 
 function getTodayIso() {
-  return new Date().toISOString().slice(0, 10)
+  return getTodayJst()
 }
 
 function getJstTimestamp() {

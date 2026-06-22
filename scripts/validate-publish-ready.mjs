@@ -6,6 +6,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
+import { getTodayJst, toDateStr } from './lib/post-publication-status.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
@@ -33,11 +34,6 @@ const MEDICAL_AD_PATTERNS = [
   { re: /痛くない/,                          label: '誇大表現「痛くない」' },
   { re: /副作用なし/,                        label: '誇大表現「副作用なし」' },
 ]
-
-function toDateStr(val) {
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
-  return String(val ?? '')
-}
 
 /**
  * 1 記事を検査し { blockers, warnings } を返す。
@@ -114,7 +110,7 @@ function checkPost(filename) {
     blockers.push('draft: true — ドラフト明示記事は公開対象外です')
   }
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getTodayJst()
 
   // ── publish_at: 未来日付はまだ公開しない ──
   if (data.publish_at) {

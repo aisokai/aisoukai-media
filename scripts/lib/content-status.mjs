@@ -4,17 +4,14 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import matter from 'gray-matter'
+import {
+  getPostPublicationStatus,
+  getTodayJst,
+  toDateStr,
+} from './post-publication-status.mjs'
 
 const HTML_BREAK_RE = /<br\s*\/?>/gi
-
-function getTodayJst() {
-  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
-}
-
-export function toDateStr(val) {
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
-  return String(val ?? '')
-}
+export { toDateStr }
 
 export function resolvePostFileName(input) {
   const name = input.endsWith('.md') ? input : `${input}.md`
@@ -40,9 +37,9 @@ function buildContentStatus(entries) {
   for (const entry of entries) {
     const { data } = matter(entry.raw)
     const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
-    const isFuture = publishAt > today
-    const reviewed = data.reviewed === true
-    const draft = data.draft === true
+    const publicationStatus = getPostPublicationStatus(data, { today })
+    const isFuture = publicationStatus.isFuture
+    const approved = publicationStatus.approved
     const hasReject = !!data.rejection_reason
     const item = {
       slug: entry.file.replace(/\.md$/, ''),
@@ -50,17 +47,18 @@ function buildContentStatus(entries) {
       publishAt,
       isFuture,
       category: String(data.category ?? ''),
-      draft,
+      draft: data.draft === true,
       file: entry.file,
       path: entry.path,
       source: entry.source,
     }
 
-    if (reviewed) {
-      if (!draft && !isFuture) live.push(item)
-      else if (isFuture) scheduled.push(item)
-    } else if (hasReject) {
+    if (hasReject) {
       rejected.push(item)
+    } else if (approved) {
+      if (publicationStatus.publishable) live.push(item)
+      else if (isFuture) scheduled.push(item)
+      else pending.push(item)
     } else if (isFuture) {
       pendingFuture.push(item)
     } else {

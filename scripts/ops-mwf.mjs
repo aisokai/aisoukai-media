@@ -8,6 +8,7 @@
 // 月水金以外は警告して終了。--force で曜日に関わらず実行できる。
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { loadContentStatus } from './lib/content-status.mjs'
@@ -51,6 +52,88 @@ function run(script, extraArgs = []) {
   }
   // 子プロセスの exit code が非 0 でも続行（通知失敗等は警告扱い）
   return result.status ?? (result.error ? 1 : 0)
+}
+
+function readJsonIfExists(path) {
+  if (!path || !existsSync(path)) return null
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    return { ok: false, generated: false, published: false, reasons: [`結果JSONの読み込みに失敗: ${error.message}`] }
+  }
+}
+
+async function sendTelegram(botToken, chatId, text) {
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ chat_id: chatId, text }),
+  })
+  const json = await res.json()
+  if (!json.ok) {
+    throw new Error(`Telegram API エラー: ${json.description ?? JSON.stringify(json)}`)
+  }
+  return json
+}
+
+function buildOpsResultNotification({
+  generateDecision,
+  scheduledResult,
+  autoPublish,
+  liveBeforeSlugs,
+  liveAfterSlugs,
+  reviewCount,
+  requestedCount,
+}) {
+  const lines = ['📣 定期更新結果']
+
+  if (!generateDecision.ok) {
+    lines.push('⚠️ 新規公開なし')
+    lines.push(`理由: ${generateDecision.reason}`)
+  } else if (!scheduledResult) {
+    lines.push('⚠️ 新規公開なし')
+    lines.push('理由: 定期記事生成の結果を確認できませんでした')
+  } else if (scheduledResult.generated && scheduledResult.published) {
+    const slug = scheduledResult.slug ?? ''
+    const newLive = slug && liveAfterSlugs.has(slug) && !liveBeforeSlugs.has(slug)
+    lines.push(newLive ? '✅ 新規記事を1件公開扱いにしました' : '✅ 記事は公開扱いです')
+    if (scheduledResult.title) lines.push(`記事: ${scheduledResult.title}`)
+    if (slug) lines.push(`slug: ${slug}`)
+    if (scheduledResult.publishAt) lines.push(`publish_at: ${scheduledResult.publishAt}`)
+  } else if (scheduledResult.generated) {
+    lines.push('⚠️ 記事は保存しましたが、公開扱いではありません')
+    if (scheduledResult.title) lines.push(`記事: ${scheduledResult.title}`)
+    if (scheduledResult.slug) lines.push(`slug: ${scheduledResult.slug}`)
+    for (const reason of (scheduledResult.reasons ?? []).slice(0, 5)) {
+      lines.push(`理由: ${reason}`)
+    }
+    if (!autoPublish) {
+      lines.push('補足: --auto-publish なしのため、Human review または Auto Publish Policy 通過までは公開されません')
+    }
+  } else {
+    lines.push('⚠️ 新規公開なし')
+    for (const reason of (scheduledResult.reasons ?? ['定期記事が作成されませんでした']).slice(0, 5)) {
+      lines.push(`理由: ${reason}`)
+    }
+  }
+
+  lines.push(`公開中: ${liveAfterSlugs.size}件 / review待ち: ${reviewCount}件 / 未処理リクエスト: ${requestedCount}件`)
+  return lines.join('\n')
+}
+
+async function sendOpsResultTelegram(text) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  const chatId   = process.env.TELEGRAM_CHAT_ID
+
+  if (!botToken || !chatId) {
+    console.warn('  ⚠️ 定期更新結果 Telegram 通知をスキップします（環境変数未設定）')
+    return false
+  }
+
+  await sendTelegram(botToken, chatId, text)
+  console.log('  ✅ 定期更新結果 Telegram 通知を送信しました')
+  return true
 }
 
 function loadEnv() {
@@ -108,6 +191,9 @@ if (force && !isSendDay) {
   console.log(`  ⚠️  --force 指定のため${dayName}曜日ですが実行します`)
 }
 
+const liveBeforeSlugs = new Set(loadContentStatus(POSTS_DIR).live.map((item) => item.slug))
+let scheduledResult = null
+
 // ── ステップ実行 ──────────────────────────────
 
 header('1/7  コンテンツ状態確認 (status:content)')
@@ -126,9 +212,15 @@ if (!generateDecision.ok) {
   console.log(`  ⏭ ${generateDecision.reason}`)
 } else {
   const args = autoPublish ? ['--auto-publish'] : []
+  const resultPath = join(tmpdir(), `aisoukai-scheduled-result-${process.pid}.json`)
+  args.push('--no-notify', '--result-json', resultPath)
   const status = run('scheduled-article-flow.mjs', args)
-  generatedArticle = status === 0
-  if (!generatedArticle) {
+  scheduledResult = readJsonIfExists(resultPath)
+  generatedArticle = scheduledResult?.generated === true
+  if (status !== 0 && !generatedArticle) {
+    const reason = scheduledResult?.reasons?.[0] ?? `scheduled-article-flow.mjs が exit ${status} で停止`
+    console.log(`  ⏭ ${reason}`)
+  } else if (status !== 0) {
     console.log('  ⚠️ 定期記事生成は完了しませんでした。後続の通知は継続します。')
   }
 }
@@ -148,6 +240,7 @@ const contentStatus = loadContentStatus(POSTS_DIR)
 const requestStore = loadRequestStore(REQUESTS_PATH)
 const requestedCount = (requestStore.requests ?? []).filter((r) => r.status === 'requested').length
 const reviewCount = contentStatus.pending.length + contentStatus.pendingFuture.length
+const liveAfterSlugs = new Set(contentStatus.live.map((item) => item.slug))
 
 console.log()
 console.log(WIDE)
@@ -186,3 +279,22 @@ if (reviewCount === 0 && requestedCount === 0) {
 }
 console.log(WIDE)
 console.log()
+
+const opsResultText = buildOpsResultNotification({
+  generateDecision,
+  scheduledResult,
+  autoPublish,
+  liveBeforeSlugs,
+  liveAfterSlugs,
+  reviewCount,
+  requestedCount,
+})
+
+console.log('  定期更新結果通知:')
+console.log(opsResultText.split('\n').map((line) => `  ${line}`).join('\n'))
+try {
+  await sendOpsResultTelegram(opsResultText)
+} catch (error) {
+  console.error(`  ❌ 定期更新結果 Telegram 送信失敗: ${error.message}`)
+  process.exitCode = 1
+}

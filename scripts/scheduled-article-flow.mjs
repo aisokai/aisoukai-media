@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 // scheduled-article-flow.mjs
-// 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 候補から補充）
+// 定期提案フロー: 公開日到来済みの承認済み topic を 1 件選択
 // → AI 下書き生成 → Telegram 通知。
 // --auto-publish 指定時は Auto Publish Policy に基づく自動レビューまで実行する。
 // Human approval の reviewed:true / publish / push は実行しない。
+// 未来日の一括下書き準備は generate-scheduled-drafts.mjs を使う。
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import matter from 'gray-matter'
 import { parseCsv } from './csv-parser.mjs'
+import { evaluatePostFile, getTodayJst } from './lib/post-publication-status.mjs'
 
 const __dirname  = dirname(fileURLToPath(import.meta.url))
 const ROOT        = join(__dirname, '..')
@@ -16,7 +19,7 @@ const TOPICS_PATH = join(ROOT, 'data', 'article-topics.sample.csv')
 const POSTS_DIR   = join(ROOT, 'content', 'posts')
 const RESEARCH_DIR = join(ROOT, 'data', 'research')
 
-const TODAY = new Date().toLocaleDateString('sv-SE')
+const TODAY = getTodayJst()
 
 const CSV_COLUMNS = [
   'id', 'discovered_at', 'source_type', 'source_url', 'topic',
@@ -89,6 +92,11 @@ function runAllowFailure(scriptPath, args = []) {
   }
 }
 
+function writeResult(resultPath, result) {
+  if (!resultPath) return
+  writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
+}
+
 // CSV から全行を読む（存在しない場合は空配列）
 function readCsvRows() {
   if (!existsSync(TOPICS_PATH)) return []
@@ -100,16 +108,35 @@ function readCsvRows() {
   }
 }
 
-// status='approved' でかつ対応する下書きファイルがまだ存在しない topic 行を探す
-function findPendingApprovedTopic(rows) {
+function hasGeneratedPostForTopic(row) {
+  const id = (row.id ?? '').trim()
+  const publishDate = (row.publish_date ?? '').trim()
+  if (!id || !publishDate) return true
+
+  const filename = `${publishDate}-${slugify(id)}.md`
+  if (existsSync(join(POSTS_DIR, filename))) return true
+
+  if (!existsSync(POSTS_DIR)) return false
+  for (const file of readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'))) {
+    try {
+      const { data } = matter(readFileSync(join(POSTS_DIR, file), 'utf8'))
+      if (String(data.source_topic_id ?? '').trim() === id) return true
+    } catch {}
+  }
+
+  return false
+}
+
+// status='approved' で、公開日到来済み、かつ対応する下書きファイルがまだ存在しない topic 行を探す
+function findMissingApprovedTopics(rows, { allowFuture = false, today = TODAY } = {}) {
   return rows
     .filter((r) => (r.status ?? '').trim() === 'approved')
     .filter((r) => {
       const id          = (r.id ?? '').trim()
       const publishDate = (r.publish_date ?? '').trim()
       if (!id || !publishDate) return false
-      const filename = `${publishDate}-${slugify(id)}.md`
-      return !existsSync(join(POSTS_DIR, filename))
+      if (!allowFuture && publishDate > today) return false
+      return !hasGeneratedPostForTopic(r)
     })
     .sort((a, b) => {
       const pa = PRIORITY_ORDER[a.priority] ?? 99
@@ -193,6 +220,24 @@ function importResearchCandidate(candidates, existingRows) {
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const autoPublish = args.auto_publish === true
+  const allowFuture = args.allow_future === true
+  const fillFromResearch = args.fill_from_research === true
+  const noNotify = args.no_notify === true
+  const resultPath = args.result_json ? String(args.result_json) : ''
+  const result = {
+    ok: false,
+    generated: false,
+    published: false,
+    autoPublish,
+    allowFuture,
+    today: TODAY,
+    topicId: '',
+    slug: '',
+    path: '',
+    title: '',
+    publishAt: '',
+    reasons: [],
+  }
 
   loadEnv()
 
@@ -206,12 +251,14 @@ async function main() {
   console.log()
 
   let topicId = null
+  let pickedTopic = null
   let rows    = readCsvRows()
 
-  // 1-a: approved で下書き未生成の topic を探す（優先度 high → medium → low）
-  const pending = findPendingApprovedTopic(rows)
+  // 1-a: approved で公開日到来済み、かつ下書き未生成の topic を探す
+  const pending = findMissingApprovedTopics(rows, { allowFuture })
   if (pending.length > 0) {
     const picked = pending[0]
+    pickedTopic = picked
     topicId = (picked.id ?? '').trim()
     console.log(`  既存の承認済み topic を使用します`)
     console.log(`  topic_id  : ${topicId}`)
@@ -219,13 +266,27 @@ async function main() {
     console.log(`  優先度    : ${picked.priority}`)
     console.log(`  公開予定日: ${picked.publish_date}`)
   } else {
-    // 1-b: 承認済み pending がない場合は research:trends から候補を補充する
+    const futurePending = findMissingApprovedTopics(rows, { allowFuture: true })
+      .filter((row) => String(row.publish_date ?? '').trim() > TODAY)
+    if (!fillFromResearch) {
+      const reason = futurePending.length > 0
+        ? `公開日が今日以前の未生成 approved topic はありません（次回候補: ${futurePending[0].publish_date} / ${futurePending[0].id}）`
+        : '公開日が今日以前の未生成 approved topic はありません'
+      console.log(`  ⏭ ${reason}`)
+      result.reasons = [reason]
+      writeResult(resultPath, result)
+      process.exit(2)
+    }
+
+    // 1-b: 明示指定時のみ research:trends から候補を補充する
     console.log(`  承認済みの未処理 topic がありません。research:trends で補充します ...`)
     console.log()
 
     const research = runResearchTrends()
     if (!research || !research.candidates?.length) {
       console.error('エラー: research:trends の候補を取得できませんでした')
+      result.reasons = ['research:trends の候補を取得できませんでした']
+      writeResult(resultPath, result)
       process.exit(1)
     }
 
@@ -236,8 +297,20 @@ async function main() {
       console.error('エラー: 未登録の research 候補が見つかりませんでした')
       console.error('  data/article-topics.sample.csv に全候補が既に登録されています')
       console.error('  npm run request:article で新しいテーマを追加してください')
+      result.reasons = ['未登録の research 候補が見つかりませんでした']
+      writeResult(resultPath, result)
       process.exit(1)
     }
+
+    rows = readCsvRows()
+    pickedTopic = rows.find((row) => String(row.id ?? '').trim() === topicId) ?? null
+  }
+
+  if (!pickedTopic) {
+    console.error(`エラー: 選択 topic を再取得できませんでした: ${topicId}`)
+    result.reasons = [`選択 topic を再取得できませんでした: ${topicId}`]
+    writeResult(resultPath, result)
+    process.exit(1)
   }
 
   // ── STEP 2: AI 下書き生成 ──
@@ -245,7 +318,28 @@ async function main() {
   console.log(`[ STEP 2/3 ]  AI 下書き生成 (${topicId}) ...`)
   console.log()
 
-  run(join(__dirname, 'generate-draft.mjs'), [topicId])
+  const generatedFilename = `${String(pickedTopic.publish_date ?? '').trim()}-${slugify(topicId)}.md`
+  const generatedFilePath = join(POSTS_DIR, generatedFilename)
+  result.topicId = topicId
+  result.slug = generatedFilename.replace(/\.md$/, '')
+  result.path = `content/posts/${generatedFilename}`
+  result.title = String(pickedTopic.title_candidate ?? '')
+  result.publishAt = String(pickedTopic.publish_date ?? '').trim()
+
+  const generateStatus = runAllowFailure(join(__dirname, 'generate-draft.mjs'), [topicId])
+  if (generateStatus !== 0) {
+    result.reasons = [`generate-draft.mjs が exit ${generateStatus} で停止しました`]
+    writeResult(resultPath, result)
+    process.exit(generateStatus)
+  }
+
+  if (!existsSync(generatedFilePath)) {
+    result.reasons = [`生成後の記事ファイルが見つかりません: content/posts/${generatedFilename}`]
+    writeResult(resultPath, result)
+    process.exit(1)
+  }
+
+  result.generated = true
 
   // ── STEP 3: Auto Publish Policy review（任意） ──
   if (autoPublish) {
@@ -260,12 +354,24 @@ async function main() {
     }
   }
 
+  const publication = evaluatePostFile(generatedFilePath)
+  result.ok = true
+  result.published = publication.publishable
+  result.title = publication.title
+  result.publishAt = publication.publishAt
+  result.reasons = publication.publishable ? [] : publication.reasons
+  writeResult(resultPath, result)
+
   // ── STEP 4: pending-review 通知 ──
   console.log()
   console.log(`[ STEP ${autoPublish ? '4/4' : '3/3'} ]  pending-review Telegram 通知 ...`)
   console.log()
 
-  run(join(__dirname, 'notify-pending-review.mjs'))
+  if (noNotify) {
+    console.log('  --no-notify 指定のため、このステップでは Telegram 通知しません')
+  } else {
+    run(join(__dirname, 'notify-pending-review.mjs'))
+  }
 
   console.log()
   console.log('━'.repeat(56))
@@ -273,6 +379,12 @@ async function main() {
   console.log('━'.repeat(56))
   console.log()
   if (autoPublish) {
+    if (result.published) {
+      console.log('  0. 新規記事は公開扱いになっています')
+    } else {
+      console.log('  0. 新規記事は保存済みですが、公開扱いではありません')
+      for (const reason of result.reasons) console.log(`     - ${reason}`)
+    }
     console.log('次のステップ:')
     console.log('  1. npm run validate:publish-ready')
     console.log('  2. npm run build')

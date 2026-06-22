@@ -7,6 +7,10 @@ import { readGitHubDirectory, readGitHubFile } from './githubContents';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
+function getTodayJst(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
+}
+
 // Human reviewed または Auto Publish Policy 通過済み、かつ draft でない記事のみ公開対象とする。
 // publish_at または date が今日より未来の場合は公開しない（スケジュール公開）。
 // AI生成記事は生成時 reviewed/auto_approved とも false で作られ、
@@ -25,7 +29,7 @@ function isPublishReady(data: Record<string, unknown>): boolean {
 
   if (!humanApproved && !autoApproved) return false
 
-  const today = new Date().toISOString().slice(0, 10)
+  const today = getTodayJst()
 
   const toStr = (v: unknown): string =>
     v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '')
