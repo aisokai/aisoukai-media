@@ -262,3 +262,13 @@ reviewed_by: 三谷
 date: 2026-07-01
 publish_at: 2026-07-01
 
+## 2026-06-22T18:08:49.683+09:00
+datetime: 2026-06-22T18:08:49.683+09:00
+action: reject
+slug: 2026-05-28-topic-20260512-032
+reviewed_by: 三谷
+reason: テーマが重複している
+reject_reason: テーマが重複している
+date: 2026-05-28
+publish_at: 2026-05-28
+
