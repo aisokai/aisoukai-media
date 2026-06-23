@@ -8,6 +8,7 @@ import {
   FileSpreadsheet,
   LayoutDashboard,
   PencilLine,
+  PlayCircle,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
@@ -107,6 +108,14 @@ export default async function AdminDashboardPage() {
           href="/admin/posts"
           badge={`${allPosts.length}件`}
           tone="blue"
+        />
+        <ToolCard
+          icon={<PlayCircle className="h-5 w-5" />}
+          title="DMP Action Queue"
+          description="DMP Core Action の確認と dry-run Action 作成。実送信・本公開は行いません。"
+          href="/admin/dmp-actions"
+          badge="dry-run"
+          tone="slate"
         />
         <ToolCard
           icon={<ShieldCheck className="h-5 w-5" />}
