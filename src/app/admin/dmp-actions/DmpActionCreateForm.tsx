@@ -226,6 +226,10 @@ export function DmpActionCreateForm({ onCreated }: Props) {
           {result.ok ? result.message : result.errors?.join(' / ')}
         </div>
       )}
+
+      <p className="mt-3 text-xs text-gray-400">
+        ※ Action の主な作成・管理は MitaniOS DMP から行います。ここはブログ現場向けの補助入口です。
+      </p>
     </section>
   )
 }
