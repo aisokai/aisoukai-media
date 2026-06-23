@@ -110,14 +110,6 @@ export default async function AdminDashboardPage() {
           tone="blue"
         />
         <ToolCard
-          icon={<PlayCircle className="h-5 w-5" />}
-          title="DMP Action Queue"
-          description="DMP Core Action の確認と dry-run Action 作成。実送信・本公開は行いません。"
-          href="/admin/dmp-actions"
-          badge="dry-run"
-          tone="slate"
-        />
-        <ToolCard
           icon={<ShieldCheck className="h-5 w-5" />}
           title="公開前チェック"
           description="投稿状態・画像・publish-ready の検証コマンドへ進むための運用メモです。"
@@ -158,6 +150,25 @@ export default async function AdminDashboardPage() {
             href="/admin/posts"
             badge="確認必須"
             tone="amber"
+          />
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <div className="mb-4">
+          <h2 className="text-lg font-bold text-gray-900">DMP Core</h2>
+          <p className="mt-1 text-sm text-gray-500">
+            主操作は MitaniOS DMP から行います。ここではブログ現場から Action の補助確認・作成ができます。
+          </p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <ToolCard
+            icon={<PlayCircle className="h-5 w-5" />}
+            title="Action Queue（補助確認）"
+            description="Action の確認と dry-run Action 作成。主操作は MitaniOS DMP から。実送信・本公開は行いません。"
+            href="/admin/dmp-actions"
+            badge="dry-run"
+            tone="slate"
           />
         </div>
       </section>
