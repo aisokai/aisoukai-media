@@ -20,6 +20,24 @@ const VALID_MEDICAL_RISK = ['low', 'medium', 'high']
 const VALID_CHECK_STATUS = ['pending', 'passed', 'failed']
 const VALID_PUBLICATION_STATUS = ['draft', 'pending_review', 'auto_approved', 'human_approved']
 
+function detectGeneratedDraftQualityIssues(body) {
+  const text = String(body ?? '')
+  const issues = []
+  const checks = [
+    { re: /\bbrief\b/i, reason: '本文にプロンプト断片 "brief" が混入しています' },
+    { re: /\b(undefined|null|NaN)\b/, reason: '本文に生成崩れを示す値が混入しています' },
+    { re: /\[[^\]]*(TODO|要確認|出典|引用|placeholder)[^\]]*\]/i, reason: '本文に未処理プレースホルダーが残っています' },
+    { re: /<\s*(title|body|article|section|placeholder)\s*>/i, reason: '本文に未処理タグ風プレースホルダーが残っています' },
+    { re: /[A-Za-z]{4,}(?:月|日|年|ヶ|か月|ヶ月)/, reason: '本文に英字断片と日付・期間表現が不自然に連結しています' },
+  ]
+
+  for (const check of checks) {
+    if (check.re.test(text) && !issues.includes(check.reason)) issues.push(check.reason)
+  }
+
+  return issues
+}
+
 function toDateStr(val) {
   if (val instanceof Date) return val.toISOString().slice(0, 10)
   return String(val ?? '')
@@ -150,6 +168,10 @@ function validatePost(filename) {
 
   if (!content || content.trim() === '') {
     errors.push('本文が空です')
+  } else {
+    for (const issue of detectGeneratedDraftQualityIssues(content)) {
+      errors.push(issue)
+    }
   }
 
   return { errors, warnings }

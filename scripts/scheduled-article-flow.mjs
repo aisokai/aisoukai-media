@@ -18,6 +18,8 @@ const ROOT        = join(__dirname, '..')
 const TOPICS_PATH = join(ROOT, 'data', 'article-topics.sample.csv')
 const POSTS_DIR   = join(ROOT, 'content', 'posts')
 const RESEARCH_DIR = join(ROOT, 'data', 'research')
+const REVIEW_HISTORY_PATH = join(ROOT, 'logs', 'review-history.md')
+const ADMIN_POST_HISTORY_PATH = join(ROOT, 'logs', 'admin-post-history.md')
 
 const TODAY = getTodayJst()
 
@@ -41,6 +43,12 @@ function loadEnv() {
 
 function slugify(id) {
   return id.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+}
+
+function topicIdFromSlug(slug) {
+  const m = String(slug ?? '').match(/^\d{4}-\d{2}-\d{2}-topic-(\d{8})-(\d{3})(?:\.md)?$/i)
+  if (!m) return ''
+  return `TOPIC-${m[1]}-${m[2]}`
 }
 
 function parseArgs(argv) {
@@ -97,6 +105,63 @@ function writeResult(resultPath, result) {
   writeFileSync(resultPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
 }
 
+function splitLogEntries(raw) {
+  return String(raw ?? '')
+    .split(/\n(?=##\s+\d{4}-\d{2}-\d{2}T)/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+}
+
+function getLogField(entry, field) {
+  const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const m = entry.match(new RegExp(`^${escaped}:\\s*(.+)$`, 'm'))
+  return m ? m[1].trim() : ''
+}
+
+// 削除済み・却下済み・重複整理済みの topic は、CSV が approved のままでも再利用しない。
+function loadBlockedScheduledTopics() {
+  const topicIds = new Set()
+  const slugs = new Set()
+
+  const blockSlug = (slug) => {
+    const cleanSlug = String(slug ?? '').replace(/\.md$/, '').trim()
+    if (!cleanSlug) return
+    slugs.add(cleanSlug)
+    const topicId = topicIdFromSlug(cleanSlug)
+    if (topicId) topicIds.add(topicId)
+  }
+
+  if (existsSync(REVIEW_HISTORY_PATH)) {
+    for (const entry of splitLogEntries(readFileSync(REVIEW_HISTORY_PATH, 'utf8'))) {
+      const action = getLogField(entry, 'action')
+      if (!['reject', 'archive_duplicate'].includes(action)) continue
+      blockSlug(getLogField(entry, 'slug'))
+    }
+  }
+
+  if (existsSync(ADMIN_POST_HISTORY_PATH)) {
+    for (const entry of splitLogEntries(readFileSync(ADMIN_POST_HISTORY_PATH, 'utf8'))) {
+      const action = getLogField(entry, 'action')
+      if (action !== 'delete-rejected') continue
+      blockSlug(getLogField(entry, 'slug'))
+    }
+  }
+
+  if (existsSync(POSTS_DIR)) {
+    for (const file of readdirSync(POSTS_DIR).filter((f) => f.endsWith('.md'))) {
+      try {
+        const { data } = matter(readFileSync(join(POSTS_DIR, file), 'utf8'))
+        if (!data.rejection_reason) continue
+        const topicId = String(data.source_topic_id ?? '').trim()
+        if (topicId) topicIds.add(topicId)
+        blockSlug(file.replace(/\.md$/, ''))
+      } catch {}
+    }
+  }
+
+  return { topicIds, slugs }
+}
+
 // CSV から全行を読む（存在しない場合は空配列）
 function readCsvRows() {
   if (!existsSync(TOPICS_PATH)) return []
@@ -108,12 +173,14 @@ function readCsvRows() {
   }
 }
 
-function hasGeneratedPostForTopic(row) {
+function hasGeneratedPostForTopic(row, blocked = loadBlockedScheduledTopics()) {
   const id = (row.id ?? '').trim()
   const publishDate = (row.publish_date ?? '').trim()
   if (!id || !publishDate) return true
 
   const filename = `${publishDate}-${slugify(id)}.md`
+  const slug = filename.replace(/\.md$/, '')
+  if (blocked.topicIds.has(id) || blocked.slugs.has(slug)) return true
   if (existsSync(join(POSTS_DIR, filename))) return true
 
   if (!existsSync(POSTS_DIR)) return false
@@ -129,6 +196,7 @@ function hasGeneratedPostForTopic(row) {
 
 // status='approved' で、公開日到来済み、かつ対応する下書きファイルがまだ存在しない topic 行を探す
 function findMissingApprovedTopics(rows, { allowFuture = false, today = TODAY } = {}) {
+  const blocked = loadBlockedScheduledTopics()
   return rows
     .filter((r) => (r.status ?? '').trim() === 'approved')
     .filter((r) => {
@@ -136,7 +204,7 @@ function findMissingApprovedTopics(rows, { allowFuture = false, today = TODAY } 
       const publishDate = (r.publish_date ?? '').trim()
       if (!id || !publishDate) return false
       if (!allowFuture && publishDate > today) return false
-      return !hasGeneratedPostForTopic(r)
+      return !hasGeneratedPostForTopic(r, blocked)
     })
     .sort((a, b) => {
       const pa = PRIORITY_ORDER[a.priority] ?? 99
@@ -223,6 +291,7 @@ async function main() {
   const allowFuture = args.allow_future === true
   const fillFromResearch = args.fill_from_research === true
   const noNotify = args.no_notify === true
+  const selectOnly = args.select_only === true
   const resultPath = args.result_json ? String(args.result_json) : ''
   const result = {
     ok: false,
@@ -230,6 +299,7 @@ async function main() {
     published: false,
     autoPublish,
     allowFuture,
+    selectOnly,
     today: TODAY,
     topicId: '',
     slug: '',
@@ -326,9 +396,20 @@ async function main() {
   result.title = String(pickedTopic.title_candidate ?? '')
   result.publishAt = String(pickedTopic.publish_date ?? '').trim()
 
+  if (selectOnly) {
+    result.ok = true
+    result.reasons = ['--select-only 指定のため、選定確認のみ実行しました']
+    console.log()
+    console.log('  --select-only 指定のため、AI下書き生成・保存・Telegram通知は実行しません')
+    writeResult(resultPath, result)
+    process.exit(0)
+  }
+
   const generateStatus = runAllowFailure(join(__dirname, 'generate-draft.mjs'), [topicId])
   if (generateStatus !== 0) {
-    result.reasons = [`generate-draft.mjs が exit ${generateStatus} で停止しました`]
+    result.reasons = generateStatus === 2
+      ? ['品質NG: 生成本文に brief 等の生成崩れが検出されたため保存しませんでした']
+      : [`generate-draft.mjs が exit ${generateStatus} で停止しました`]
     writeResult(resultPath, result)
     process.exit(generateStatus)
   }

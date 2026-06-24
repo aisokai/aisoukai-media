@@ -70,6 +70,24 @@ function buildTags(row) {
   return tags.slice(0, 4).filter(Boolean)
 }
 
+function detectGeneratedDraftQualityIssues(body) {
+  const text = String(body ?? '')
+  const issues = []
+  const checks = [
+    { re: /\bbrief\b/i, reason: '本文にプロンプト断片 "brief" が混入しています' },
+    { re: /\b(undefined|null|NaN)\b/, reason: '本文に生成崩れを示す値が混入しています' },
+    { re: /\[[^\]]*(TODO|要確認|出典|引用|placeholder)[^\]]*\]/i, reason: '本文に未処理プレースホルダーが残っています' },
+    { re: /<\s*(title|body|article|section|placeholder)\s*>/i, reason: '本文に未処理タグ風プレースホルダーが残っています' },
+    { re: /[A-Za-z]{4,}(?:月|日|年|ヶ|か月|ヶ月)/, reason: '本文に英字断片と日付・期間表現が不自然に連結しています' },
+  ]
+
+  for (const check of checks) {
+    if (check.re.test(text) && !issues.includes(check.reason)) issues.push(check.reason)
+  }
+
+  return issues
+}
+
 function parseArgs(argv) {
   const args = { _: [] }
   for (let i = 0; i < argv.length; i++) {
@@ -205,6 +223,13 @@ async function main() {
   if (!body) {
     console.error('エラー: API からの応答が空でした')
     process.exit(1)
+  }
+
+  const qualityIssues = detectGeneratedDraftQualityIssues(body)
+  if (qualityIssues.length > 0) {
+    console.error('エラー: 生成本文の品質チェックに失敗しました。記事は保存しません。')
+    for (const issue of qualityIssues) console.error(`  - ${issue}`)
+    process.exit(2)
   }
 
   // frontmatter 組み立て

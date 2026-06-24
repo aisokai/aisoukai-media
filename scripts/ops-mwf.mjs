@@ -102,7 +102,8 @@ function buildOpsResultNotification({
     if (slug) lines.push(`slug: ${slug}`)
     if (scheduledResult.publishAt) lines.push(`publish_at: ${scheduledResult.publishAt}`)
   } else if (scheduledResult.generated) {
-    lines.push('⚠️ 記事は保存しましたが、公開扱いではありません')
+    lines.push('⚠️ 新規公開なし')
+    lines.push('状態: 記事は保存のみ。定期更新成功とは扱いません')
     if (scheduledResult.title) lines.push(`記事: ${scheduledResult.title}`)
     if (scheduledResult.slug) lines.push(`slug: ${scheduledResult.slug}`)
     for (const reason of (scheduledResult.reasons ?? []).slice(0, 5)) {
@@ -113,6 +114,7 @@ function buildOpsResultNotification({
     }
   } else {
     lines.push('⚠️ 新規公開なし')
+    lines.push('状態: 記事は保存していません')
     for (const reason of (scheduledResult.reasons ?? ['定期記事が作成されませんでした']).slice(0, 5)) {
       lines.push(`理由: ${reason}`)
     }

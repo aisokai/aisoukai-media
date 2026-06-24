@@ -13,7 +13,8 @@ test('ops:mwf connects the scheduled blog agent before Telegram review notificat
   assert.match(source, /--no-notify/)
   assert.match(source, /ANTHROPIC_API_KEY 未設定/)
   assert.match(source, /review待ちが \$\{reviewCount\}件あるため/)
-  assert.match(source, /記事は保存しましたが、公開扱いではありません/)
+  assert.match(source, /定期更新成功とは扱いません/)
+  assert.match(source, /状態: 記事は保存していません/)
   assert.match(source, /新規記事を1件公開扱いにしました/)
 
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")

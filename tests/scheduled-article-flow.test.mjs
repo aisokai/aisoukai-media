@@ -13,4 +13,40 @@ test('scheduled article flow only picks due approved topics unless allow-future 
   assert.match(source, /source_topic_id/)
   assert.match(source, /--no-notify/)
   assert.match(source, /result_json/)
+  assert.match(source, /loadBlockedScheduledTopics/)
+  assert.match(source, /review-history\.md/)
+  assert.match(source, /admin-post-history\.md/)
+  assert.match(source, /delete-rejected/)
+  assert.match(source, /archive_duplicate/)
+  assert.match(source, /topicIdFromSlug/)
+  assert.match(source, /blocked\.topicIds\.has/)
+  assert.match(source, /blocked\.slugs\.has/)
+  assert.match(source, /select_only/)
+  assert.match(source, /品質NG/)
+})
+
+test('draft generation has save-before quality gates for broken prompt fragments', () => {
+  const source = readFileSync('scripts/generate-draft.mjs', 'utf8')
+
+  assert.match(source, /detectGeneratedDraftQualityIssues/)
+  assert.match(source, /\\bbrief\\b/i)
+  assert.match(source, /記事は保存しません/)
+  assert.match(source, /process\.exit\(2\)/)
+  assert.match(source, /writeFileSync\(filePath, content/)
+})
+
+test('ops result notification does not treat draft-only generation as scheduled success', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /定期更新成功とは扱いません/)
+  assert.match(source, /状態: 記事は保存していません/)
+  assert.match(source, /理由: \$\{reason\}/)
+})
+
+test('post validation rejects generated body corruption markers', () => {
+  const source = readFileSync('scripts/validate-posts.mjs', 'utf8')
+
+  assert.match(source, /detectGeneratedDraftQualityIssues/)
+  assert.match(source, /\\bbrief\\b/i)
+  assert.match(source, /本文にプロンプト断片/)
 })
