@@ -119,7 +119,10 @@ export function DmpActionPanel() {
     }
   }, [])
 
-  useEffect(() => { fetchActions() }, [fetchActions])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fetchActions() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [fetchActions])
 
   const selected = selectedId ? actions.find((a) => a.id === selectedId) ?? null : null
 

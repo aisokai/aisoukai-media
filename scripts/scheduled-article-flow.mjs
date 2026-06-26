@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
 import { parseCsv } from './csv-parser.mjs'
 import { evaluatePostFile, getTodayJst } from './lib/post-publication-status.mjs'
+import { pickArticleImage } from './lib/auto-post-image.mjs'
 
 const __dirname  = dirname(fileURLToPath(import.meta.url))
 const ROOT        = join(__dirname, '..')
@@ -285,6 +286,55 @@ function importResearchCandidate(candidates, existingRows) {
   return topicId
 }
 
+function normalizeMatterDates(data) {
+  const out = { ...data }
+  for (const [key, value] of Object.entries(out)) {
+    if (value instanceof Date) out[key] = value.toISOString().slice(0, 10)
+  }
+  return out
+}
+
+function normalizeTags(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean)
+  return String(value ?? '')
+    .split(/[\s,、・]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function ensureGeneratedPostImage(filePath, topicId) {
+  const raw = readFileSync(filePath, 'utf8')
+  const parsed = matter(raw)
+  const data = normalizeMatterDates(parsed.data)
+  const image = String(data.image ?? '').trim()
+  const imageAlt = String(data.image_alt ?? '').trim()
+
+  if (image && imageAlt) {
+    return { ok: true, assigned: false, image, imageAlt, imageId: '' }
+  }
+
+  const picked = pickArticleImage({
+    title: String(data.title ?? ''),
+    category: String(data.category ?? ''),
+    excerpt: String(data.excerpt ?? data.description ?? ''),
+    tags: normalizeTags(data.tags),
+    sourceTopicId: String(data.source_topic_id ?? topicId),
+    bodyContent: parsed.content,
+  })
+
+  data.image = picked.image
+  data.image_alt = picked.image_alt
+  writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
+
+  return {
+    ok: true,
+    assigned: true,
+    image: picked.image,
+    imageAlt: picked.image_alt,
+    imageId: picked.image_id,
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const autoPublish = args.auto_publish === true
@@ -306,6 +356,7 @@ async function main() {
     path: '',
     title: '',
     publishAt: '',
+    image: { ok: false, assigned: false, image: '', imageAlt: '', imageId: '' },
     reasons: [],
   }
 
@@ -421,6 +472,16 @@ async function main() {
   }
 
   result.generated = true
+
+  try {
+    result.image = ensureGeneratedPostImage(generatedFilePath, topicId)
+    console.log()
+    console.log(`  image: ok${result.image.assigned ? ` (${result.image.imageId} を補完)` : ''}`)
+  } catch (error) {
+    result.reasons = [`画像を設定できませんでした: ${error.message}`]
+    writeResult(resultPath, result)
+    process.exit(1)
+  }
 
   // ── STEP 3: Auto Publish Policy review（任意） ──
   if (autoPublish) {

@@ -191,10 +191,10 @@ tags:
 | `npm run request:archive -- <update_id>` | リクエストを archived にする（最終状態。一覧から省略表示） |
 | `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
-| `npm run ops:mwf` | 月水金 定期運用を一括実行（status→fetch→list→定期記事生成→通知×3）。月水金以外は警告。`--force` で強制実行 |
+| `npm run ops:mwf` | 月水金 定期運用を実行（selected ネタ同期→承認済み topic から1記事生成→画像確認→Telegram レビュー依頼）。月水金以外は警告。`--force` で強制実行 |
 | `npm run image:import-inbox` | `public/images/library/inbox/` を再帰走査して画像を自動分類・コピー・JSON 登録する（デフォルト dry-run / `--apply` で実行 / `--apply --move` で移動） |
 | `npm run image:list` | 画像ライブラリのサマリーを表示する（カテゴリ別件数 / alt未カスタマイズ / license未更新 / 未使用画像。`--all` で全件表示） |
-| `npm run image:check` | `data/image-library.json` の整合性を検証する（path実在 / id重複 / category妥当性 / alt・license確認 / 記事参照整合） |
+| `npm run image:check` | `data/image-library.json` と記事画像の整合性を検証する（path実在 / id重複 / category妥当性 / alt・license確認 / 記事の image・image_alt 必須） |
 | `npm run image:reclassify -- <image-id> --category <category>` | 画像のカテゴリを変更してファイルを移動し、JSON と記事 frontmatter を更新する（デフォルト dry-run / `--apply` で実行 / `--alt "..."` で alt を上書き） |
 | `npm run image:suggest -- <slug>` | 記事に合う画像を `data/image-library.json` から候補提示する（読み取り専用） |
 | `npm run image:assign -- <slug> --image <image-id>` | 画像 ID を記事 frontmatter に割り当てる（`image` / `image_alt` を更新。`reviewed` は変更しない） |
@@ -205,7 +205,7 @@ tags:
 | `npm run image:usage` | 記事 ↔ 画像の対応一覧を表示する（未割当記事・共用画像も表示。読み取り専用） |
 | `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
-| `npm run article:scheduled` | 定期提案フロー: 未処理の承認済み topic を 1 件選択（なければ research 補充）→ AI 下書き生成 → Telegram 通知 |
+| `npm run article:scheduled` | 定期提案フロー: 公開日到来済み・未生成の承認済み topic を 1 件選択 → AI 下書き生成 → 画像確認 → Telegram 通知 |
 | `npm run article:scheduled -- --auto-publish` | 定期提案フロー後に Auto Publish Policy を実行し、low risk 記事だけ自動承認する |
 | `npm run article:auto-scheduled` | 定期自動運用向けの短縮コマンド。`article:scheduled -- --auto-publish` と同じ |
 | `npm run article:batch-scheduled -- --month YYYY-MM --limit N` | 指定月の approved かつ未生成 topic をまとめて下書き生成する（Human が明示実行 / approve・publish はしない） |
@@ -284,55 +284,45 @@ Telegram から直接承認しない。publish API は作らない。
 
 ### 月水金 定期運用（`ops:mwf`）
 
-**月・水・金に1コマンドで全チェックを実行する:**
+**月・水・金に、承認済みネタから1記事を生成してレビュー依頼を送る:**
 
 ```bash
 npm run ops:mwf               # 月・水・金のみ実行
 npm run ops:mwf -- --force    # 曜日に関わらず実行
 ```
 
-`ops:mwf` が順に実行すること（approve / publish / request:draft 自動実行なし）:
-1. `status:content` — 公開中/予定/review待ちの件数確認
-2. `telegram:requests --apply` — 新着リクエストを取得・保存
-3. `request:list` — リクエスト一覧とトリアージコマンドを表示
-4. `article:scheduled` — review待ちがなく、APIキーがある場合に定期記事下書きを1件生成
-5. `notify:posting-reminder` — 投稿確認リマインドを Telegram に送信
-6. `notify:requests` — リクエスト状態サマリーを Telegram に送信
-7. `notify:pending-review` — review待ち記事一覧を Telegram に送信
+`ops:mwf` が順に実行すること（approve / publish / push / request:draft 自動実行なし）:
+1. `topic-candidates:convert` 相当 — 当月・翌月の selected ネタを approved topic として CSV に同期
+2. `article:scheduled` — 公開日到来済み・未生成の approved topic を1件選び、AI下書きを生成
+3. 生成記事の `image` / `image_alt` を検査し、空なら画像ライブラリから補完
+4. Telegram に `/admin/pending-review` のレビュー・承認依頼を送信
 
 記事生成ステップの制御:
 
 ```bash
-npm run ops:mwf -- --no-generate    # 従来どおり状態確認・通知のみ
-npm run ops:mwf -- --auto-publish   # article:scheduled -- --auto-publish を使用
+npm run ops:mwf -- --no-generate    # selected ネタ同期と Telegram 通知のみ。記事は生成しない
 ```
 
 記事生成は次の場合にスキップされる:
 
 - `--no-generate` 指定
 - `ANTHROPIC_API_KEY` 未設定
-- 既に review 待ち記事がある
-- `article:scheduled` 側で生成可能な topic がない、または生成に失敗した
+- 公開日到来済み・未生成の approved topic がない
+- 記事生成または画像設定に失敗した
 
 **ops:mwf 後に Human が実行するアクション:**
 
 ```bash
-# ① 未処理リクエストを下書きへ変換（request:list に表示されるコマンド例をコピペ）
-npm run request:draft -- <update_id> --category "虫歯治療" --date 2026-06-01 --yes
-
-# ② review待ちを承認
+# review待ちを承認
 # スマホなら /admin/pending-review、CLIなら以下
 npm run approve:post -- <slug> --reviewed-by "三谷"
 
-# ③ 承認後にデプロイ（Human の明示判断で実行）
+# 承認後にデプロイ（Human の明示判断で実行）
 npm run build
 git push origin main
-
-# ④ 下書き完了 / 見送り後のクリーンアップ
-npm run request:archive -- --all-done
 ```
 
-> `approve / publish / request:draft` は `ops:mwf` が自動実行しない。Human 判断が必要。
+> `approve / publish / push / request:draft` は `ops:mwf` が自動実行しない。Human 判断が必要。
 > 定期記事生成は下書き作成までで、標準では Human review 待ちに残る。
 
 #### launchd による自動実行（macOS）

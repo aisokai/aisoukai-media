@@ -38,8 +38,24 @@ function parseArgs(argv) {
   return args
 }
 
-function nextMonth(today = new Date()) {
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)).toISOString().slice(0, 7)
+function currentMonthJst() {
+  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7)
+}
+
+function addMonths(month, amount) {
+  const [year, monthIndex] = month.split('-').map(Number)
+  return new Date(Date.UTC(year, monthIndex - 1 + amount, 1)).toISOString().slice(0, 7)
+}
+
+function nextMonth() {
+  return addMonths(currentMonthJst(), 1)
+}
+
+function resolveMonth(value) {
+  const raw = String(value ?? nextMonth()).trim()
+  if (raw === 'current' || raw === 'this') return currentMonthJst()
+  if (raw === 'next') return nextMonth()
+  return raw
 }
 
 function csvEscape(value) {
@@ -53,11 +69,17 @@ function todayJst() {
 
 function main() {
   const args = parseArgs(process.argv.slice(2))
-  const month = String(args.month ?? nextMonth()).trim()
+  const month = resolveMonth(args.month)
   const yes = args.yes === true
+  const ifExists = args.if_exists === true
+  const allowEmpty = args.allow_empty === true
   const candidatePath = join(CANDIDATE_DIR, `${month}.json`)
 
   if (!existsSync(candidatePath)) {
+    if (ifExists) {
+      console.log(`月次ネタ候補 ${month}: ファイルなしのためスキップ`)
+      return
+    }
     console.error(`エラー: data/monthly-topic-candidates/${month}.json が見つかりません`)
     process.exit(1)
   }
@@ -65,6 +87,10 @@ function main() {
   const file = JSON.parse(readFileSync(candidatePath, 'utf8'))
   const selected = file.topics.filter((topic) => topic.status === 'selected')
   if (selected.length === 0) {
+    if (allowEmpty) {
+      console.log(`月次ネタ候補 ${month}: selected なしのためスキップ`)
+      return
+    }
     console.error('エラー: 今月採用のネタ候補がありません')
     process.exit(1)
   }
@@ -85,7 +111,7 @@ function main() {
       id,
       discovered_at: discoveredAt,
       source_type: topic.sourceType,
-      source_url: '',
+      source_url: topic.sourceUrl ?? '',
       topic: topic.title,
       title_candidate: topic.title,
       category: topic.category,

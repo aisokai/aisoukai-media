@@ -164,9 +164,15 @@ function main() {
     try {
       const { data } = matter(readFileSync(join(POSTS_DIR, f), 'utf8'))
       const imgPath = typeof data.image === 'string' ? data.image.trim() : ''
-      if (imgPath && !libraryPaths.has(imgPath)) {
+      const imgAlt = typeof data.image_alt === 'string' ? data.image_alt.trim() : ''
+      if (!imgPath) {
+        errors.push(`content/posts/${f}: image が空です`)
+      } else if (!libraryPaths.has(imgPath)) {
         articleIssues.push({ file: f, path: imgPath })
         warnings.push(`content/posts/${f}: image "${imgPath}" が image-library.json に存在しません`)
+      }
+      if (!imgAlt) {
+        errors.push(`content/posts/${f}: image_alt が空です`)
       }
     } catch (e) {
       warnings.push(`content/posts/${f}: 読み取り失敗: ${e.message}`)
