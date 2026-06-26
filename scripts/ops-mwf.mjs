@@ -27,6 +27,7 @@ const noGenerate = cliArgs.includes('--no-generate')
 const autoPublish = cliArgs.includes('--auto-publish')
 
 const nowJst    = new Date(Date.now() + 9 * 3600 * 1000)
+const TODAY     = nowJst.toISOString().slice(0, 10)
 const dayOfWeek = nowJst.getUTCDay()
 const dayName   = DAY_NAMES_JA[dayOfWeek]
 const isSendDay = SEND_DAYS.has(dayOfWeek)
@@ -83,24 +84,47 @@ function buildOpsResultNotification({
   autoPublish,
   liveBeforeSlugs,
   liveAfterSlugs,
+  todayLiveItems = [],
   reviewCount,
   requestedCount,
 }) {
   const lines = ['📣 定期更新結果']
 
-  if (!generateDecision.ok) {
-    lines.push('⚠️ 新規公開なし')
-    lines.push(`理由: ${generateDecision.reason}`)
-  } else if (!scheduledResult) {
-    lines.push('⚠️ 新規公開なし')
-    lines.push('理由: 定期記事生成の結果を確認できませんでした')
-  } else if (scheduledResult.generated && scheduledResult.published) {
+  if (scheduledResult?.generated && scheduledResult.published) {
     const slug = scheduledResult.slug ?? ''
     const newLive = slug && liveAfterSlugs.has(slug) && !liveBeforeSlugs.has(slug)
     lines.push(newLive ? '✅ 新規記事を1件公開扱いにしました' : '✅ 記事は公開扱いです')
     if (scheduledResult.title) lines.push(`記事: ${scheduledResult.title}`)
     if (slug) lines.push(`slug: ${slug}`)
     if (scheduledResult.publishAt) lines.push(`publish_at: ${scheduledResult.publishAt}`)
+  } else if (todayLiveItems.length > 0) {
+    lines.push('✅ 本日公開対象は既に公開中')
+    const shownItems = todayLiveItems.slice(0, 3)
+    for (const item of shownItems) {
+      lines.push(`記事: ${item.title}`)
+      lines.push(`slug: ${item.slug}`)
+      if (item.publishAt) lines.push(`publish_at: ${item.publishAt}`)
+    }
+    if (todayLiveItems.length > shownItems.length) {
+      lines.push(`ほか ${todayLiveItems.length - shownItems.length}件`)
+    }
+    if (scheduledResult?.generated) {
+      lines.push('補足: 追加生成した記事は保存のみ。定期更新成功とは扱いません')
+      if (scheduledResult.title) lines.push(`追加記事: ${scheduledResult.title}`)
+      if (scheduledResult.slug) lines.push(`追加slug: ${scheduledResult.slug}`)
+      for (const reason of (scheduledResult.reasons ?? []).slice(0, 5)) {
+        lines.push(`追加記事の理由: ${reason}`)
+      }
+      if (!autoPublish) {
+        lines.push('補足: --auto-publish なしのため、Human review または Auto Publish Policy 通過までは公開されません')
+      }
+    }
+  } else if (!generateDecision.ok) {
+    lines.push('⚠️ 新規公開なし')
+    lines.push(`理由: ${generateDecision.reason}`)
+  } else if (!scheduledResult) {
+    lines.push('⚠️ 新規公開なし')
+    lines.push('理由: 定期記事生成の結果を確認できませんでした')
   } else if (scheduledResult.generated) {
     lines.push('⚠️ 新規公開なし')
     lines.push('状態: 記事は保存のみ。定期更新成功とは扱いません')
@@ -243,6 +267,13 @@ const requestStore = loadRequestStore(REQUESTS_PATH)
 const requestedCount = (requestStore.requests ?? []).filter((r) => r.status === 'requested').length
 const reviewCount = contentStatus.pending.length + contentStatus.pendingFuture.length
 const liveAfterSlugs = new Set(contentStatus.live.map((item) => item.slug))
+const todayLiveItems = contentStatus.live.filter(
+  (item) =>
+    item.reviewed === true &&
+    item.draft === false &&
+    item.publishAtSource === 'publish_at' &&
+    item.publishAt === TODAY
+)
 
 console.log()
 console.log(WIDE)
@@ -288,6 +319,7 @@ const opsResultText = buildOpsResultNotification({
   autoPublish,
   liveBeforeSlugs,
   liveAfterSlugs,
+  todayLiveItems,
   reviewCount,
   requestedCount,
 })

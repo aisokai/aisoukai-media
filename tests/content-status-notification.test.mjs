@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import {
   buildNotificationReviewContext,
   buildReviewSummary,
+  loadContentStatus,
 } from '../scripts/lib/content-status.mjs'
 
 function git(root, args) {
@@ -60,4 +61,29 @@ test('production notification counts origin/main pending posts and separates loc
   assert.match(summary, /review待ち 1件/)
   assert.match(summary, /ローカルのみ \/ needs-push 1件/)
   assert.match(summary, /本番レビュー画面には未反映。push後に表示されます。/)
+})
+
+test('content status exposes publish_at-backed human-reviewed live posts for ops result notification', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aisoukai-content-status-live-'))
+  const postsDir = join(root, 'content', 'posts')
+  mkdirSync(postsDir, { recursive: true })
+  writeFileSync(join(postsDir, '2020-01-01-live.md'), `---
+title: live today candidate
+date: 2020-01-01
+publish_at: 2020-01-01
+category: テスト
+reviewed: true
+draft: false
+---
+
+本文
+`)
+
+  const status = loadContentStatus(postsDir)
+  assert.equal(status.live.length, 1)
+  assert.equal(status.live[0].slug, '2020-01-01-live')
+  assert.equal(status.live[0].publishAt, '2020-01-01')
+  assert.equal(status.live[0].publishAtSource, 'publish_at')
+  assert.equal(status.live[0].reviewed, true)
+  assert.equal(status.live[0].draft, false)
 })
