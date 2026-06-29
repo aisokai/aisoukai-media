@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
+import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -76,7 +77,7 @@ async function sendTelegram(botToken, chatId, text) {
   return json
 }
 
-async function sendOpsTelegram(text) {
+async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-review-request' } = {}) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
 
@@ -85,9 +86,21 @@ async function sendOpsTelegram(text) {
     return false
   }
 
-  await sendTelegram(botToken, chatId, text)
-  console.log('  ✅ Telegram 通知を送信しました')
-  return true
+  const reservation = reserveNotificationSend({ root: ROOT, date, job, text })
+  if (!reservation.shouldSend) {
+    console.log(`  ⏭ Telegram 通知をスキップしました（同一日・同一job・同一本文の重複: ${reservation.key}）`)
+    return false
+  }
+
+  try {
+    await sendTelegram(botToken, chatId, text)
+    reservation.commit()
+    console.log('  ✅ Telegram 通知を送信しました')
+    return true
+  } catch (error) {
+    reservation.release()
+    throw error
+  }
 }
 
 function loadEnv() {

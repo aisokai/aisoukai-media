@@ -35,12 +35,12 @@ test('draft generation has save-before quality gates for broken prompt fragments
   assert.match(source, /writeFileSync\(filePath, content/)
 })
 
-test('ops result notification does not treat draft-only generation as scheduled success', () => {
+test('ops review notification reports no due approved topic as no generated article', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
-  assert.match(source, /定期更新成功とは扱いません/)
-  assert.match(source, /状態: 記事は保存していません/)
-  assert.match(source, /理由: \$\{reason\}/)
+  assert.match(source, /今日は生成対象の承認済みネタがありません/)
+  assert.match(source, /生成記事: なし/)
+  assert.match(source, /scheduledResult\?\.generated/)
 })
 
 test('post validation rejects generated body corruption markers', () => {
