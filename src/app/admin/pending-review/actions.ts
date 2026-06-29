@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/adminAuth'
 import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
 import { approvePostMarkdown, rejectPostMarkdown } from '@/lib/reviewActions'
+import { notifyPostApprovedTelegram } from '@/lib/reviewApprovalNotification.mjs'
 
 export type ReviewActionResult = {
   ok: boolean
@@ -28,6 +29,15 @@ function validateSlug(slug: string) {
   if (!/^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/.test(slug)) {
     throw new Error('slug の形式が不正です')
   }
+}
+
+function extractFrontmatterValue(raw: string, key: string) {
+  const match = raw.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'))
+  return match?.[1]?.trim().replace(/^["']|["']$/g, '')
+}
+
+function getTodayJst() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
 async function loadReviewLog() {
@@ -67,9 +77,23 @@ export async function approvePostAction({
     revalidatePath('/blog')
     revalidatePath(`/blog/${slug}`)
 
+    const notificationSent = await notifyPostApprovedTelegram({
+      title: extractFrontmatterValue(postFile.content, 'title') ?? '（タイトル未設定）',
+      slug,
+      reviewedBy: by,
+      commitSha: commit.sha,
+      publishDate:
+        extractFrontmatterValue(postFile.content, 'publish_at') ??
+        extractFrontmatterValue(postFile.content, 'date'),
+      date: extractFrontmatterValue(postFile.content, 'date'),
+      today: getTodayJst(),
+    })
+
+    const notificationNote = notificationSent ? 'Telegram通知済み。' : 'Telegram通知は未送信です。'
+
     return {
       ok: true,
-      message: `承認しました。GitHub commit: ${commit.sha.slice(0, 7)}`,
+      message: `承認しました。GitHub commit: ${commit.sha.slice(0, 7)}。${notificationNote}`,
     }
   } catch (error) {
     return { ok: false, message: sanitizeError(error) }
