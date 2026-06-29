@@ -284,7 +284,6 @@ export function formatContentStatusLines(status, {
   dashboardKind = 'production',
   originRef = 'origin/main',
   originAvailable = true,
-  localReviewUrl = 'http://localhost:3000/admin/pending-review',
 } = {}) {
   const reviewQueue = [...status.pending, ...status.pendingFuture]
   const reviewCount = reviewQueue.length
@@ -305,7 +304,7 @@ export function formatContentStatusLines(status, {
       if (hiddenLocalItems.length > 3) {
         lines.push(`- 他 ${hiddenLocalItems.length - 3}件`)
       }
-      lines.push(`ローカル確認: ${localReviewUrl}`)
+      lines.push(`push後確認: ${dashboardUrl}`)
     }
     return lines
   }
@@ -380,7 +379,7 @@ export function formatContentStatusLines(status, {
     if (hiddenLocalItems.length > 3) {
       lines.push(`- 他 ${hiddenLocalItems.length - 3}件`)
     }
-    lines.push(`ローカル確認: ${localReviewUrl}`)
+    lines.push(`push後確認: ${dashboardUrl}`)
   }
 
   lines.push('')

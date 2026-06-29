@@ -61,6 +61,8 @@ test('production notification counts origin/main pending posts and separates loc
   assert.match(summary, /review待ち 1件/)
   assert.match(summary, /ローカルのみ \/ needs-push 1件/)
   assert.match(summary, /本番レビュー画面には未反映。push後に表示されます。/)
+  assert.match(summary, /push後確認: https:\/\/aisoukai-media\.vercel\.app\/admin\/pending-review/)
+  assert.doesNotMatch(summary, /localhost/)
 })
 
 test('content status exposes publish_at-backed human-reviewed live posts for ops result notification', () => {
