@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // approve-post.mjs
-// Human が実行する承認 CLI。AIが自動実行してはならない。
+// Human が本文確認後に実行する承認 CLI。AIが自動実行してはならない。
 // 対象記事の reviewed:true / draft:false / reviewed_at を設定する。
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -90,14 +90,21 @@ function main() {
   const by    = String(args.reviewed_by ?? args.by ?? '').trim()
 
   if (!input) {
-    console.error('使い方: npm run approve:post -- <slug または ファイル名> --reviewed-by "氏名"')
-    console.error('   例:  npm run approve:post -- 2026-05-22-topic-20260511-007 --reviewed-by "山田太郎"')
+    console.error('使い方: npm run approve:post -- <slug または ファイル名> --reviewed-by "氏名" --confirm-body-reviewed')
+    console.error('   例:  npm run approve:post -- 2026-05-22-topic-20260511-007 --reviewed-by "山田太郎" --confirm-body-reviewed')
     process.exit(1)
   }
 
   if (!by) {
     console.error('エラー: --reviewed-by オプションは必須です')
-    console.error('   例:  npm run approve:post -- <slug> --reviewed-by "承認者名"')
+    console.error('   例:  npm run approve:post -- <slug> --reviewed-by "承認者名" --confirm-body-reviewed')
+    process.exit(1)
+  }
+
+  if (args.confirm_body_reviewed !== true) {
+    console.error('エラー: 本文確認後の承認であることを明示してください')
+    console.error('   例:  npm run approve:post -- <slug> --reviewed-by "承認者名" --confirm-body-reviewed')
+    console.error('   掲載ネタの承認だけでは本文承認にできません。')
     process.exit(1)
   }
 

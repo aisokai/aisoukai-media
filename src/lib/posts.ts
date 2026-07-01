@@ -11,23 +11,19 @@ function getTodayJst(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
-// Human reviewed または Auto Publish Policy 通過済み、かつ draft でない記事のみ公開対象とする。
+// Human が本文確認済み、かつ draft でない記事のみ公開対象とする。
 // publish_at または date が今日より未来の場合は公開しない（スケジュール公開）。
 // AI生成記事は生成時 reviewed/auto_approved とも false で作られ、
-// Human approval 後に reviewed: true、Auto Publish Policy 通過後に auto_approved: true へ変更する。
+// Human approval 後に reviewed: true / reviewed_at / reviewed_by へ変更する。
 function isPublishReady(data: Record<string, unknown>): boolean {
   if (data['draft'] === true) return false
   if (data['archived'] === true) return false
 
-  const humanApproved = data['reviewed'] === true
-  const autoApproved =
-    data['auto_approved'] === true &&
-    data['publication_status'] === 'auto_approved' &&
-    data['legal_check_status'] === 'passed' &&
-    data['image_check_status'] === 'passed' &&
-    data['medical_risk'] === 'low'
+  const hasReviewedAt = String(data['reviewed_at'] ?? '').trim().length > 0
+  const hasReviewedBy = String(data['reviewed_by'] ?? '').trim().length > 0
+  const humanApproved = data['reviewed'] === true && hasReviewedAt && hasReviewedBy
 
-  if (!humanApproved && !autoApproved) return false
+  if (!humanApproved) return false
 
   const today = getTodayJst()
 

@@ -25,6 +25,20 @@ test('scheduled article flow only picks due approved topics unless allow-future 
   assert.match(source, /品質NG/)
 })
 
+test('scheduled article flow can prepare the next approved topic for today without auto publishing', () => {
+  const source = readFileSync('scripts/scheduled-article-flow.mjs', 'utf8')
+  const generateSource = readFileSync('scripts/generate-draft.mjs', 'utf8')
+
+  assert.match(source, /publish_today/)
+  assert.match(source, /allowFuture = args\.allow_future === true \|\| publishToday/)
+  assert.match(source, /--publish-date/)
+  assert.match(source, /TODAY/)
+  assert.doesNotMatch(source, /auto-review-post\.mjs/)
+
+  assert.match(generateSource, /publish_date_override/)
+  assert.match(generateSource, /--publish-date/)
+})
+
 test('draft generation has save-before quality gates for broken prompt fragments', () => {
   const source = readFileSync('scripts/generate-draft.mjs', 'utf8')
 
@@ -38,7 +52,7 @@ test('draft generation has save-before quality gates for broken prompt fragments
 test('ops review notification reports no due approved topic as no generated article', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
-  assert.match(source, /今日は生成対象の承認済みネタがありません/)
+  assert.match(source, /本日配信予定の未承認記事はありません/)
   assert.match(source, /生成記事: なし/)
   assert.match(source, /scheduledResult\?\.generated/)
 })

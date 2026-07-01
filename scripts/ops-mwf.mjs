@@ -11,6 +11,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
+import { loadContentStatus } from './lib/content-status.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -21,6 +22,11 @@ const cliArgs = process.argv.slice(2)
 const force = cliArgs.includes('--force')
 const noGenerate = cliArgs.includes('--no-generate')
 const ignoredAutoPublish = cliArgs.includes('--auto-publish')
+
+if (ignoredAutoPublish) {
+  console.error('  ❌ ops:mwf では --auto-publish を受け付けません。本文確認後に承認してください。')
+  process.exit(1)
+}
 
 const nowJst = new Date(Date.now() + 9 * 3600 * 1000)
 const TODAY = nowJst.toISOString().slice(0, 10)
@@ -138,7 +144,15 @@ function shouldGenerateScheduledArticle() {
   return { ok: true }
 }
 
-function buildReviewRequestNotification({ generateDecision, scheduledResult }) {
+function findTodayLivePosts(contentStatus, today = TODAY) {
+  return (contentStatus?.live ?? []).filter((post) => post.publishAt === today)
+}
+
+function alreadyLiveTodayNoop({ scheduledResult, contentStatus }) {
+  return scheduledResult?.generated === false && findTodayLivePosts(contentStatus).length > 0
+}
+
+function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus }) {
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
   const lines = ['📝 月水金の記事生成']
 
@@ -157,7 +171,7 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult }) {
   if (scheduledResult.generated) {
     const imageOk = scheduledResult.image?.ok === true
     lines.push(imageOk
-      ? '記事を生成し、画像を設定しました。レビューと承認をお願いします。'
+      ? '本日配信予定の記事を生成しました。本文確認・承認をお願いします。'
       : '記事は生成しましたが、画像設定の確認が必要です。')
     if (scheduledResult.title) lines.push(`記事: ${scheduledResult.title}`)
     if (scheduledResult.publishAt) lines.push(`公開予定日: ${scheduledResult.publishAt}`)
@@ -165,7 +179,7 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult }) {
     if (scheduledResult.slug) lines.push(`slug: ${scheduledResult.slug}`)
     lines.push(`画像: ${imageOk ? '設定済み' : '未設定または要確認'}`)
     lines.push('')
-    lines.push('承認画面:')
+    lines.push('本文確認・承認:')
     lines.push(dashboardUrl)
 
     const reasons = scheduledResult.reasons ?? []
@@ -177,7 +191,24 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult }) {
     return lines.join('\n')
   }
 
-  lines.push('今日は生成対象の承認済みネタがありません。')
+  const todayLivePosts = findTodayLivePosts(contentStatus)
+  if (todayLivePosts.length > 0) {
+    lines.push('本日公開対象の記事は既に公開中です。')
+    for (const post of todayLivePosts.slice(0, 3)) {
+      lines.push(`記事: ${post.title}`)
+      lines.push(`公開日: ${post.publishAt}`)
+    }
+    if (todayLivePosts.length > 3) {
+      lines.push(`他 ${todayLivePosts.length - 3}件`)
+    }
+    lines.push('新規下書き生成: なし')
+    for (const reason of (scheduledResult.reasons ?? []).slice(0, 3)) {
+      lines.push(`補足: ${reason}`)
+    }
+    return lines.join('\n')
+  }
+
+  lines.push('本日配信予定の未承認記事はありません。')
   for (const reason of (scheduledResult.reasons ?? ['公開日到来済み・未生成の approved topic がありません']).slice(0, 5)) {
     lines.push(`理由: ${reason}`)
   }
@@ -192,11 +223,6 @@ console.log('  ops:mwf — 月水金 記事生成・レビュー依頼')
 console.log(`  ${jstStr} JST  (${dayName}曜日)`)
 console.log(`  記事生成: ${noGenerate ? '無効' : '有効（draft / Human review）'}`)
 console.log(WIDE)
-
-if (ignoredAutoPublish) {
-  console.log()
-  console.log('  ⚠️  ops:mwf では --auto-publish を使いません。Human review 待ちの下書きとして作成します。')
-}
 
 if (!isSendDay && !force) {
   console.log()
@@ -231,7 +257,7 @@ if (!generateDecision.ok) {
   console.log(`  ⏭ ${generateDecision.reason}`)
 } else {
   const resultPath = join(tmpdir(), `aisoukai-scheduled-result-${process.pid}.json`)
-  const status = run('scheduled-article-flow.mjs', ['--no-notify', '--result-json', resultPath])
+  const status = run('scheduled-article-flow.mjs', ['--publish-today', '--no-notify', '--result-json', resultPath])
   scheduledResult = readJsonIfExists(resultPath)
   if (status !== 0) {
     const reason = scheduledResult?.reasons?.[0] ?? `scheduled-article-flow.mjs が exit ${status} で停止`
@@ -241,7 +267,11 @@ if (!generateDecision.ok) {
 }
 
 header('3/3  Telegram レビュー依頼')
-const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult })
+const contentStatus = loadContentStatus(join(ROOT, 'content', 'posts'))
+const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus })
+if (alreadyLiveTodayNoop({ scheduledResult, contentStatus })) {
+  process.exitCode = 0
+}
 console.log(notificationText.split('\n').map((line) => `  ${line}`).join('\n'))
 try {
   await sendOpsTelegram(notificationText)

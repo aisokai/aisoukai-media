@@ -2,7 +2,6 @@
 // scheduled-article-flow.mjs
 // 定期提案フロー: 公開日到来済みの承認済み topic を 1 件選択
 // → AI 下書き生成 → Telegram 通知。
-// --auto-publish 指定時は Auto Publish Policy に基づく自動レビューまで実行する。
 // Human approval の reviewed:true / publish / push は実行しない。
 // 未来日の一括下書き準備は generate-scheduled-drafts.mjs を使う。
 import { execFileSync } from 'node:child_process'
@@ -338,7 +337,8 @@ function ensureGeneratedPostImage(filePath, topicId) {
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   const autoPublish = args.auto_publish === true
-  const allowFuture = args.allow_future === true
+  const publishToday = args.publish_today === true
+  const allowFuture = args.allow_future === true || publishToday
   const fillFromResearch = args.fill_from_research === true
   const noNotify = args.no_notify === true
   const selectOnly = args.select_only === true
@@ -349,6 +349,7 @@ async function main() {
     published: false,
     autoPublish,
     allowFuture,
+    publishToday,
     selectOnly,
     today: TODAY,
     topicId: '',
@@ -361,6 +362,13 @@ async function main() {
   }
 
   loadEnv()
+
+  if (autoPublish) {
+    console.error('エラー: scheduled-article-flow では --auto-publish を受け付けません。本文確認後に管理画面で承認してください。')
+    result.reasons = ['--auto-publish は無効です。本文確認後に管理画面で承認してください。']
+    writeResult(resultPath, result)
+    process.exit(1)
+  }
 
   console.log('━'.repeat(56))
   console.log('定期提案フロー開始')
@@ -439,13 +447,14 @@ async function main() {
   console.log(`[ STEP 2/3 ]  AI 下書き生成 (${topicId}) ...`)
   console.log()
 
-  const generatedFilename = `${String(pickedTopic.publish_date ?? '').trim()}-${slugify(topicId)}.md`
+  const effectivePublishDate = publishToday ? TODAY : String(pickedTopic.publish_date ?? '').trim()
+  const generatedFilename = `${effectivePublishDate}-${slugify(topicId)}.md`
   const generatedFilePath = join(POSTS_DIR, generatedFilename)
   result.topicId = topicId
   result.slug = generatedFilename.replace(/\.md$/, '')
   result.path = `content/posts/${generatedFilename}`
   result.title = String(pickedTopic.title_candidate ?? '')
-  result.publishAt = String(pickedTopic.publish_date ?? '').trim()
+  result.publishAt = effectivePublishDate
 
   if (selectOnly) {
     result.ok = true
@@ -456,7 +465,10 @@ async function main() {
     process.exit(0)
   }
 
-  const generateStatus = runAllowFailure(join(__dirname, 'generate-draft.mjs'), [topicId])
+  const generateArgs = publishToday
+    ? [topicId, '--publish-date', TODAY]
+    : [topicId]
+  const generateStatus = runAllowFailure(join(__dirname, 'generate-draft.mjs'), generateArgs)
   if (generateStatus !== 0) {
     result.reasons = generateStatus === 2
       ? ['品質NG: 生成本文に brief 等の生成崩れが検出されたため保存しませんでした']
@@ -483,19 +495,6 @@ async function main() {
     process.exit(1)
   }
 
-  // ── STEP 3: Auto Publish Policy review（任意） ──
-  if (autoPublish) {
-    console.log()
-    console.log(`[ STEP 3/4 ]  Auto Publish Policy review (${topicId}) ...`)
-    console.log()
-
-    const status = runAllowFailure(join(__dirname, 'auto-review-post.mjs'), [slugify(topicId)])
-    if (status !== 0) {
-      console.warn()
-      console.warn('Auto Publish Policy を通過しませんでした。記事は pending review に残します。')
-    }
-  }
-
   const publication = evaluatePostFile(generatedFilePath)
   result.ok = true
   result.published = publication.publishable
@@ -506,7 +505,7 @@ async function main() {
 
   // ── STEP 4: pending-review 通知 ──
   console.log()
-  console.log(`[ STEP ${autoPublish ? '4/4' : '3/3'} ]  pending-review Telegram 通知 ...`)
+  console.log('[ STEP 3/3 ]  pending-review Telegram 通知 ...')
   console.log()
 
   if (noNotify) {
@@ -520,24 +519,10 @@ async function main() {
   console.log('✅ 定期提案フロー完了')
   console.log('━'.repeat(56))
   console.log()
-  if (autoPublish) {
-    if (result.published) {
-      console.log('  0. 新規記事は公開扱いになっています')
-    } else {
-      console.log('  0. 新規記事は保存済みですが、公開扱いではありません')
-      for (const reason of result.reasons) console.log(`     - ${reason}`)
-    }
-    console.log('次のステップ:')
-    console.log('  1. npm run validate:publish-ready')
-    console.log('  2. npm run build')
-    console.log('  3. blocked 記事があれば /admin/pending-review で Human review')
-  } else {
-    console.log('次のステップ（Human が実行）:')
-    console.log('  1. content/posts/ の下書きを目視確認')
-    console.log('  2. npm run dev → http://localhost:3000/admin/pending-review で確認')
-    console.log(`  3. npm run approve:post -- <slug> --reviewed-by "氏名"`)
-    console.log('  4. npm run build → git push → deploy')
-  }
+  console.log('次のステップ（Human が実行）:')
+  console.log('  1. 管理画面で本文確認')
+  console.log('  2. 問題なければ本文承認')
+  console.log('  3. 承認後に公開対象になります')
 }
 
 main().catch((e) => {

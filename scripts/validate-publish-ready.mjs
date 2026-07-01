@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // validate-publish-ready.mjs
 // publish-ready 判定チェッカー。記事ごとに承認状態・必須項目を検査し、
-// Human approval または Auto Publish Policy が済んでいない記事を明示する。ファイルは変更しない。
+// Human が本文確認済みでない記事を明示する。ファイルは変更しない。
 import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -69,7 +69,6 @@ function checkPost(filename) {
 
   // ── 承認状態 ──
   const humanApproved = data.reviewed === true
-  const autoApproved = data.auto_approved === true
 
   // reviewed:true なのに承認メタデータがない場合は blocker
   if (humanApproved) {
@@ -81,29 +80,12 @@ function checkPost(filename) {
     }
   }
 
-  if (autoApproved) {
-    if (data.publication_status !== 'auto_approved') {
-      blockers.push('auto_approved:true ですが publication_status が auto_approved ではありません')
-    }
-    if (data.legal_check_status !== 'passed') {
-      blockers.push('auto_approved:true ですが legal_check_status が passed ではありません')
-    }
-    if (data.image_check_status !== 'passed') {
-      blockers.push('auto_approved:true ですが image_check_status が passed ではありません')
-    }
-    if (data.medical_risk !== 'low') {
-      blockers.push(`auto_approved:true ですが medical_risk が low ではありません: "${data.medical_risk ?? '未設定'}"`)
-    }
-    if (!data.auto_approved_at || String(data.auto_approved_at).trim() === '') {
-      blockers.push('auto_approved_at がありません')
-    }
-    if (!data.auto_approved_by || String(data.auto_approved_by).trim() === '') {
-      blockers.push('auto_approved_by がありません')
-    }
+  if (!humanApproved) {
+    blockers.push('本文未承認です（reviewed:true / reviewed_at / reviewed_by が必要）')
   }
 
-  if (!humanApproved && !autoApproved) {
-    blockers.push('reviewed:false / auto_approved:false — approval が未完了です')
+  if (data.auto_approved === true && !humanApproved) {
+    blockers.push('auto_approved:true は本文承認の代替にしません')
   }
 
   if (data.draft === true) {
@@ -129,8 +111,8 @@ function checkPost(filename) {
   }
 
   // ── AI生成フラグ（warning: 未承認の AI 生成物だけ内容確認を促す） ──
-  if (data.ai_generated === true && !humanApproved && !autoApproved) {
-    warnings.push('ai_generated: true — Human review または Auto Publish Policy の記録を確認してください')
+  if (data.ai_generated === true && !humanApproved) {
+    warnings.push('ai_generated: true — Human による本文確認・承認を行ってください')
   }
 
   // ── 必須フィールド ──
@@ -246,8 +228,8 @@ if (ready.length > 0) {
 } else {
   console.log()
   console.log('publish-ready な記事はありません。')
-  console.log('  → Human 承認: npm run approve:post -- <slug> --reviewed-by "氏名"')
-  console.log('  → 自動承認: npm run article:auto-review -- <slug>')
+  console.log('  → 管理画面で本文確認・承認: /admin/pending-review')
+  console.log('  → CLIで本文確認後に承認: npm run approve:post -- <slug> --reviewed-by "氏名" --confirm-body-reviewed')
   console.log('  → npm run status:content  でコンテンツ全体の状態を確認できます')
 }
 

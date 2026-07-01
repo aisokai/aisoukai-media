@@ -43,16 +43,16 @@ test('未承認は review_waiting', () => {
   assert.equal(classifyWorkflowStatus({ date: PAST }, { today: TODAY }), WORKFLOW_STATUS.REVIEW_WAITING)
 })
 
-test('reviewed:true かつ日付到来は published', () => {
+test('本文確認済み かつ日付到来は published', () => {
   assert.equal(
-    classifyWorkflowStatus({ reviewed: true, date: PAST }, { today: TODAY }),
+    classifyWorkflowStatus({ reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: PAST }, { today: TODAY }),
     WORKFLOW_STATUS.PUBLISHED,
   )
 })
 
-test('reviewed:true だが未来日付は publish_waiting', () => {
+test('本文確認済み だが未来日付は publish_waiting', () => {
   assert.equal(
-    classifyWorkflowStatus({ reviewed: true, date: FUTURE }, { today: TODAY }),
+    classifyWorkflowStatus({ reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: FUTURE }, { today: TODAY }),
     WORKFLOW_STATUS.PUBLISH_WAITING,
   )
 })
@@ -148,8 +148,8 @@ test('summarizeWorkflowCounts: 状態別件数と画像未設定件数', () => {
     { data: { draft: true, date: PAST } }, // draft
     { data: { date: PAST } }, // review_waiting, 画像未設定
     { data: { date: PAST, image: '/i.jpg', image_alt: 'a' } }, // review_waiting, 画像ok
-    { data: { reviewed: true, date: PAST, image: '/i.jpg', image_alt: 'a' } }, // published
-    { data: { reviewed: true, date: FUTURE, image: '/i.jpg', image_alt: 'a' } }, // publish_waiting
+    { data: { reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: PAST, image: '/i.jpg', image_alt: 'a' } }, // published
+    { data: { reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: FUTURE, image: '/i.jpg', image_alt: 'a' } }, // publish_waiting
     { data: { archived: true } }, // blocked
   ]
   const counts = summarizeWorkflowCounts(posts, { today: TODAY })

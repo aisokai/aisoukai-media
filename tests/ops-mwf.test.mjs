@@ -11,8 +11,9 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.match(source, /--auto-publish/)
   assert.match(source, /--result-json/)
   assert.match(source, /--no-notify/)
+  assert.match(source, /--publish-today/)
   assert.match(source, /ANTHROPIC_API_KEY 未設定/)
-  assert.match(source, /今日は生成対象の承認済みネタがありません/)
+  assert.match(source, /本文確認・承認/)
   assert.match(source, /approve \/ publish \/ push は実行していません/)
 
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
@@ -21,6 +22,15 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.ok(scheduledIndex > 0)
   assert.ok(notificationBuildIndex > scheduledIndex)
   assert.ok(sendIndex > notificationBuildIndex)
+})
+
+test('ops:mwf rejects auto-publish and keeps article approval as body review only', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /ops:mwf では --auto-publish を受け付けません/)
+  assert.match(source, /process\.exit\(1\)/)
+  assert.match(source, /本文確認後に承認/)
+  assert.doesNotMatch(source, /--auto-publish', '--no-notify/)
 })
 
 test('ops:mwf guards duplicate Telegram review notifications by date, job, and text', () => {
@@ -38,4 +48,22 @@ test('ops:mwf guards duplicate Telegram review notifications by date, job, and t
   assert.ok(envCheckIndex > 0)
   assert.ok(reserveIndex > envCheckIndex)
   assert.ok(sendIndex > reserveIndex)
+})
+
+test('ops:mwf reports already-live today posts before no-topic notifications', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /loadContentStatus/)
+  assert.match(source, /findTodayLivePosts/)
+  assert.match(source, /alreadyLiveTodayNoop/)
+  assert.match(source, /本日公開対象の記事は既に公開中です/)
+  assert.match(source, /新規下書き生成: なし/)
+  assert.match(source, /process\.exitCode = 0/)
+
+  const todayLiveIndex = source.indexOf('const todayLivePosts = findTodayLivePosts')
+  const alreadyLiveIndex = source.indexOf('本日公開対象の記事は既に公開中です')
+  const noTopicIndex = source.indexOf('本日配信予定の未承認記事はありません。')
+  assert.ok(todayLiveIndex > 0)
+  assert.ok(alreadyLiveIndex > todayLiveIndex)
+  assert.ok(noTopicIndex > alreadyLiveIndex)
 })

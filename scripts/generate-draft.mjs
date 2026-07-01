@@ -108,6 +108,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const topicId = String(args.topic_id ?? args._[0] ?? '').trim()
   const force = args.force === true
+  const publish_date_override = String(args.publish_date ?? '').trim()
 
   if (!topicId) {
     console.error('使い方: npm run generate:draft -- TOPIC-20260511-001')
@@ -159,7 +160,8 @@ async function main() {
   const row = matches[0]
   const title       = getField(row, FIELD_ALIASES.title)
   const category    = getField(row, FIELD_ALIASES.category)
-  const publishDate = getField(row, FIELD_ALIASES.publishDate)
+  const csvPublishDate = getField(row, FIELD_ALIASES.publishDate)
+  const publishDate = publish_date_override || csvPublishDate
   const keyword     = getField(row, FIELD_ALIASES.keyword)
   const intent      = getField(row, FIELD_ALIASES.intent)
   const topic       = getField(row, FIELD_ALIASES.topic)
@@ -170,7 +172,8 @@ async function main() {
   const missing = []
   if (!title)                          missing.push('title_candidate')
   if (!VALID_CATEGORIES.has(category)) missing.push(`category (値: "${category || '空'}")`)
-  if (!isValidDate(publishDate))       missing.push('publish_date')
+  if (!isValidDate(csvPublishDate))    missing.push('publish_date')
+  if (publish_date_override && !isValidDate(publish_date_override)) missing.push('--publish-date')
   if (!keyword)                        missing.push('target_keyword')
   if (!intent)                         missing.push('patient_intent')
 

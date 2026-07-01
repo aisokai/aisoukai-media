@@ -22,14 +22,12 @@ function addBlocker(blockers, code, message) {
 export function getPostPublicationStatus(data, { today = getTodayJst() } = {}) {
   const blockers = []
   const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
-  const humanApproved = data.reviewed === true
-  const autoApproved =
-    data.auto_approved === true &&
-    data.publication_status === 'auto_approved' &&
-    data.legal_check_status === 'passed' &&
-    data.image_check_status === 'passed' &&
-    data.medical_risk === 'low'
-  const approved = humanApproved || autoApproved
+  const humanApproved =
+    data.reviewed === true &&
+    Boolean(toDateStr(data.reviewed_at)) &&
+    Boolean(String(data.reviewed_by ?? '').trim())
+  const autoApproved = false
+  const approved = humanApproved
 
   if (data.archived === true) {
     addBlocker(blockers, 'archived', 'archived:true のため公開対象外')
@@ -47,7 +45,7 @@ export function getPostPublicationStatus(data, { today = getTodayJst() } = {}) {
     addBlocker(
       blockers,
       'approval_missing',
-      'reviewed:true または Auto Publish Policy 通過済みではありません',
+      '本文確認済みではありません（reviewed:true / reviewed_at / reviewed_by が必要）',
     )
   }
 

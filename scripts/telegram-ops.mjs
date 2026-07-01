@@ -4,9 +4,9 @@
 // Human がトリガーする。AI が自動実行してはならない。
 //
 // メッセージ種別:
-//   "承認" / "OK" / "投稿" 等     → 最新 pending slug を承認（複数あっても最後追加分を自動採用）
+//   "承認" / "OK" / "投稿" 等     → 記事本文は承認せず、管理画面での本文確認へ誘導
 //   "差し戻し" / "修正" / "NG" 等 → 直近 pending slug を差し戻し（同上）
-//   "approve <slug> [by <名前>]"  → 明示スラグ承認（直近以外を承認したい場合）
+//   "approve <slug> [by <名前>]"  → 記事本文は承認せず、管理画面での本文確認へ誘導
 //   "reject <slug> <理由>"        → 明示スラグ差し戻し（互換維持）
 //   8文字以上の一般テキスト        → 記事リクエスト + 下書き生成 + validate + push（--build 時）
 //   publish / push / deploy 等     → スキップ
@@ -16,17 +16,18 @@
 // フラグ:
 //   --dry-run         : コンソール表示のみ。書き込み・Git 操作・Telegram 返信なし（--apply がなければ暗黙 dry-run）
 //   --apply           : ファイル書き込み + Telegram 返信（build/git なし）
-//   --apply --build   : approve → validate → build → git add → commit → push → Telegram 返信
+//   --apply --build   : 下書き生成時のみ validate → git add → commit → push → Telegram 返信
+//   --allow-body-approve-from-telegram : 例外的に Telegram から本文承認を許可（通常運用では使わない）
 //   --verbose         : 成功時も各ステップの詳細を Telegram に含める（デフォルトは要約のみ）
 //
 // セッション管理:
 //   data/telegram-session.json に chat_id 別の直近 pending slug を保存
 //   draft 生成 → status: pending_approval
-//   承認 / 差し戻し後 → status: approved / rejected
+//   管理画面承認 / 差し戻し後 → status: approved / rejected
 //
 // 安全条件:
 //   - TELEGRAM_ALLOWED_CHAT_IDS に含まれる chat_id/from_id のみ承認/差し戻し操作可
-//   - pending slug なしで「承認」が来たら対象不明として何もしない
+//   - Telegram の「承認」だけでは本文承認を書き込まない
 //   - build 失敗時は commit/push しない
 //   - staged ファイルに機密ファイルが混入した場合は push しない
 //   - 機密パターン（.env / .key 等）の未追跡ファイルがある場合は push しない
@@ -54,6 +55,9 @@ const REQUESTS_PATH  = join(ROOT, 'data', 'article-requests.json')
 const SESSION_PATH   = join(ROOT, 'data', 'telegram-session.json')
 const LOGS_DIR       = join(ROOT, 'logs')
 const LOG_PATH       = join(LOGS_DIR, 'review-history.md')
+
+const cliArgs = process.argv.slice(2)
+const allowTelegramBodyApprove = cliArgs.includes('--allow-body-approve-from-telegram')
 
 
 // ── 環境変数 ──────────────────────────────────────────────────────────────
@@ -118,6 +122,20 @@ function getSiteUrl() {
   if (!raw) return null
   const cleaned = raw.replace(/\/$/, '')
   return /^https?:\/\//.test(cleaned) ? cleaned : `https://${cleaned}`
+}
+
+function getPendingReviewUrl(siteUrl) {
+  return siteUrl ? `${siteUrl}/admin/pending-review` : 'https://aisoukai-media.vercel.app/admin/pending-review'
+}
+
+function buildTelegramBodyApprovalBlockedMessage(siteUrl, detail = '') {
+  const lines = [
+    '本文承認はTelegram返信では実行しません。',
+    '管理画面で本文を確認してから承認してください。',
+    getPendingReviewUrl(siteUrl),
+  ]
+  if (detail) lines.push('', detail)
+  return lines.join('\n')
 }
 
 // ── ファイルユーティリティ ────────────────────────────────────────────────
@@ -1013,7 +1031,23 @@ async function main() {
         continue
       }
 
-      // ── 日本語承認 ──────────────────────────────────────────────────
+        if (!allowTelegramBodyApprove && (parsed.type === 'jp_approve' || parsed.type === 'approve')) {
+          const detail = parsed.type === 'approve'
+            ? `対象候補: ${parsed.slug}`
+            : '掲載ネタOKだけでは本文承認にできません。'
+          const msg = buildTelegramBodyApprovalBlockedMessage(siteUrl, detail)
+          console.log('    ⛔ Telegram本文承認は無効。管理画面へ誘導します。')
+          if (dryRun) {
+            console.log(`    [dry-run] 管理画面誘導メッセージ:\n${msg.split('\n').map(l => '      ' + l).join('\n')}`)
+          } else {
+            await sendTelegram(botToken, msgChatId || defaultChatId, msg).catch((e) => {
+              console.log(`    ⚠️ Telegram 返信失敗: ${e.message}`)
+            })
+          }
+          continue
+        }
+
+        // ── 日本語承認（例外フラグ有効時のみ）──────────────────────────────
 
       if (parsed.type === 'jp_approve') {
         const pendingItems = getPendingItems(msgChatId)

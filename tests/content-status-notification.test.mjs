@@ -75,6 +75,8 @@ date: 2020-01-01
 publish_at: 2020-01-01
 category: テスト
 reviewed: true
+reviewed_at: 2020-01-01
+reviewed_by: 三谷
 draft: false
 ---
 
