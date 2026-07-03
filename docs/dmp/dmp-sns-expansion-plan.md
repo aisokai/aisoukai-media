@@ -79,6 +79,18 @@ image_direction: "清潔感のある歯ブラシと洗面台"
 | `npm run sns:approve -- <slug> --reviewed-by "氏名"` | 手動投稿可として承認 |
 | `npm run sns:reject -- <slug> --reason "理由"` | 差し戻し |
 
+### 実装状況 (2026-07-03)
+
+| コマンド | 状態 |
+|---------|------|
+| `npm run sns:instagram:draft -- --topic <topic-id>` | 実装済み (`scripts/generate-instagram-draft.mjs`) |
+| `npm run sns:list-pending-review` | 実装済み |
+| `npm run sns:notify-pending-review` | 実装済み (`scripts/notify-sns-pending-review.mjs`) |
+| `npm run sns:approve -- <slug> --reviewed-by "氏名"` | 実装済み (Human 専用, `scripts/approve-sns-draft.mjs`) |
+| `npm run sns:reject -- <slug> --reviewed-by "氏名" --reason "理由"` | 実装済み (Human 専用) |
+| `npm run media:sns:from-post` (Phase 2B) | 実装済み (`scripts/generate-sns-from-post.mjs`) |
+| `ops:sns-weekly` / `ops:sns-daily-status` (Phase 2C) | 未実装 |
+
 ---
 
 ## Phase 2B: ブログ記事からSNSへの再編集
