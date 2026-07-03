@@ -21,6 +21,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
   const [reviewerName, setReviewerName] = useState(getStoredReviewerName)
   const [reason, setReason] = useState('')
   const [result, setResult] = useState<ReviewActionResult | null>(null)
+  const [completed, setCompleted] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   function saveReviewerName(value: string) {
@@ -30,6 +31,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
 
   function approve() {
     setResult(null)
+    if (completed) return
     if (!reviewerName.trim()) {
       setResult({ ok: false, message: '承認者名を入力してください' })
       return
@@ -39,7 +41,10 @@ export default function ReviewActionButtons({ slug, title }: Props) {
     startTransition(async () => {
       const next = await approvePostAction({ slug, reviewedBy: reviewerName })
       setResult(next)
-      if (next.ok) router.refresh()
+      if (next.ok) {
+        setCompleted(true)
+        router.refresh()
+      }
     })
   }
 
@@ -77,14 +82,14 @@ export default function ReviewActionButtons({ slug, title }: Props) {
       <div className="mt-3 grid gap-2">
         <button
           type="button"
-          disabled={isPending}
+          disabled={isPending || completed}
           onClick={approve}
           className="min-h-12 w-full rounded-xl bg-green-600 px-4 py-3 text-base font-bold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-slate-400"
         >
-          {isPending ? '処理中...' : '承認する'}
+          {completed ? '承認済み' : isPending ? '処理中...' : '承認する'}
         </button>
 
-        <details className="rounded-xl border border-slate-200 bg-white p-3">
+        {!completed && <details className="rounded-xl border border-slate-200 bg-white p-3">
           <summary className="cursor-pointer select-none text-sm font-bold text-slate-700">
             却下する
           </summary>
@@ -102,7 +107,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
           >
             却下を確定
           </button>
-        </details>
+        </details>}
       </div>
 
       {result && (

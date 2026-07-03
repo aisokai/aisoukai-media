@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import matter from 'gray-matter'
 import { requireAdmin } from '@/lib/adminAuth'
 import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
 import { approvePostMarkdown, rejectPostMarkdown } from '@/lib/reviewActions'
@@ -40,6 +41,15 @@ function getTodayJst() {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10)
 }
 
+function isReviewedPost(raw: string) {
+  const { data } = matter(raw)
+  return (
+    data.reviewed === true &&
+    Boolean(String(data.reviewed_at ?? '').trim()) &&
+    Boolean(String(data.reviewed_by ?? '').trim())
+  )
+}
+
 async function loadReviewLog() {
   try {
     return (await readGitHubFile('logs/review-history.md')).content
@@ -66,6 +76,16 @@ export async function approvePostAction({
       readGitHubFile(postPath),
       loadReviewLog(),
     ])
+
+    if (isReviewedPost(postFile.content)) {
+      revalidatePath('/admin/pending-review')
+      revalidatePath('/blog')
+      revalidatePath(`/blog/${slug}`)
+      return {
+        ok: true,
+        message: 'この記事は既に承認済みです。画面を更新します。',
+      }
+    }
 
     const update = approvePostMarkdown(postFile.content, slug, by)
     const commit = await commitGitHubFiles(`approve post: ${slug}`, [
