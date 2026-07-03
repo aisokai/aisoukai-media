@@ -37,6 +37,16 @@ test('ops:mwf rejects auto-publish and keeps article approval as body review onl
   assert.doesNotMatch(source, /--auto-publish', '--no-notify/)
 })
 
+test('ops:mwf has a process lock to prevent cron and launchd double generation', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /ops-mwf\.lock/)
+  assert.match(source, /acquireRunLock/)
+  assert.match(source, /openSync\(LOCK_PATH, 'wx'\)/)
+  assert.match(source, /別の ops:mwf が実行中です/)
+  assert.match(source, /process\.on\('exit', releaseRunLock\)/)
+})
+
 test('ops:mwf only syncs the generated draft path to GitHub for production review', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 

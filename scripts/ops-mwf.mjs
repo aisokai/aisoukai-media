@@ -6,7 +6,7 @@
 // 5) Telegram で Human review / approval を依頼、のみ。
 // approve / publish / Telegram request 取得は実行しない。
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,6 +16,9 @@ import { loadContentStatus } from './lib/content-status.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
+const LOG_DIR = join(ROOT, 'logs')
+const LOCK_PATH = join(LOG_DIR, 'ops-mwf.lock')
+const LOCK_STALE_MS = 2 * 60 * 60 * 1000
 const SEND_DAYS = new Set([1, 3, 5]) // 月=1, 水=3, 金=5 (JST UTC+9)
 const DAY_NAMES_JA = ['日', '月', '火', '水', '木', '金', '土']
 
@@ -37,6 +40,59 @@ const isSendDay = SEND_DAYS.has(dayOfWeek)
 
 const WIDE = '═'.repeat(60)
 const BAR = '─'.repeat(60)
+
+function acquireRunLock() {
+  if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true })
+  try {
+    const fd = openSync(LOCK_PATH, 'wx')
+    writeFileSync(fd, JSON.stringify({
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+    }) + '\n')
+    return { acquired: true, fd }
+  } catch (error) {
+    if (error?.code !== 'EEXIST') {
+      return { acquired: false, reason: `ロック作成に失敗: ${error.message}` }
+    }
+    try {
+      const raw = readFileSync(LOCK_PATH, 'utf8')
+      const parsed = JSON.parse(raw)
+      const startedAt = Date.parse(parsed.startedAt)
+      if (Number.isFinite(startedAt) && Date.now() - startedAt > LOCK_STALE_MS) {
+        unlinkSync(LOCK_PATH)
+        return acquireRunLock()
+      }
+    } catch {
+      // 壊れた lock は二重起動防止を優先して残す。
+    }
+    return { acquired: false, reason: '別の ops:mwf が実行中です' }
+  }
+}
+
+const runLock = acquireRunLock()
+if (!runLock.acquired) {
+  console.log(`  ⏭ ${runLock.reason}`)
+  process.exit(0)
+}
+
+function releaseRunLock() {
+  try {
+    if (runLock.fd !== undefined) closeSync(runLock.fd)
+  } catch {}
+  try {
+    if (existsSync(LOCK_PATH)) unlinkSync(LOCK_PATH)
+  } catch {}
+}
+
+process.on('exit', releaseRunLock)
+process.on('SIGINT', () => {
+  releaseRunLock()
+  process.exit(130)
+})
+process.on('SIGTERM', () => {
+  releaseRunLock()
+  process.exit(143)
+})
 
 function header(title) {
   console.log()
