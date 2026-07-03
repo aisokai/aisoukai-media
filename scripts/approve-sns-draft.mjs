@@ -12,7 +12,7 @@ import { pathToFileURL } from 'node:url'
 import matter from 'gray-matter'
 import { SNS_DRAFTS_DIR, isDraftMarkdownFile, normalizeDraftData } from './lib/sns-drafts.mjs'
 import { applySnsReviewDecision } from './lib/sns-review.mjs'
-import { ROOT, getJstTimestamp, jobPath, transitionJob } from './lib/media-queue.mjs'
+import { ROOT, getJstTimestamp, jobPath, transitionJob, saveJob } from './lib/media-queue.mjs'
 
 const LOGS_DIR = join(ROOT, 'logs')
 const LOG_PATH = join(LOGS_DIR, 'review-history.md')
@@ -57,7 +57,7 @@ function updateLinkedJob(jobId, decision, reviewedBy, timestamp) {
   } else {
     job = transitionJob(job, 'rejected')
   }
-  writeFileSync(path, `${JSON.stringify(job, null, 2)}\n`)
+  saveJob(job)
   return job
 }
 
@@ -100,8 +100,8 @@ export function runSnsReviewCli({ decision }) {
     process.exit(1)
   }
 
-  writeFileSync(filePath, matter.stringify(parsed.content, updated))
   const job = updateLinkedJob(updated.media_job_id, decision, updated.reviewed_by, timestamp)
+  writeFileSync(filePath, matter.stringify(parsed.content, updated))
   appendReviewLog({
     datetime: timestamp,
     action: decision === 'approve' ? 'sns_approve' : 'sns_reject',

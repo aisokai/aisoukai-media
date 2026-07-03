@@ -330,3 +330,10 @@ platform: instagram
 reviewed_by: スモークテスト
 reason: テスト
 
+## 2026-07-03T22:00:19.574+09:00
+datetime: 2026-07-03T22:00:19.574+09:00
+action: sns_approve
+file: 2026-07-03-instagram-fix-smoke.md
+platform: instagram
+reviewed_by: 修正スモーク
+
