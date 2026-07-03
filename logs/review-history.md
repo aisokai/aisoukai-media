@@ -315,3 +315,18 @@ reviewed_by: 三谷
 date: 2026-07-03
 publish_at: 2026-07-03
 
+## 2026-07-03T21:52:42.218+09:00
+datetime: 2026-07-03T21:52:42.218+09:00
+action: sns_approve
+file: 2026-07-03-instagram-smoke-test.md
+platform: instagram
+reviewed_by: スモークテスト
+
+## 2026-07-03T21:53:04.579+09:00
+datetime: 2026-07-03T21:53:04.579+09:00
+action: sns_reject
+file: 2026-07-03-instagram-smoke-test2.md
+platform: instagram
+reviewed_by: スモークテスト
+reason: テスト
+
