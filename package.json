@@ -23,6 +23,7 @@
     "sns:approve": "node scripts/approve-sns-draft.mjs",
     "sns:reject": "node scripts/reject-sns-draft.mjs",
     "sns:instagram:draft": "node scripts/generate-instagram-draft.mjs",
+    "sns:notify-pending-review": "node scripts/notify-sns-pending-review.mjs",
     "request:article": "node scripts/request-article.mjs",
     "notify:pending-review": "node scripts/notify-pending-review.mjs",
     "notify:draft": "node scripts/notify-draft.mjs",
