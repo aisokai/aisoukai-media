@@ -337,3 +337,10 @@ file: 2026-07-03-instagram-fix-smoke.md
 platform: instagram
 reviewed_by: 修正スモーク
 
+## 2026-07-04T07:56:04.509+09:00
+datetime: 2026-07-04T07:56:04.509+09:00
+action: sns_approve
+file: 2026-07-04-instagram-p2-smoke.md
+platform: instagram
+reviewed_by: P2スモーク
+

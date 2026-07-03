@@ -7,7 +7,7 @@
 // 使い方:
 //   npm run sns:approve -- <draft-filename|slug> --reviewed-by "氏名"
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import matter from 'gray-matter'
 import { SNS_DRAFTS_DIR, isDraftMarkdownFile, normalizeDraftData } from './lib/sns-drafts.mjs'
@@ -19,6 +19,10 @@ const LOG_PATH = join(LOGS_DIR, 'review-history.md')
 
 function resolveDraftFile(arg) {
   const name = arg.endsWith('.md') ? arg : `${arg}.md`
+  // 対象は content/sns-drafts/ 直下のみ。パス区切り・相対パスは拒否する
+  if (name !== basename(name) || name.includes('..') || name.startsWith('.')) {
+    throw new Error(`ファイル名にパスを含めることはできません: ${arg}`)
+  }
   if (existsSync(join(SNS_DRAFTS_DIR, name))) return name
   // slug 部分一致 (末尾一致) で 1 件に絞れる場合は許可
   const candidates = readdirSync(SNS_DRAFTS_DIR)
@@ -28,6 +32,11 @@ function resolveDraftFile(arg) {
   throw new Error(`ドラフトが見つかりません: ${name}`)
 }
 
+// review-history.md は行単位の append-only ログのため、改行混入で形式を崩さないよう1行化する
+function toLogLine(value) {
+  return String(value ?? '').replace(/\s*[\r\n]+\s*/g, ' ').trim()
+}
+
 function appendReviewLog(entry) {
   const lines = [
     `## ${entry.datetime}`,
@@ -35,30 +44,28 @@ function appendReviewLog(entry) {
     `action: ${entry.action}`,
     `file: ${entry.file}`,
     `platform: ${entry.platform}`,
-    `reviewed_by: ${entry.reviewed_by}`,
+    `reviewed_by: ${toLogLine(entry.reviewed_by)}`,
   ]
-  if (entry.reason) lines.push(`reason: ${entry.reason}`)
+  if (entry.reason) lines.push(`reason: ${toLogLine(entry.reason)}`)
   if (entry.media_job_id) lines.push(`media_job_id: ${entry.media_job_id}`)
   lines.push('')
   if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true })
   appendFileSync(LOG_PATH, lines.join('\n') + '\n', 'utf8')
 }
 
-function updateLinkedJob(jobId, decision, reviewedBy, timestamp) {
+// 紐付く job の遷移を「計算だけ」行う (書き込みなし)。遷移不能ならここで throw し、何も書き込まれない
+function prepareLinkedJob(jobId, decision, reviewedBy, timestamp) {
   if (!jobId) return null
   const path = jobPath(jobId)
   if (!existsSync(path)) {
     console.warn(`⚠ 紐付く media queue job が見つかりません: ${jobId} (frontmatter のみ更新)`)
     return null
   }
-  let job = JSON.parse(readFileSync(path, 'utf8'))
+  const job = JSON.parse(readFileSync(path, 'utf8'))
   if (decision === 'approve') {
-    job = transitionJob(job, 'approved', { approved_by: reviewedBy, approved_at: timestamp })
-  } else {
-    job = transitionJob(job, 'rejected')
+    return transitionJob(job, 'approved', { approved_by: reviewedBy, approved_at: timestamp })
   }
-  saveJob(job)
-  return job
+  return transitionJob(job, 'rejected')
 }
 
 export function runSnsReviewCli({ decision }) {
@@ -100,8 +107,26 @@ export function runSnsReviewCli({ decision }) {
     process.exit(1)
   }
 
-  const job = updateLinkedJob(updated.media_job_id, decision, updated.reviewed_by, timestamp)
+  // 純粋計算を先に済ませ、書き込みは「ドラフト → queue job → ログ」の順に行う。
+  // 途中で失敗しても queue だけが approved になる状態 (fail-open) を作らない。
+  let job
+  try {
+    job = prepareLinkedJob(updated.media_job_id, decision, updated.reviewed_by, timestamp)
+  } catch (e) {
+    console.error(`エラー: media queue job を遷移できません: ${e.message}`)
+    process.exit(1)
+  }
+
   writeFileSync(filePath, matter.stringify(parsed.content, updated))
+  if (job) {
+    try {
+      saveJob(job)
+    } catch (e) {
+      console.error(`⚠ ドラフトは更新済みですが job ${job.id} の保存に失敗しました: ${e.message}`)
+      console.error('   media:queue:validate で状態を確認し、手動で整合を取ってください。')
+      process.exit(1)
+    }
+  }
   appendReviewLog({
     datetime: timestamp,
     action: decision === 'approve' ? 'sns_approve' : 'sns_reject',

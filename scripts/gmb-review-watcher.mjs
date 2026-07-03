@@ -70,7 +70,7 @@ export async function runWatcher({
   // 前提条件チェック: 実API読み取りには gmb-location.json が必要。
   // 未設定はエラーではなくセットアップ待ち (fail-soft)。launchd を exit 1 で落とさない。
   if (source === 'api' && !existsSync(gmbLocationConfigPath)) {
-    appendMediaLog({ event: 'watcher_setup_pending', reason: 'gmb-location.json missing' })
+    if (write) appendMediaLog({ event: 'watcher_setup_pending', reason: 'gmb-location.json missing' })
     return { setupPending: true, total: 0, newCount: 0, results: [] }
   }
   const reviews = await fetchReviews({ source })
