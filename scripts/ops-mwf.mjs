@@ -2,8 +2,9 @@
 // ops-mwf.mjs
 // 月水金 08:30 の定期記事生成 CLI。
 // やることは 1) selected ネタを承認済み topic に同期 2) 承認済み topic から1記事生成
-// 3) 画像設定済みの下書きとして保存 4) Telegram で Human review / approval を依頼、のみ。
-// approve / publish / push / Telegram request 取得は実行しない。
+// 3) 画像設定済みの下書きとして保存 4) レビュー画面に出すため生成下書きだけ GitHub へ同期
+// 5) Telegram で Human review / approval を依頼、のみ。
+// approve / publish / Telegram request 取得は実行しない。
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -54,6 +55,65 @@ function run(script, extraArgs = []) {
     console.error(`  ❌ 実行エラー (${script}): ${result.error.message}`)
   }
   return result.status ?? (result.error ? 1 : 0)
+}
+
+function runCommand(command, args, { stdio = 'pipe' } = {}) {
+  const result = spawnSync(command, args, {
+    cwd: ROOT,
+    env: process.env,
+    encoding: 'utf8',
+    stdio,
+  })
+  return {
+    ok: result.status === 0,
+    status: result.status ?? (result.error ? 1 : 0),
+    output: `${result.stdout ?? ''}${result.stderr ?? ''}`.trim(),
+    error: result.error,
+  }
+}
+
+function isSafeGeneratedPostPath(path) {
+  return /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(String(path ?? ''))
+}
+
+function syncGeneratedDraftToGitHub(scheduledResult) {
+  const relPath = scheduledResult?.path
+  if (!scheduledResult?.generated) {
+    return { ok: true, skipped: true, reason: 'generated=false' }
+  }
+  if (!isSafeGeneratedPostPath(relPath)) {
+    return { ok: false, reason: `生成記事パスが安全な形式ではありません: ${relPath ?? '未設定'}` }
+  }
+
+  const validate = runCommand('npm', ['run', 'validate:posts'])
+  if (!validate.ok) {
+    return { ok: false, reason: `validate:posts に失敗: ${validate.output.slice(0, 300)}` }
+  }
+
+  const add = runCommand('git', ['add', '--', relPath])
+  if (!add.ok) {
+    return { ok: false, reason: `git add に失敗: ${add.output.slice(0, 300)}` }
+  }
+
+  const diff = runCommand('git', ['diff', '--cached', '--quiet', '--', relPath])
+  if (diff.status === 0) {
+    return { ok: true, skipped: true, reason: '生成記事は既にGitHub同期済み' }
+  }
+  if (diff.status !== 1) {
+    return { ok: false, reason: `git diff --cached に失敗: ${diff.output.slice(0, 300)}` }
+  }
+
+  const commit = runCommand('git', ['commit', '-m', `draft: ${scheduledResult.slug}`])
+  if (!commit.ok) {
+    return { ok: false, reason: `git commit に失敗: ${commit.output.slice(0, 300)}` }
+  }
+
+  const push = runCommand('git', ['push', 'origin', 'main'])
+  if (!push.ok) {
+    return { ok: false, reason: `git push に失敗: ${push.output.slice(0, 300)}` }
+  }
+
+  return { ok: true, skipped: false, reason: '生成下書きをGitHubへ同期しました' }
 }
 
 function readJsonIfExists(path) {
@@ -152,7 +212,7 @@ function alreadyLiveTodayNoop({ scheduledResult, contentStatus }) {
   return scheduledResult?.generated === false && findTodayLivePosts(contentStatus).length > 0
 }
 
-function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus }) {
+function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult }) {
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
   const lines = ['📝 月水金の記事生成']
 
@@ -181,6 +241,15 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult, con
     lines.push('')
     lines.push('本文確認・承認:')
     lines.push(dashboardUrl)
+    lines.push('')
+    if (draftSyncResult?.ok && !draftSyncResult.skipped) {
+      lines.push('GitHub同期: 完了（本番レビュー画面に反映されます）')
+    } else if (draftSyncResult?.ok && draftSyncResult.skipped) {
+      lines.push(`GitHub同期: スキップ（${draftSyncResult.reason}）`)
+    } else if (draftSyncResult) {
+      lines.push('GitHub同期: 失敗（ローカルのみの可能性があります）')
+      lines.push(`同期エラー: ${draftSyncResult.reason}`)
+    }
 
     const reasons = scheduledResult.reasons ?? []
     if (reasons.length > 0) {
@@ -248,6 +317,7 @@ for (const month of topicSyncMonths()) {
 
 let generateDecision = shouldGenerateScheduledArticle()
 let scheduledResult = null
+let draftSyncResult = null
 if (syncFailed) {
   generateDecision = { ok: false, reason: 'ネタリスト selected 同期に失敗したため記事生成を停止' }
 }
@@ -264,11 +334,21 @@ if (!generateDecision.ok) {
     console.log(`  ⚠️ ${reason}`)
     process.exitCode = 1
   }
+  if (scheduledResult?.generated) {
+    header('2.5/3  生成下書きのGitHub同期')
+    draftSyncResult = syncGeneratedDraftToGitHub(scheduledResult)
+    if (draftSyncResult.ok) {
+      console.log(`  ✅ ${draftSyncResult.reason}`)
+    } else {
+      console.log(`  ⚠️ ${draftSyncResult.reason}`)
+      process.exitCode = 1
+    }
+  }
 }
 
 header('3/3  Telegram レビュー依頼')
 const contentStatus = loadContentStatus(join(ROOT, 'content', 'posts'))
-const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus })
+const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult })
 if (alreadyLiveTodayNoop({ scheduledResult, contentStatus })) {
   process.exitCode = 0
 }
@@ -290,5 +370,5 @@ if (scheduledResult?.generated) {
 } else {
   console.log('  生成記事: なし')
 }
-console.log('  approve / publish / push は実行していません')
+console.log('  approve / publish は実行していません')
 console.log(WIDE)

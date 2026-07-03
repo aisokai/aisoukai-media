@@ -14,12 +14,16 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.match(source, /--publish-today/)
   assert.match(source, /ANTHROPIC_API_KEY 未設定/)
   assert.match(source, /本文確認・承認/)
-  assert.match(source, /approve \/ publish \/ push は実行していません/)
+  assert.match(source, /syncGeneratedDraftToGitHub/)
+  assert.match(source, /生成下書きのGitHub同期/)
+  assert.match(source, /approve \/ publish は実行していません/)
 
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
+  const syncIndex = source.indexOf('draftSyncResult = syncGeneratedDraftToGitHub')
   const notificationBuildIndex = source.indexOf('const notificationText = buildReviewRequestNotification')
   const sendIndex = source.lastIndexOf('await sendOpsTelegram')
   assert.ok(scheduledIndex > 0)
+  assert.ok(syncIndex > scheduledIndex)
   assert.ok(notificationBuildIndex > scheduledIndex)
   assert.ok(sendIndex > notificationBuildIndex)
 })
@@ -31,6 +35,17 @@ test('ops:mwf rejects auto-publish and keeps article approval as body review onl
   assert.match(source, /process\.exit\(1\)/)
   assert.match(source, /本文確認後に承認/)
   assert.doesNotMatch(source, /--auto-publish', '--no-notify/)
+})
+
+test('ops:mwf only syncs the generated draft path to GitHub for production review', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /isSafeGeneratedPostPath/)
+  assert.match(source, /content\\\/posts\\\/\\d\{4\}-\\d\{2\}-\\d\{2\}-\[a-z0-9-\]\+\\\.md/)
+  assert.match(source, /git', \['add', '--', relPath\]/)
+  assert.match(source, /git', \['commit', '-m', `draft: \$\{scheduledResult\.slug\}`\]/)
+  assert.match(source, /git', \['push', 'origin', 'main'\]/)
+  assert.doesNotMatch(source, /git', \['add', '-A'\]/)
 })
 
 test('ops:mwf guards duplicate Telegram review notifications by date, job, and text', () => {
