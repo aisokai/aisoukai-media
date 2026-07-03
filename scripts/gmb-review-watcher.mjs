@@ -15,6 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { GMB_REVIEWS_DIR, fetchReviews } from './lib/gmb-adapter.mjs'
+import { GMB_LOCATION_CONFIG_PATH } from './lib/gmb-api.mjs'
 import { classifyReview, REPLY_TEMPLATES, selectReplyTemplate } from './lib/review-rules.mjs'
 import {
   ROOT, appendMediaLog, createJob, getJstTimestamp, maskPersonalInfo, saveJob, transitionJob,
@@ -61,7 +62,17 @@ export function buildReviewArtifacts(review) {
   return { snapshot, replyDraft }
 }
 
-export async function runWatcher({ source = 'mock', write = true } = {}) {
+export async function runWatcher({
+  source = 'mock',
+  write = true,
+  gmbLocationConfigPath = GMB_LOCATION_CONFIG_PATH,
+} = {}) {
+  // 前提条件チェック: 実API読み取りには gmb-location.json が必要。
+  // 未設定はエラーではなくセットアップ待ち (fail-soft)。launchd を exit 1 で落とさない。
+  if (source === 'api' && !existsSync(gmbLocationConfigPath)) {
+    appendMediaLog({ event: 'watcher_setup_pending', reason: 'gmb-location.json missing' })
+    return { setupPending: true, total: 0, newCount: 0, results: [] }
+  }
   const reviews = await fetchReviews({ source })
   const processedIds = loadProcessedIds()
   const newReviews = reviews.filter((r) => !r.has_reply && !processedIds.includes(r.review_id))
@@ -117,7 +128,12 @@ function main() {
   const write = !process.argv.includes('--no-write')
   const sourceIdx = process.argv.indexOf('--source')
   const source = sourceIdx >= 0 ? process.argv[sourceIdx + 1] : 'mock'
-  runWatcher({ source, write }).then(({ total, newCount, results }) => {
+  runWatcher({ source, write }).then(({ setupPending, total, newCount, results }) => {
+    if (setupPending) {
+      console.log('⏸ GMB review watcher: セットアップ待ち。config/gmb-location.json がありません。')
+      console.log('   有効化するには先生が npm run media:gmb:discover を実行してください (GMB API 認証が必要)。')
+      return
+    }
     console.log(`✅ GMB review watcher (${source === 'api' ? '実API読み取り' : 'dry-run / mock'}): 取得 ${total} 件, 新規未返信 ${newCount} 件 ${write ? '(下書き保存済み)' : '(表示のみ)'}`)
     for (const { snapshot, job, error } of results) {
       if (error) {
