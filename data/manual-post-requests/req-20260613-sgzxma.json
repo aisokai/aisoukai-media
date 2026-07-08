@@ -5,7 +5,9 @@
   "raw_instruction": "歯科健診を半年受けていない人向けに、受診の目安をやさしく説明する記事を作って。",
   "title_hint": "",
   "publish_at": "",
-  "status": "pending",
+  "status": "rejected",
   "requested_by": "cli",
-  "created_at": "2026-06-13T07:25:53.403+09:00"
+  "created_at": "2026-06-13T07:25:53.403+09:00",
+  "rejected_at": "2026-07-06T16:27:52.606+09:00",
+  "rejected_by": "mitanios-dmp"
 }

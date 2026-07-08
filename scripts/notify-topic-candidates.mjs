@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 月次ネタ候補のPC確認リマインドをTelegramへ送る。
+// 月次ネタ候補の確認リマインドをTelegramへ送る。
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -54,7 +54,7 @@ function buildText(file) {
     `高リスク候補: ${highRisk}件`,
     `重複注意: ${duplicate}件`,
     '',
-    'パソコンで月次ネタ候補を確認してください。',
+    'スマホでもPCでも月次ネタ候補を確認できます。',
     `管理画面: ${url}`,
   ].join('\n')
 }

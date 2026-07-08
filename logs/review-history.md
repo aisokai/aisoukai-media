@@ -344,3 +344,11 @@ file: 2026-07-04-instagram-p2-smoke.md
 platform: instagram
 reviewed_by: P2スモーク
 
+## 2026-07-06T16:28:34.305+09:00
+datetime: 2026-07-06T16:28:34.305+09:00
+action: approve
+slug: 2026-07-06-monthly-202606topic018
+reviewed_by: 三谷
+date: 2026-07-06
+publish_at: 2026-07-06
+

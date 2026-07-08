@@ -105,14 +105,14 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">月次ネタ候補</h1>
           <p className="mt-2 text-sm text-gray-500">
-            PCで月次ネタ候補を確認し、スマホでは簡易承認だけ行う想定です。
+            スマホでもPCでも月次ネタ候補を確認し、採用・予備・保留・却下を選べます。
           </p>
         </div>
         <Link
           href={`/admin/topic-candidates?month=${file.month}`}
           className="rounded-md bg-gray-900 px-4 py-2 text-sm font-bold text-white"
         >
-          PCで確認する
+          候補を確認する
         </Link>
       </div>
 
