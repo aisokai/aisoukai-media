@@ -14,15 +14,19 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.match(source, /--publish-today/)
   assert.match(source, /ANTHROPIC_API_KEY 未設定/)
   assert.match(source, /本文確認・承認/)
+  assert.match(source, /checkScheduledGitReadiness/)
   assert.match(source, /syncGeneratedDraftToGitHub/)
   assert.match(source, /生成下書きのGitHub同期/)
   assert.match(source, /approve \/ publish は実行していません/)
 
+  const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
   const syncIndex = source.indexOf('draftSyncResult = syncGeneratedDraftToGitHub')
   const notificationBuildIndex = source.indexOf('const notificationText = buildReviewRequestNotification')
   const sendIndex = source.lastIndexOf('await sendOpsTelegram')
+  assert.ok(readinessIndex > 0)
   assert.ok(scheduledIndex > 0)
+  assert.ok(readinessIndex < scheduledIndex)
   assert.ok(syncIndex > scheduledIndex)
   assert.ok(notificationBuildIndex > scheduledIndex)
   assert.ok(sendIndex > notificationBuildIndex)
@@ -56,6 +60,23 @@ test('ops:mwf only syncs the generated draft path to GitHub for production revie
   assert.match(source, /git', \['commit', '-m', `draft: \$\{scheduledResult\.slug\}`\]/)
   assert.match(source, /git', \['push', 'origin', 'main'\]/)
   assert.doesNotMatch(source, /git', \['add', '-A'\]/)
+})
+
+test('ops:mwf stops before generation when git is dirty or out of sync', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /git', \['status', '--porcelain'\]/)
+  assert.match(source, /未commit変更があります/)
+  assert.match(source, /git', \['fetch', 'origin', 'main'\]/)
+  assert.match(source, /git', \['rev-list', '--left-right', '--count', 'HEAD\.\.\.origin\/main'\]/)
+  assert.match(source, /GitHub側に未取得commitがあります/)
+  assert.match(source, /ローカルのみのcommitがあります/)
+  assert.match(source, /Git同期が安全でないため記事生成を停止/)
+
+  const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
+  const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
+  assert.ok(readinessIndex > 0)
+  assert.ok(scheduledIndex > readinessIndex)
 })
 
 test('ops:mwf guards duplicate Telegram review notifications by date, job, and text', () => {

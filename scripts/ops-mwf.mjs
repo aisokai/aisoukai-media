@@ -2,7 +2,8 @@
 // ops-mwf.mjs
 // 月水金 08:30 の定期記事生成 CLI。
 // やることは 1) selected ネタを承認済み topic に同期 2) 承認済み topic から1記事生成
-// 3) 画像設定済みの下書きとして保存 4) レビュー画面に出すため生成下書きだけ GitHub へ同期
+// 3) Git が clean / origin 同期済みの時だけ画像設定済みの下書きとして保存
+// 4) レビュー画面に出すため生成下書きだけ GitHub へ同期
 // 5) Telegram で Human review / approval を依頼、のみ。
 // approve / publish / Telegram request 取得は実行しない。
 import { spawnSync } from 'node:child_process'
@@ -126,6 +127,41 @@ function runCommand(command, args, { stdio = 'pipe' } = {}) {
     output: `${result.stdout ?? ''}${result.stderr ?? ''}`.trim(),
     error: result.error,
   }
+}
+
+function checkScheduledGitReadiness() {
+  const status = runCommand('git', ['status', '--porcelain'])
+  if (!status.ok) {
+    return { ok: false, reason: `git status を確認できません: ${status.output.slice(0, 300)}` }
+  }
+  const dirtyLines = status.output.split('\n').filter((line) => line.trim().length > 0)
+  if (dirtyLines.length > 0) {
+    return { ok: false, reason: `未commit変更があります（${dirtyLines.length}件）。先に整理してください。` }
+  }
+
+  const fetch = runCommand('git', ['fetch', 'origin', 'main'])
+  if (!fetch.ok) {
+    return { ok: false, reason: `origin/main の取得に失敗: ${fetch.output.slice(0, 300)}` }
+  }
+
+  const divergence = runCommand('git', ['rev-list', '--left-right', '--count', 'HEAD...origin/main'])
+  if (!divergence.ok) {
+    return { ok: false, reason: `GitHubとの差分確認に失敗: ${divergence.output.slice(0, 300)}` }
+  }
+  const [aheadRaw, behindRaw] = divergence.output.trim().split(/\s+/)
+  const ahead = Number(aheadRaw)
+  const behind = Number(behindRaw)
+  if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
+    return { ok: false, reason: `GitHubとの差分確認結果を読めません: ${divergence.output.slice(0, 120)}` }
+  }
+  if (behind > 0) {
+    return { ok: false, reason: `GitHub側に未取得commitがあります（behind ${behind}）。先にpullしてください。` }
+  }
+  if (ahead > 0) {
+    return { ok: false, reason: `ローカルのみのcommitがあります（ahead ${ahead}）。先にpushまたは整理してください。` }
+  }
+
+  return { ok: true, reason: 'Git状態はcleanでorigin/mainと同期済みです' }
 }
 
 function isSafeGeneratedPostPath(path) {
@@ -364,16 +400,29 @@ if (force && !isSendDay) {
   console.log(`  ⚠️  --force 指定のため${dayName}曜日ですが実行します`)
 }
 
-header('1/3  ネタリスト selected 同期')
-let syncFailed = false
-for (const month of topicSyncMonths()) {
-  const status = run('convert-selected-topics.mjs', ['--month', month, '--yes', '--if-exists', '--allow-empty'])
-  if (status !== 0) syncFailed = true
-}
-
 let generateDecision = shouldGenerateScheduledArticle()
 let scheduledResult = null
 let draftSyncResult = null
+let gitReadiness = { ok: true, reason: '記事生成なし' }
+
+if (generateDecision.ok) {
+  gitReadiness = checkScheduledGitReadiness()
+  if (!gitReadiness.ok) {
+    generateDecision = { ok: false, reason: `Git同期が安全でないため記事生成を停止: ${gitReadiness.reason}` }
+  }
+}
+
+header('1/3  ネタリスト selected 同期')
+let syncFailed = false
+if (!gitReadiness.ok) {
+  console.log(`  ⏭ ${gitReadiness.reason}`)
+} else {
+  for (const month of topicSyncMonths()) {
+    const status = run('convert-selected-topics.mjs', ['--month', month, '--yes', '--if-exists', '--allow-empty'])
+    if (status !== 0) syncFailed = true
+  }
+}
+
 if (syncFailed) {
   generateDecision = { ok: false, reason: 'ネタリスト selected 同期に失敗したため記事生成を停止' }
 }
