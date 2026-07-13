@@ -360,3 +360,11 @@ reviewed_by: 三谷
 date: 2026-07-06
 publish_at: 2026-07-06
 
+## 2026-07-09T18:04:06.947+09:00
+datetime: 2026-07-09T18:04:06.947+09:00
+action: approve
+slug: 2026-07-08-monthly-202606topic019
+reviewed_by: 三谷
+date: 2026-07-08
+publish_at: 2026-07-08
+
