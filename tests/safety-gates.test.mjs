@@ -191,7 +191,7 @@ test('gmb-auth はloopback callbackとstateを認可URLへ固定する', () => {
   assert.equal(url.searchParams.get('redirect_uri'), 'http://127.0.0.1:54321/oauth/callback')
   assert.equal(url.searchParams.get('state'), 'synthetic-state')
   assert.equal(url.searchParams.get('access_type'), 'offline')
-  assert.equal(url.searchParams.get('prompt'), 'consent')
+  assert.equal(url.searchParams.get('prompt'), 'select_account consent')
 })
 
 test('GMB Keychain helperは値を標準出力へ出さず3項目をservice名で取得する', () => {

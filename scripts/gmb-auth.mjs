@@ -23,7 +23,7 @@ export function buildAuthorizationUrl({ clientId, redirectUri, state }) {
     response_type: 'code',
     scope: SCOPE,
     access_type: 'offline',
-    prompt: 'consent',
+    prompt: 'select_account consent',
     state,
   })
 }
