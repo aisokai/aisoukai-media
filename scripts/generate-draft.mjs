@@ -2,10 +2,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import Anthropic from '@anthropic-ai/sdk'
 import { parseCsv } from './csv-parser.mjs'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 import { pickArticleImage } from './lib/auto-post-image.mjs'
+import {
+  OPENAI_MODEL,
+  generateBlogArticleText,
+  loadRepoEnv,
+} from './lib/openai-blog-generator.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -31,16 +35,6 @@ const FIELD_ALIASES = {
   sourceThemeSnapshotId: ['source_theme_snapshot_id', 'theme_snapshot_id', 'snapshot_id'],
   sourceThemeSnapshotHash: ['source_theme_snapshot_hash', 'theme_snapshot_hash', 'snapshot_hash'],
   sourceThemeRowVersion: ['source_theme_row_version', 'theme_row_version', 'row_version'],
-}
-
-// .env.local を読み、process.env に反映する（既存の環境変数は上書きしない）
-function loadEnv() {
-  const envPath = join(ROOT, '.env.local')
-  if (!existsSync(envPath)) return
-  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.+)$/)
-    if (m) process.env[m[1]] ??= m[2].trim().replace(/^["']|["']$/g, '')
-  }
 }
 
 function getField(row, keys) {
@@ -107,7 +101,7 @@ function parseArgs(argv) {
 }
 
 async function main() {
-  loadEnv()
+  loadRepoEnv(ROOT)
 
   const args = parseArgs(process.argv.slice(2))
   const topicId = String(args.topic_id ?? args._[0] ?? '').trim()
@@ -123,11 +117,11 @@ async function main() {
   }
 
   // API キー確認（値はログに出さない）
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    console.error('エラー: ANTHROPIC_API_KEY が未設定です')
+    console.error('エラー: OPENAI_API_KEY が未設定です')
     console.error('  .env.local に以下を追加してください:')
-    console.error('  ANTHROPIC_API_KEY=sk-ant-...')
+    console.error('  OPENAI_API_KEY を設定してください')
     process.exit(1)
   }
 
@@ -220,23 +214,12 @@ async function main() {
   console.log(`  リスク   : ${medicalRisk}`)
   console.log('━'.repeat(50))
   console.log()
-  console.log(`⏳ Claude に記事本文を生成中...`)
+  console.log(`⏳ OpenAI に記事本文を生成中...`)
 
   // プロンプト生成と API 呼び出し
   const prompt = buildArticlePrompt({ title, category, keyword, intent, medicalRisk, topic })
 
-  const client = new Anthropic({ apiKey })
-  const response = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 2000,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const body = response.content[0]?.type === 'text' ? response.content[0].text.trim() : ''
-  if (!body) {
-    console.error('エラー: API からの応答が空でした')
-    process.exit(1)
-  }
+  const { body, response } = await generateBlogArticleText({ prompt })
 
   const qualityIssues = detectGeneratedDraftQualityIssues(body)
   if (qualityIssues.length > 0) {
@@ -307,8 +290,8 @@ ${body}
   console.log()
   console.log(`✅ 生成完了`)
   console.log(`   出力先 : content/posts/${filename}`)
-  console.log(`   モデル : claude-haiku-4-5-20251001`)
-  console.log(`   トークン: 入力 ${response.usage.input_tokens} / 出力 ${response.usage.output_tokens}`)
+  console.log(`   モデル : ${OPENAI_MODEL}`)
+  console.log(`   トークン: 入力 ${response.usage?.prompt_tokens ?? 0} / 出力 ${response.usage?.completion_tokens ?? 0}`)
   console.log(`   image  : ok (${pickedImage.image_id})`)
   console.log(`   image_alt: ok`)
   console.log()

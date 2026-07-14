@@ -1,6 +1,6 @@
 /**
  * カテゴリ別セクション構成と医療ライティングガイドラインを組み合わせて
- * Claude に渡すプロンプト文字列を生成する。API 呼び出しは行わない。
+ * 記事生成AIに渡すプロンプト文字列を生成する。API 呼び出しは行わない。
  */
 
 const SECTION_MAP = {
@@ -97,7 +97,7 @@ const SECTION_MAP = {
  *   medicalRisk: string,
  *   topic: string,
  * }} params
- * @returns {string} Claude に渡すプロンプト文字列
+ * @returns {string} 記事生成AIに渡すプロンプト文字列
  */
 export function buildArticlePrompt({ title, category, keyword, intent, medicalRisk, topic }) {
   const sections = SECTION_MAP[category] ?? SECTION_MAP['その他']
