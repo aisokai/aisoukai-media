@@ -10,7 +10,7 @@ import { pickArticleImage } from './lib/auto-post-image.mjs'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const TOPICS_PATH = join(ROOT, 'data', 'article-topics.sample.csv')
-const POSTS_DIR = join(ROOT, 'content', 'posts')
+const DEFAULT_POSTS_DIR = join(ROOT, 'content', 'posts')
 
 const VALID_CATEGORIES = new Set([
   '虫歯治療', '根管治療', '歯周病治療', '予防歯科', '小児歯科',
@@ -27,6 +27,10 @@ const FIELD_ALIASES = {
   publishDate: ['publish_date'],
   topic:       ['topic'],
   notes:       ['notes'],
+  sourceThemeTopicId:    ['source_theme_topic_id', 'theme_topic_id', 'theme_id', 'source_topic_id'],
+  sourceThemeSnapshotId: ['source_theme_snapshot_id', 'theme_snapshot_id', 'snapshot_id'],
+  sourceThemeSnapshotHash: ['source_theme_snapshot_hash', 'theme_snapshot_hash', 'snapshot_hash'],
+  sourceThemeRowVersion: ['source_theme_row_version', 'theme_row_version', 'row_version'],
 }
 
 // .env.local を読み、process.env に反映する（既存の環境変数は上書きしない）
@@ -109,6 +113,8 @@ async function main() {
   const topicId = String(args.topic_id ?? args._[0] ?? '').trim()
   const force = args.force === true
   const publish_date_override = String(args.publish_date ?? '').trim()
+  const topicsPath = String(args.topics_path ?? TOPICS_PATH).trim() || TOPICS_PATH
+  const postsDir = String(args.posts_dir ?? DEFAULT_POSTS_DIR).trim() || DEFAULT_POSTS_DIR
 
   if (!topicId) {
     console.error('使い方: npm run generate:draft -- TOPIC-20260511-001')
@@ -128,9 +134,9 @@ async function main() {
   // CSV 読み込み
   let raw
   try {
-    raw = readFileSync(TOPICS_PATH, 'utf8')
+    raw = readFileSync(topicsPath, 'utf8')
   } catch {
-    console.error(`エラー: ${TOPICS_PATH} が見つかりません`)
+    console.error(`エラー: ${topicsPath} が見つかりません`)
     process.exit(1)
   }
 
@@ -167,6 +173,10 @@ async function main() {
   const topic       = getField(row, FIELD_ALIASES.topic)
   const medicalRisk = getField(row, FIELD_ALIASES.medicalRisk)
   const notes       = getField(row, FIELD_ALIASES.notes)
+  const sourceThemeTopicId = getField(row, FIELD_ALIASES.sourceThemeTopicId) || topicId
+  const sourceThemeSnapshotId = getField(row, FIELD_ALIASES.sourceThemeSnapshotId)
+  const sourceThemeSnapshotHash = getField(row, FIELD_ALIASES.sourceThemeSnapshotHash)
+  const sourceThemeRowVersion = getField(row, FIELD_ALIASES.sourceThemeRowVersion)
 
   // 必須フィールド検証
   const missing = []
@@ -186,7 +196,7 @@ async function main() {
   // 出力ファイルパス確定
   const slug     = slugify(topicId)
   const filename = `${publishDate}-${slug}.md`
-  const filePath = join(POSTS_DIR, filename)
+  const filePath = join(postsDir, filename)
 
   // 既存ファイルチェック（--force なしは安全停止）
   if (existsSync(filePath)) {
@@ -268,6 +278,7 @@ tags:
 ${tagsYaml}
 author: 藍想会メディア編集部
 reviewed: false
+draft: true
 review_mode: auto
 auto_approved: false
 publication_status: draft
@@ -278,6 +289,10 @@ image: "${esc(pickedImage.image)}"
 image_alt: "${esc(pickedImage.image_alt)}"
 ai_generated: true
 source_topic_id: "${esc(topicId)}"
+source_theme_topic_id: "${esc(sourceThemeTopicId)}"
+source_theme_snapshot_id: "${esc(sourceThemeSnapshotId)}"
+source_theme_snapshot_hash: "${esc(sourceThemeSnapshotHash)}"
+source_theme_row_version: "${esc(sourceThemeRowVersion)}"
 source_notes: "${esc(notes)}"
 ---
 
@@ -285,7 +300,7 @@ ${body}
 `
 
   // ファイル書き込み
-  mkdirSync(POSTS_DIR, { recursive: true })
+  mkdirSync(postsDir, { recursive: true })
   writeFileSync(filePath, content, 'utf8')
 
   // 完了メッセージ（パス表示）

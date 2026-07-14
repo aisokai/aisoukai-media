@@ -11,6 +11,8 @@
     "new:post": "node scripts/new-post.mjs",
     "import:topic": "node scripts/import-topic.mjs",
     "generate:draft": "node scripts/generate-draft.mjs",
+    "theme-blog:dry-run": "node scripts/theme-blog-flow.mjs --dry-run",
+    "theme-blog:generate": "node scripts/theme-blog-flow.mjs --generate",
     "validate:posts": "node scripts/validate-posts.mjs",
     "validate:topics": "node scripts/validate-topics.mjs",
     "research:trends": "node scripts/research-trends.mjs",
