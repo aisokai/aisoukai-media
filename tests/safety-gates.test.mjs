@@ -6,7 +6,12 @@ import { mkdtempSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { upsertEnvValue } from '../scripts/gmb-auth.mjs'
+import { buildAuthorizationUrl } from '../scripts/gmb-auth.mjs'
+import {
+  GMB_KEYCHAIN_SERVICES,
+  getGmbKeychainCredentials,
+  saveGmbRefreshToken,
+} from '../scripts/lib/gmb-keychain.mjs'
 import { applyJob, createDeleteRequest, DELETE_TYPES } from '../scripts/lib/media-apply.mjs'
 import { approveMediaJob } from '../scripts/lib/telegram-media-commands.mjs'
 import { notifyTelegramIfConfigured } from '../scripts/lib/telegram-notify.mjs'
@@ -158,26 +163,57 @@ test('通知系flagは実configで初期OFF', () => {
 
 // ── 4. gmb-auth は refresh token を stdout に表示しない ────────────────
 
-test('gmb-auth --exchange は --write-env なしでは秘密値を表示せず終了する', () => {
-  const result = spawnSync('node', ['scripts/gmb-auth.mjs', '--exchange', 'dummy-code'], {
-    cwd: ROOT, encoding: 'utf8',
-    env: { ...process.env, GMB_CLIENT_ID: 'dummy', GMB_CLIENT_SECRET: 'dummy' },
+test('gmb-auth は完全一致のHuman GateなしではOAuthを開始しない', () => {
+  const result = spawnSync('node', ['scripts/gmb-auth.mjs', '--authorize'], {
+    cwd: ROOT, encoding: 'utf8', env: process.env,
   })
-  assert.notEqual(result.status, 0, '--write-env なしは非0終了')
+  assert.notEqual(result.status, 0)
   const output = `${result.stdout}\n${result.stderr}`
-  assert.ok(!output.includes('GMB_REFRESH_TOKEN='), '秘密値の行を出力してはならない')
-  assert.match(output, /--write-env/)
+  assert.doesNotMatch(output, /refresh_token|client_secret/i)
+  assert.match(output, /GMB_OAUTH_KEYCHAIN/)
 })
 
 test('gmb-auth は refresh token を console 出力する実装を持たない', () => {
   const source = readFileSync(join(ROOT, 'scripts', 'gmb-auth.mjs'), 'utf8')
-  assert.doesNotMatch(source, /console\.(?:log|error)\([^)]*GMB_REFRESH_TOKEN/)
+  assert.doesNotMatch(source, /urn:ietf:wg:oauth:2\.0:oob/)
+  assert.match(source, /127\.0\.0\.1/)
+  assert.match(source, /saveGmbRefreshToken/)
   assert.doesNotMatch(source, /show-token/)
 })
 
-test('refresh token は .env.local の値としてupsertされる', () => {
-  const next = upsertEnvValue('GMB_CLIENT_ID=client\nGMB_REFRESH_TOKEN=old\n', 'GMB_REFRESH_TOKEN', 'new-secret')
-  assert.match(next, /GMB_CLIENT_ID=client/)
-  assert.match(next, /GMB_REFRESH_TOKEN=new-secret/)
-  assert.doesNotMatch(next, /GMB_REFRESH_TOKEN=old/)
+test('gmb-auth はloopback callbackとstateを認可URLへ固定する', () => {
+  const url = new URL(buildAuthorizationUrl({
+    clientId: 'synthetic-client',
+    redirectUri: 'http://127.0.0.1:54321/oauth/callback',
+    state: 'synthetic-state',
+  }))
+  assert.equal(url.hostname, 'accounts.google.com')
+  assert.equal(url.searchParams.get('redirect_uri'), 'http://127.0.0.1:54321/oauth/callback')
+  assert.equal(url.searchParams.get('state'), 'synthetic-state')
+  assert.equal(url.searchParams.get('access_type'), 'offline')
+  assert.equal(url.searchParams.get('prompt'), 'consent')
+})
+
+test('GMB Keychain helperは値を標準出力へ出さず3項目をservice名で取得する', () => {
+  const requested = []
+  const credentials = getGmbKeychainCredentials({
+    account: 'synthetic-user',
+    execFileSyncImpl: (_file, args) => {
+      requested.push(args)
+      return `value-for-${args[4]}`
+    },
+  })
+  assert.equal(Object.keys(credentials).length, 3)
+  assert.deepEqual(requested.map((args) => args[4]), Object.values(GMB_KEYCHAIN_SERVICES))
+})
+
+test('Refresh Token保存はKeychain serviceだけを更新する', () => {
+  let invocation
+  saveGmbRefreshToken('synthetic-refresh-token-value', {
+    account: 'synthetic-user',
+    execFileSyncImpl: (file, args, options) => { invocation = { file, args, options } },
+  })
+  assert.equal(invocation.file, '/usr/bin/security')
+  assert.ok(invocation.args.includes(GMB_KEYCHAIN_SERVICES.refreshToken))
+  assert.deepEqual(invocation.options.stdio, ['ignore', 'ignore', 'ignore'])
 })

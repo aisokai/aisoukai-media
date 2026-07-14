@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './media-queue.mjs'
+import { getGmbKeychainCredentials } from './gmb-keychain.mjs'
 
 export const GMB_LOCATION_CONFIG_PATH = join(ROOT, 'config', 'gmb-location.json')
 
@@ -31,7 +32,12 @@ export function loadEnvLocal() {
 export function getGmbCredentials() {
   loadEnvLocal()
   const { GMB_CLIENT_ID, GMB_CLIENT_SECRET, GMB_REFRESH_TOKEN } = process.env
-  return { clientId: GMB_CLIENT_ID, clientSecret: GMB_CLIENT_SECRET, refreshToken: GMB_REFRESH_TOKEN }
+  const keychain = getGmbKeychainCredentials()
+  return {
+    clientId: keychain.clientId || GMB_CLIENT_ID,
+    clientSecret: keychain.clientSecret || GMB_CLIENT_SECRET,
+    refreshToken: keychain.refreshToken || GMB_REFRESH_TOKEN,
+  }
 }
 
 export function requireCredentials() {
@@ -41,7 +47,7 @@ export function requireCredentials() {
   if (!creds.clientSecret) missing.push('GMB_CLIENT_SECRET')
   if (!creds.refreshToken) missing.push('GMB_REFRESH_TOKEN')
   if (missing.length > 0) {
-    throw new Error(`GMB認証情報が未設定です: ${missing.join(', ')} (.env.local に設定してください。手順: docs/gmb-oauth-setup-guide.md)`)
+    throw new Error(`GMB認証情報が未設定です: ${missing.join(', ')} (Mac mini Keychainを確認してください。手順: docs/gmb-oauth-setup-guide.md)`)
   }
   return creds
 }

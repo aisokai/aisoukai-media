@@ -25,21 +25,19 @@
 
 1. 「認証情報 → 認証情報を作成 → OAuthクライアントID」
 2. 種類: **デスクトップアプリ**
-3. 表示された クライアントID / クライアントシークレット を `.env.local` に追記:
+3. 表示されたクライアントID / クライアントシークレットをMac miniのログインKeychainへ登録:
 
-```
-GMB_CLIENT_ID=<クライアントID>
-GMB_CLIENT_SECRET=<クライアントシークレット>
-```
+- `io.mitanios.gmb.client-id`
+- `io.mitanios.gmb.client-secret`
 
 ## Step 4: refresh token 取得 (初回のみ)
 
 ```bash
-npm run media:gmb:auth -- --url        # 表示されたURLをブラウザで開く → GMB管理者アカウントで承認 → codeをコピー
-npm run media:gmb:auth -- --exchange <code> --write-env
+npm run media:gmb:auth -- --authorize --confirm GMB_OAUTH_KEYCHAIN
 ```
 
-refresh token は stdout に表示されず、`.env.local` の `GMB_REFRESH_TOKEN` に直接保存されます。
+localhost callbackで認証結果を受け取り、refresh tokenはstdoutに表示せずMac mini Keychainの
+`io.mitanios.gmb.refresh-token`へ直接保存されます。手動codeコピー方式は使用しません。
 **refresh token は秘密値です。チャット・commit・スクリーンショット・他人への共有に含めないでください。**
 
 ## Step 5: location ID 取得

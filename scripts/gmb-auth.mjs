@@ -1,116 +1,146 @@
 #!/usr/bin/env node
-// GMB OAuth 初回認可ヘルパー (先生が手動実行する)。
-// refresh token を取得し、明示指定時のみ .env.local に直接保存する。
-// 秘密値は stdout / log / Markdown に表示しない。
-//
-// 使い方:
-//   1) .env.local に GMB_CLIENT_ID / GMB_CLIENT_SECRET を設定
-//   2) node scripts/gmb-auth.mjs --url                         → 認可URLを表示。ブラウザで開いて承認
-//   3) node scripts/gmb-auth.mjs --exchange <code> --write-env → refresh token を .env.local に保存
-//      --write-env の明示なしには交換しない (codeを消費しない)
+// Human-gated localhost OAuth helper. No GMB content is read, posted, or replied to.
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { execFile } from 'node:child_process'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { createServer } from 'node:http'
 import { pathToFileURL } from 'node:url'
-import { getGmbCredentials } from './lib/gmb-api.mjs'
-import { ROOT } from './lib/media-queue.mjs'
+import {
+  getGmbKeychainCredentials,
+  saveGmbRefreshToken,
+} from './lib/gmb-keychain.mjs'
 
-const REDIRECT_URI = 'urn:ietf:wg:oauth:2.0:oob'
+const HOST = '127.0.0.1'
+const CALLBACK_PATH = '/oauth/callback'
 const SCOPE = 'https://www.googleapis.com/auth/business.manage'
+const CONFIRMATION = 'GMB_OAUTH_KEYCHAIN'
+const TIMEOUT_MS = 5 * 60 * 1000
 
-function requireClient() {
-  const { clientId, clientSecret } = getGmbCredentials()
-  if (!clientId || !clientSecret) {
-    console.error('❌ GMB_CLIENT_ID / GMB_CLIENT_SECRET を .env.local に設定してください (手順: docs/gmb-oauth-setup-guide.md)')
-    process.exit(1)
-  }
-  return { clientId, clientSecret }
-}
-
-export function upsertEnvValue(raw, key, value) {
-  const lines = String(raw ?? '').split('\n')
-  let replaced = false
-  const out = lines.map((line) => {
-    if (line.match(new RegExp(`^${key}\\s*=`))) {
-      replaced = true
-      return `${key}=${value}`
-    }
-    return line
+export function buildAuthorizationUrl({ clientId, redirectUri, state }) {
+  return 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: SCOPE,
+    access_type: 'offline',
+    prompt: 'consent',
+    state,
   })
-  if (!replaced) {
-    if (out.length > 0 && out[out.length - 1] !== '') out.push('')
-    out.push(`${key}=${value}`)
+}
+
+function exactConfirmationPresent(argv) {
+  const index = argv.indexOf('--confirm')
+  return argv[index + 1] === CONFIRMATION
+}
+
+function requireClientCredentials() {
+  const credentials = getGmbKeychainCredentials()
+  if (!credentials.clientId || !credentials.clientSecret) {
+    throw new Error('GMB OAuth client情報がMac mini Keychainにありません')
   }
-  return `${out.filter((line, i) => !(i === out.length - 1 && line === '')).join('\n')}\n`
+  return credentials
 }
 
-function saveRefreshTokenToEnv(refreshToken, envPath = join(ROOT, '.env.local')) {
-  const current = existsSync(envPath) ? readFileSync(envPath, 'utf8') : ''
-  writeFileSync(envPath, upsertEnvValue(current, 'GMB_REFRESH_TOKEN', refreshToken), 'utf8')
-}
-
-async function main() {
-  if (process.argv.includes('--url')) {
-    const { clientId } = requireClient()
-    const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+async function exchangeAuthorizationCode({ code, clientId, clientSecret, redirectUri, fetchImpl = fetch }) {
+  const response = await fetchImpl('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
       client_id: clientId,
-      redirect_uri: REDIRECT_URI,
-      response_type: 'code',
-      scope: SCOPE,
-      access_type: 'offline',
-      prompt: 'consent',
+      client_secret: clientSecret,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+    }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || typeof payload.refresh_token !== 'string') {
+    throw new Error(`OAuth token交換に失敗しました (HTTP ${response.status})`)
+  }
+  return payload.refresh_token
+}
+
+function stateMatches(expected, actual) {
+  const expectedBytes = Buffer.from(expected)
+  const actualBytes = Buffer.from(actual)
+  return expectedBytes.length === actualBytes.length && timingSafeEqual(expectedBytes, actualBytes)
+}
+
+async function authorize() {
+  const { clientId, clientSecret } = requireClientCredentials()
+  const state = randomBytes(32).toString('hex')
+
+  await new Promise((resolve, reject) => {
+    let settled = false
+    const finish = (error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      server.close(() => error ? reject(error) : resolve())
+    }
+
+    const server = createServer(async (request, response) => {
+      try {
+        const requestUrl = new URL(request.url ?? '/', `http://${HOST}`)
+        if (requestUrl.pathname !== CALLBACK_PATH) {
+          response.writeHead(404).end('Not found')
+          return
+        }
+        const returnedState = requestUrl.searchParams.get('state') ?? ''
+        const code = requestUrl.searchParams.get('code') ?? ''
+        if (!stateMatches(state, returnedState) || !code) {
+          response.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+          response.end('OAuth verification failed. Close this tab.')
+          finish(new Error('OAuth callback検証に失敗しました'))
+          return
+        }
+        const address = server.address()
+        if (!address || typeof address === 'string') throw new Error('OAuth callback address unavailable')
+        const redirectUri = `http://${HOST}:${address.port}${CALLBACK_PATH}`
+        const refreshToken = await exchangeAuthorizationCode({ code, clientId, clientSecret, redirectUri })
+        saveGmbRefreshToken(refreshToken)
+        response.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
+        response.end('MitaniOS GMB OAuth completed. You can close this tab.')
+        finish()
+      } catch (error) {
+        if (!response.headersSent) response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
+        response.end('OAuth setup failed. Close this tab and return to MitaniOS.')
+        finish(error instanceof Error ? error : new Error('OAuth setup failed'))
+      }
     })
-    console.log('以下のURLをブラウザで開き、承認後に表示されるcodeをコピーしてください:\n')
-    console.log(url)
-    console.log('\n次: node scripts/gmb-auth.mjs --exchange <code> --write-env')
+
+    const timeout = setTimeout(() => finish(new Error('OAuth認証がタイムアウトしました')), TIMEOUT_MS)
+    server.listen(0, HOST, () => {
+      const address = server.address()
+      if (!address || typeof address === 'string') {
+        finish(new Error('OAuth callback serverを開始できません'))
+        return
+      }
+      const redirectUri = `http://${HOST}:${address.port}${CALLBACK_PATH}`
+      const authorizationUrl = buildAuthorizationUrl({ clientId, redirectUri, state })
+      execFile('/usr/bin/open', [authorizationUrl], { stdio: 'ignore' }, (error) => {
+        if (error) finish(new Error('Google認証画面を開けませんでした'))
+      })
+      console.log('Google認証画面を開きました。GMB管理アカウントで承認してください。')
+      console.log('Refresh Tokenは値を表示せずMac mini Keychainへ保存します。')
+    })
+  })
+
+  console.log('GMB OAuth接続をKeychainへ保存しました。投稿・返信は実行していません。')
+}
+
+async function main(argv = process.argv.slice(2)) {
+  if (!argv.includes('--authorize') || !exactConfirmationPresent(argv)) {
+    console.error(`実行には --authorize --confirm ${CONFIRMATION} が必要です。`)
+    process.exitCode = 1
     return
   }
-
-  const exIdx = process.argv.indexOf('--exchange')
-  if (exIdx >= 0) {
-    const code = process.argv[exIdx + 1]
-    if (!code) {
-      console.error('書式: node scripts/gmb-auth.mjs --exchange <code> --write-env')
-      process.exit(1)
-    }
-    // 安全装置: refresh token は秘密値のため stdout には出さない。
-    // --write-env が無ければ交換自体を行わず、使い捨てcodeを消費しない。
-    if (!process.argv.includes('--write-env')) {
-      console.error('⛔ refresh token は秘密値のため表示しません。保存する場合のみ --write-env を付けて再実行してください:')
-      console.error(`   node scripts/gmb-auth.mjs --exchange ${code.slice(0, 4)}... --write-env`)
-      console.error('   (.env.local はgitignore対象です。チャット・ログ・commit・スクリーンショットに秘密値を含めないでください)')
-      process.exit(1)
-    }
-    const { clientId, clientSecret } = requireClient()
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: REDIRECT_URI,
-      }),
-    })
-    const json = await res.json()
-    if (!res.ok || !json.refresh_token) {
-      console.error(`❌ 交換に失敗しました (HTTP ${res.status})。codeの期限切れ・redirect URI設定を確認してください`)
-      process.exit(1)
-    }
-    saveRefreshTokenToEnv(json.refresh_token)
-    console.log('✅ refresh token を取得し、.env.local に保存しました (値は表示していません)')
-    console.log('   .env.local はgitignore対象です。チャット・ログ・commitに含めないでください。')
-    return
-  }
-
-  console.log('使い方: --url で認可URL表示 → --exchange <code> --write-env で refresh token を .env.local に保存')
-  console.log('(refresh token はstdoutに表示しません)')
+  await authorize()
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((err) => {
-    console.error(`❌ ${err.message}`)
-    process.exit(1)
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : 'GMB OAuth setup failed')
+    process.exitCode = 1
   })
 }
