@@ -1510,6 +1510,75 @@
       ],
       "license_source": "院内提供",
       "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）"
+    },
+    {
+      "id": "general-ai-summer-family-travel-tooth-check",
+      "path": "/images/library/general/ai-summer-family-travel-tooth-check.png",
+      "category": "general",
+      "title": "夏の家族旅行前の歯科チェックをイメージする家族",
+      "alt": "夏の家族旅行前の歯科チェックをイメージする家族のイメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "sha256": "2f27d888ead89dfff3927e65df58493546988492c77e603deae86068aa390fd8",
+      "source_filename": "ai-summer-family-travel-tooth-check.png",
+      "license_status": "assumed_approved",
+      "usage_status": "active",
+      "created_at": "2026-07-15T09:45:57.242Z",
+      "updated_at": "2026-07-15T09:45:57.242Z",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "license_source": "院内提供",
+      "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）",
+      "note": "AI生成画像。ブログ見出し用（夏の旅行前に歯の痛みが不安な人が確認したいこと）"
+    },
+    {
+      "id": "general-ai-summer-travel-tooth-check-clinic",
+      "path": "/images/library/general/ai-summer-travel-tooth-check-clinic.png",
+      "category": "general",
+      "title": "旅行前の歯科相談をイメージする女性",
+      "alt": "旅行前の歯科相談をイメージする女性のイメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "sha256": "9ad0c651f62cfb9f02e98c0f79ef8d5e67191633e6c67bba7322d175b6ff2b8a",
+      "source_filename": "ai-summer-travel-tooth-check-clinic.png",
+      "license_status": "assumed_approved",
+      "usage_status": "active",
+      "created_at": "2026-07-15T09:45:57.243Z",
+      "updated_at": "2026-07-15T09:45:57.243Z",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "license_source": "院内提供",
+      "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）",
+      "note": "AI生成画像。ブログ見出し用（夏の旅行前に歯の痛みが不安な人が確認したいこと）"
+    },
+    {
+      "id": "general-ai-summer-travel-tooth-check-home",
+      "path": "/images/library/general/ai-summer-travel-tooth-check-home.png",
+      "category": "general",
+      "title": "夏の旅行前に頬へ手を添えて準備する女性",
+      "alt": "夏の旅行前に頬へ手を添えて準備する女性のイメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "sha256": "aaa1894248946517e88f46044e4e5c223d15f7145002d8ae5e27b7c36a9e8483",
+      "source_filename": "ai-summer-travel-tooth-check-home.png",
+      "license_status": "assumed_approved",
+      "usage_status": "active",
+      "created_at": "2026-07-15T09:45:57.244Z",
+      "updated_at": "2026-07-15T09:45:57.244Z",
+      "tags": [
+        "歯科",
+        "歯科診療"
+      ],
+      "license_source": "院内提供",
+      "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）",
+      "note": "AI生成画像。ブログ見出し用（夏の旅行前に歯の痛みが不安な人が確認したいこと）"
     }
   ]
 }
