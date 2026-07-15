@@ -12,7 +12,8 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.match(source, /--result-json/)
   assert.match(source, /--no-notify/)
   assert.match(source, /--publish-today/)
-  assert.match(source, /ANTHROPIC_API_KEY 未設定/)
+  assert.match(source, /OPENAI_API_KEY 未設定/)
+  assert.doesNotMatch(source, /ANTHROPIC_API_KEY/)
   assert.match(source, /本文確認・承認/)
   assert.match(source, /checkScheduledGitReadiness/)
   assert.match(source, /syncGeneratedDraftToGitHub/)
@@ -43,12 +44,14 @@ test('ops:mwf rejects auto-publish and keeps article approval as body review onl
 
 test('ops:mwf has a process lock to prevent cron and launchd double generation', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const gitignore = readFileSync('.gitignore', 'utf8')
 
   assert.match(source, /ops-mwf\.lock/)
   assert.match(source, /acquireRunLock/)
   assert.match(source, /openSync\(LOCK_PATH, 'wx'\)/)
   assert.match(source, /別の ops:mwf が実行中です/)
   assert.match(source, /process\.on\('exit', releaseRunLock\)/)
+  assert.match(gitignore, /^logs\/ops-mwf\.lock$/m)
 })
 
 test('ops:mwf only syncs the generated draft path to GitHub for production review', () => {

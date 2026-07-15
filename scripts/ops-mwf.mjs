@@ -289,8 +289,8 @@ function shouldGenerateScheduledArticle() {
     return { ok: false, reason: '--no-generate 指定のため記事生成をスキップ' }
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { ok: false, reason: 'ANTHROPIC_API_KEY 未設定のため記事生成をスキップ' }
+  if (!process.env.OPENAI_API_KEY) {
+    return { ok: false, reason: 'OPENAI_API_KEY 未設定のため記事生成をスキップ' }
   }
 
   return { ok: true }
