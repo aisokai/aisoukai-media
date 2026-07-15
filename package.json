@@ -99,6 +99,7 @@
     "media:notify:pending": "node scripts/notify-media-pending.mjs",
     "media:gmb:discover": "node scripts/gmb-discovery.mjs",
     "media:gmb:auth": "node scripts/gmb-auth.mjs",
+    "media:gmb:connection:check": "node scripts/gmb-readonly-check.mjs",
     "media:gmb:apply": "node scripts/gmb-apply.mjs",
     "media:executor": "node scripts/media-executor.mjs",
     "media:executor:apply": "node scripts/media-executor.mjs --apply",
