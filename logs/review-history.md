@@ -368,3 +368,11 @@ reviewed_by: 三谷
 date: 2026-07-08
 publish_at: 2026-07-08
 
+## 2026-07-15T19:01:15.266+09:00
+datetime: 2026-07-15T19:01:15.266+09:00
+action: approve
+slug: 2026-07-15-monthly-202606topic020
+reviewed_by: 三谷
+date: 2026-07-15
+publish_at: 2026-07-15
+
