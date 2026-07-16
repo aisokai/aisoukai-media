@@ -41,13 +41,17 @@ test('localPost payload は日本語STANDARD投稿として組み立てられる
 
 test('認証情報が未設定なら明示エラーで停止する (秘密値は表示しない)', () => {
   const saved = {}
+  const savedUser = process.env.USER
   for (const key of ['GMB_CLIENT_ID', 'GMB_CLIENT_SECRET', 'GMB_REFRESH_TOKEN']) {
     saved[key] = process.env[key]
     process.env[key] = ''
   }
+  process.env.USER = ''
   try {
     assert.throws(() => requireCredentials(), /GMB_CLIENT_ID|GMB認証情報/)
   } finally {
+    if (savedUser === undefined) delete process.env.USER
+    else process.env.USER = savedUser
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value

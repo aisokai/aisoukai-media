@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { loadContentStatus } from './lib/content-status.mjs'
+import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -114,9 +115,9 @@ function run(script, extraArgs = []) {
   return result.status ?? (result.error ? 1 : 0)
 }
 
-function runCommand(command, args, { stdio = 'pipe' } = {}) {
+function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
   const result = spawnSync(command, args, {
-    cwd: ROOT,
+    cwd,
     env: process.env,
     encoding: 'utf8',
     stdio,
@@ -166,6 +167,15 @@ function checkScheduledGitReadiness() {
 
 function isSafeGeneratedPostPath(path) {
   return /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(String(path ?? ''))
+}
+
+function isLegacyTopicPoolExhausted(status, result) {
+  if (status !== 2 || String(result?.topicId ?? '').trim() || String(result?.path ?? '').trim()) {
+    return false
+  }
+  return (result?.reasons ?? []).some((reason) =>
+    String(reason).includes('公開日が今日以前の未生成 approved topic はありません'),
+  )
 }
 
 function syncGeneratedDraftToGitHub(scheduledResult) {
@@ -434,7 +444,17 @@ if (!generateDecision.ok) {
   const resultPath = join(tmpdir(), `aisoukai-scheduled-result-${process.pid}.json`)
   const status = run('scheduled-article-flow.mjs', ['--publish-today', '--no-notify', '--result-json', resultPath])
   scheduledResult = readJsonIfExists(resultPath)
-  if (status !== 0) {
+  if (isLegacyTopicPoolExhausted(status, scheduledResult)) {
+    console.log('  従来ネタCSVに候補がないため、テーマリサーチから補充します ...')
+    scheduledResult = runThemeOpsFallback({
+      today: TODAY,
+      runProcess: runCommand,
+    })
+    if (!scheduledResult.ok) {
+      console.log(`  ⚠️ ${scheduledResult.reason}`)
+      process.exitCode = 1
+    }
+  } else if (status !== 0) {
     const reason = scheduledResult?.reasons?.[0] ?? `scheduled-article-flow.mjs が exit ${status} で停止`
     console.log(`  ⚠️ ${reason}`)
     process.exitCode = 1

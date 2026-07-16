@@ -7,6 +7,7 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
 
   assert.match(source, /月水金 08:30 の定期記事生成 CLI/)
   assert.match(source, /scheduled-article-flow\.mjs/)
+  assert.match(source, /runThemeOpsFallback/)
   assert.match(source, /--no-generate/)
   assert.match(source, /--auto-publish/)
   assert.match(source, /--result-json/)
@@ -31,6 +32,20 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.ok(syncIndex > scheduledIndex)
   assert.ok(notificationBuildIndex > scheduledIndex)
   assert.ok(sendIndex > notificationBuildIndex)
+})
+
+test('ops:mwf falls back to the canonical theme CSV only after the legacy topic pool is exhausted', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
+  const fallbackIndex = source.indexOf('runThemeOpsFallback({')
+  const syncIndex = source.indexOf('draftSyncResult = syncGeneratedDraftToGitHub')
+  assert.ok(fallbackIndex > scheduledIndex)
+  assert.ok(syncIndex > fallbackIndex)
+  assert.match(source, /function isLegacyTopicPoolExhausted/)
+  assert.match(source, /isLegacyTopicPoolExhausted\(status, scheduledResult\)/)
+  assert.match(source, /未生成 approved topic はありません/)
+  assert.match(source, /テーマリサーチから補充します/)
 })
 
 test('ops:mwf rejects auto-publish and keeps article approval as body review only', () => {
