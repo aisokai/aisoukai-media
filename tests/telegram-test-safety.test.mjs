@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { EXPLICIT_SEND_FLAG, runTelegramLiveCheck } from '../scripts/telegram-notify-live-check.mjs'
+import { spawnSync } from 'node:child_process'
+import { EXPLICIT_SEND_FLAG, hasExplicitHumanGate, HUMAN_APPROVAL_FLAG } from '../scripts/lib/explicit-execution-gate.mjs'
 
 const ROOT = process.cwd()
 
@@ -13,31 +14,15 @@ test('通常テストは *.test.mjs の明示対象だけを収集する', () =>
   assert.match(packageJson.scripts['telegram:notify:live-check'], /telegram-notify-live-check\.mjs/)
 })
 
-test('live Telegram確認は --send なしでは環境読込も送信も行わない', async () => {
-  let loadEnvCalled = false
-  let sendCalled = false
-  const result = await runTelegramLiveCheck({
-    argv: [],
-    env: {},
-    loadEnvImpl: () => { loadEnvCalled = true },
-    sendTelegramImpl: async () => { sendCalled = true },
-  })
-  assert.deepEqual(result, { sent: false, reason: 'explicit-send-required' })
-  assert.equal(loadEnvCalled, false)
-  assert.equal(sendCalled, false)
+test('live Telegram確認は二重の明示Human Gateなしでは到達不能', () => {
+  assert.equal(hasExplicitHumanGate([]), false)
+  assert.equal(hasExplicitHumanGate([EXPLICIT_SEND_FLAG]), false)
+  assert.equal(hasExplicitHumanGate([HUMAN_APPROVAL_FLAG]), false)
+  assert.equal(hasExplicitHumanGate([EXPLICIT_SEND_FLAG, HUMAN_APPROVAL_FLAG]), true)
 })
 
-test('live Telegram確認は --send を明示しても注入したmockだけを使う', async () => {
-  let sent = null
-  const env = { TELEGRAM_BOT_TOKEN: 'synthetic-token', TELEGRAM_CHAT_ID: 'synthetic-chat' }
-  const result = await runTelegramLiveCheck({
-    argv: [EXPLICIT_SEND_FLAG],
-    env,
-    loadEnvImpl: () => {},
-    sendTelegramImpl: async (token, chatId, text) => { sent = { token, chatId, text } },
-  })
-  assert.deepEqual(result, { sent: true, reason: 'sent' })
-  assert.deepEqual(sent, {
-    token: 'synthetic-token', chatId: 'synthetic-chat', text: 'aisoukai-media Telegram notification test',
-  })
+test('live CLIは無引数でfail-closedし、送信実装を読まない', () => {
+  const result = spawnSync(process.execPath, ['scripts/telegram-notify-live-check.mjs'], { cwd: ROOT, env: { PATH: process.env.PATH }, encoding: 'utf8' })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /--send.*--human-approved/)
 })

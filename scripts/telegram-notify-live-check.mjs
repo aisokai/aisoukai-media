@@ -6,10 +6,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { EXPLICIT_SEND_FLAG, hasExplicitHumanGate, HUMAN_APPROVAL_FLAG } from './lib/explicit-execution-gate.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
-export const EXPLICIT_SEND_FLAG = '--send'
 
 function loadEnv(env = process.env) {
   const envPath = join(ROOT, '.env.local')
@@ -20,35 +20,26 @@ function loadEnv(env = process.env) {
   }
 }
 
-async function sendTelegram(botToken, chatId, text, fetchImpl = fetch) {
-  const res = await fetchImpl(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  })
-  const json = await res.json()
-  if (!json.ok) throw new Error(`Telegram API エラー: ${json.description ?? JSON.stringify(json)}`)
-  return json
-}
-
 export async function runTelegramLiveCheck({
-  argv = process.argv.slice(2), env = process.env, loadEnvImpl = loadEnv, sendTelegramImpl = sendTelegram,
+  argv = process.argv.slice(2), env = process.env, loadEnvImpl = loadEnv,
+  loadSenderImpl = async () => (await import('./telegram-live-send.mjs')).sendTelegram,
 } = {}) {
-  if (!argv.includes(EXPLICIT_SEND_FLAG)) return { sent: false, reason: 'explicit-send-required' }
+  if (!hasExplicitHumanGate(argv)) return { sent: false, reason: 'explicit-human-gate-required' }
 
   loadEnvImpl(env)
   const botToken = env.TELEGRAM_BOT_TOKEN
   const chatId = env.TELEGRAM_CHAT_ID
   if (!botToken || !chatId) return { sent: false, reason: 'missing-credentials' }
 
-  await sendTelegramImpl(botToken, chatId, 'aisoukai-media Telegram notification test')
+  const sendTelegram = await loadSenderImpl()
+  await sendTelegram(botToken, chatId, 'aisoukai-media Telegram notification test')
   return { sent: true, reason: 'sent' }
 }
 
 async function main() {
   const result = await runTelegramLiveCheck()
-  if (result.reason === 'explicit-send-required') {
-    console.error('外部送信を行うには --send を明示してください。通常テストではこのCLIを実行しません。')
+  if (result.reason === 'explicit-human-gate-required') {
+    console.error(`外部送信には ${EXPLICIT_SEND_FLAG} と ${HUMAN_APPROVAL_FLAG} の明示が必要です。通常テストではこのCLIを実行しません。`)
     process.exitCode = 1
     return
   }
