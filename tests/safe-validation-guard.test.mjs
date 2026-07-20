@@ -51,5 +51,18 @@ test('T07-GUARD: cycle terminates for safe modules', () => {
 })
 test('T07-GUARD: rejects repo escape symlink', () => {
   const root = fixture({ 'entry.mjs': `${imp} './escape.mjs'` }, [['/dev/null', 'escape.mjs']])
-  try { assert.ok(inspectTestClosure({ root, entry: 'entry.mjs' }).violations.some((v) => v.includes('symlink/path escape'))) } finally { rmSync(root, { recursive: true, force: true }) }
+  try { assert.ok(inspectTestClosure({ root, entry: 'entry.mjs' }).violations.some((v) => v.includes('SYMLINK_PATH_ESCAPE'))) } finally { rmSync(root, { recursive: true, force: true }) }
 })
+test('T07-GUARD: rejects internal symlink', () => {
+  const root = fixture({ 'entry.mjs': `${imp} './linked.mjs'`, 'target.mjs': 'export const safe = true' }, [['target.mjs', 'linked.mjs']])
+  try { assert.ok(inspectTestClosure({ root, entry: 'entry.mjs' }).violations.some((v) => v.includes('SYMLINK_PATH_ESCAPE'))) } finally { rmSync(root, { recursive: true, force: true }) }
+})
+test('T07-GUARD: rejects dangerous cycle without recursion overflow', () => {
+  const root = fixture({ 'entry.mjs': `${imp} './a.mjs'`, 'a.mjs': `${imp} './b.mjs'`, 'b.mjs': `${imp} './a.mjs'; f${'etch'}()` })
+  try { assert.ok(inspectTestClosure({ root, entry: 'entry.mjs' }).violations.some((v) => v.includes('forbidden runtime reference'))) } finally { rmSync(root, { recursive: true, force: true }) }
+})
+const transportFile = './telegram-' + 'transport.mjs'
+assertViolation('live transport module reference', { 'entry.mjs': `${imp} '${transportFile}'`, 'telegram-transport.mjs': 'export const safe = true' }, 'live/notify transport')
+for (const api of ['spawn', 'exec', 'fork']) {
+  assertViolation(`${api} invocation reference`, { 'entry.mjs': `${imp} '${mid}'`, 'mid.mjs': `${imp} '${childProcess}'; ${api}()` }, 'forbidden runtime reference')
+}

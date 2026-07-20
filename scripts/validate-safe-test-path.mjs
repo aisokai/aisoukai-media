@@ -33,12 +33,14 @@ function inspectClosure(root, entry, violations, seen = new Set(), rootEntry = e
   const absolute = join(root, entry)
   let real
   try { real = realpathSync(absolute) } catch { violations.push(`missing manifest test: ${entry}`); return }
+  if (lstatSync(absolute).isSymbolicLink()) { violations.push(`SYMLINK_PATH_ESCAPE: ${entry}`); return }
   if (!real.startsWith(`${realpathSync(root)}/`)) { violations.push(`symlink/path escape: ${entry}`); return }
   if (seen.has(real)) return
   seen.add(real)
   const source = readFileSync(real, 'utf8')
   const rel = relative(root, real)
   if (!(rootEntry === 'tests/safe-validation-guard.test.mjs' && rel === 'scripts/validate-safe-test-path.mjs') && FORBIDDEN.test(source)) violations.push(`forbidden runtime reference from ${rootEntry}: ${rel}`)
+  if (/(?:live|notify|telegram)[A-Za-z_-]*(?:transport|send)|(?:transport|send)[A-Za-z_-]*(?:live|notify|telegram)/i.test(rel)) violations.push(`live/notify transport reference from ${rootEntry}: ${rel}`)
   const { staticImports, dynamic } = imports(source)
   for (const expression of dynamic) {
     const literal = expression.match(/^\s*['"](\.{1,2}\/[^'"]+)['"]\s*$/)
