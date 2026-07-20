@@ -4,19 +4,20 @@
   "terminalState": "pending_independent_review",
   "repository": "/Users/caelus/projects/aisoukai-media",
   "branch": "main",
-  "subjectCommit": "431db0cdd1c1a74740ffb2c3234864356a0ea820",
-  "commands": [{"command":"npm test","exit":0,"normalTestCount":137},{"command":"node scripts/validate-safe-test-path.mjs","exit":0}],
+  "subjectCommit": "caa5534d185c4250c625c1ccbb62718aaea6130a",
+  "commands": [{"command":"npm test","exit":0,"normalTestCount":146,"attackFixtureCount":9},{"command":"node scripts/validate-safe-test-path.mjs","exit":0}],
   "architecture": "npm test invokes only network-denied-launcher.sh, which requires sandbox-exec and runs a fixed inline command sequence under deny network* with .env.local read denied. No inner runner or telegram live transport module exists.",
   "integrationCoverage": {"verified":1,"unproven":18,"contract":"docs/evidence/t07-integration-coverage.json"},
   "observed": {"externalSendObserved":0,"scope":"This sandboxed run only; not a system-wide claim."},
   "artifactSha256": {
     "package.json":"4326713a2cac17546a367f69187ffc8de1e489f6117c13cb22a45e383a72833c",
     "scripts/network-denied-launcher.sh":"49b5731392e5253084eb5afe830844f8e656ac16707db4037906eecadea80994",
-    "scripts/validate-safe-test-path.mjs":"4599a27403fe0fe283ab851f780230bda77c21dd68c55a9077161b1dc49cf27d",
+    "scripts/validate-safe-test-path.mjs":"b6a66112ac5eb744520a162fb35c473aabb47a35db4b09d3d064fd955814ff7d",
     "scripts/safe-test-manifest.mjs":"6d50d05ec254c442549dbaf07c15c82467b83e2db90affaba5525c08b6b1a838",
     "scripts/telegram-notify-live-check.mjs":"c166a1d61b645a444aeb3e104253eb988f9a37f476252493e949d52611eede61",
     "docs/evidence/t07-integration-coverage.json":"0ecb2774001ce3f91ee437f93dc7af82c339b1fc830c59ab9d7c4dfe0b4234ff",
-    "tests/telegram-test-safety.test.mjs":"250e89bb1d14113114fb3b5e11f4dd4fe3ceef9bd048e7564bd70c2acc66a9bc"
+    "tests/telegram-test-safety.test.mjs":"250e89bb1d14113114fb3b5e11f4dd4fe3ceef9bd048e7564bd70c2acc66a9bc",
+    "tests/safe-validation-guard.test.mjs":"9ba03bbaea27bb98105d77d2dfa570ae22021434679c790efd3f4c7371240e46"
   },
   "push":"not performed",
   "remaining":"18 integration contracts are explicitly unproven; independent review required."
