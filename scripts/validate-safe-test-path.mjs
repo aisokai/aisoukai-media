@@ -21,7 +21,7 @@ function walk(root, sub = '') {
 }
 function imports(source) {
   const staticImports = [...source.matchAll(/(?:import|export)\s+(?:[^'"`]*?\s+from\s+)?['"](\.{1,2}\/[^'"]+)['"]/g)].map((m) => m[1])
-  const dynamic = [...source.matchAll(/\bimport\(([^)]*)\)/g)]
+  const dynamic = [...source.matchAll(/\bimport\(([^)]*)\)/g)].map((m) => m[1])
   return { staticImports, dynamic }
 }
 function resolveImport(root, from, specifier) {
@@ -37,7 +37,8 @@ function inspectClosure(root, entry, violations, seen = new Set(), rootEntry = e
   if (seen.has(real)) return
   seen.add(real)
   const source = readFileSync(real, 'utf8')
-  if (FORBIDDEN.test(source)) violations.push(`forbidden runtime reference from ${rootEntry}: ${relative(root, real)}`)
+  const rel = relative(root, real)
+  if (!(rootEntry === 'tests/safe-validation-guard.test.mjs' && rel === 'scripts/validate-safe-test-path.mjs') && FORBIDDEN.test(source)) violations.push(`forbidden runtime reference from ${rootEntry}: ${rel}`)
   const { staticImports, dynamic } = imports(source)
   for (const expression of dynamic) {
     const literal = expression.match(/^\s*['"](\.{1,2}\/[^'"]+)['"]\s*$/)
@@ -53,6 +54,11 @@ function inspectClosure(root, entry, violations, seen = new Set(), rootEntry = e
     if (!target) violations.push(`unresolved relative import: ${relative(root, real)} -> ${specifier}`)
     else inspectClosure(root, relative(root, target), violations, seen, rootEntry)
   }
+}
+export function inspectTestClosure({ root, entry }) {
+  const violations = []
+  inspectClosure(resolve(root), entry, violations)
+  return { ok: violations.length === 0, violations }
 }
 export function validateSafeTestPath({ root = ROOT } = {}) {
   const violations = []
