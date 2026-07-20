@@ -42,7 +42,7 @@ function inspectClosure(root, entry, violations, seen = new Set()) {
   for (const specifier of staticImports) {
     const target = resolveImport(root, relative(root, real), specifier)
     if (!target) violations.push(`unresolved relative import: ${relative(root, real)} -> ${specifier}`)
-    else if (specifier !== '../scripts/telegram-notify-live-check.mjs' && /telegram-live-send|\.env|(?:^|[-/])(live|send)(?:[-/.]|$)/i.test(specifier)) violations.push(`test imports isolated live module: ${relative(root, real)} -> ${specifier}`)
+    else inspectClosure(root, relative(root, target), violations, seen)
   }
 }
 export function validateSafeTestPath({ root = ROOT } = {}) {
@@ -54,11 +54,12 @@ export function validateSafeTestPath({ root = ROOT } = {}) {
   if (JSON.stringify(discovered) !== JSON.stringify(manifest)) violations.push('normal test manifest does not exactly match discovered *.test.mjs files')
   for (const file of walk(root).filter((file) => file.endsWith('.integration.mjs'))) if (!INTEGRATION.has(file)) violations.push(`unregistered integration test: ${file}`)
   for (const entry of NORMAL_TEST_FILES) inspectClosure(root, entry, violations)
-  const wrapper = readFileSync(join(root, 'scripts/network-denied-validation.sh'), 'utf8')
+  const wrapper = readFileSync(join(root, 'scripts/network-denied-launcher.sh'), 'utf8')
   if (!wrapper.includes('(deny network*)') || /allow\s+network\*/.test(wrapper)) violations.push('sandbox must deny all network without localhost allow')
-  if (!wrapper.includes('command -v sandbox-exec')) violations.push('sandbox absence must fail closed')
+  if (!wrapper.includes('command -v sandbox-exec') || /NETWORK_DENIED_ACTIVE/.test(wrapper)) violations.push('sandbox absence/bypass must fail closed')
   const live = readFileSync(join(root, 'scripts/telegram-notify-live-check.mjs'), 'utf8')
   if (!live.includes('HUMAN_GATE_REQUIRED') || /telegram-live-send|\.env|process\.env|--send/.test(live)) violations.push('live CLI is not hard-disabled before env/transport access')
+  if (existsSync(join(root, 'scripts/telegram-live-send.mjs'))) violations.push('production live transport module must not exist')
   return { ok: violations.length === 0, violations }
 }
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
