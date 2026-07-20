@@ -6,6 +6,6 @@ import { NORMAL_TEST_FILES } from '../scripts/safe-test-manifest.mjs'
 
 test('normal validation uses one explicit test manifest', () => {
   const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8'))
-  assert.equal(packageJson.scripts.test, 'sh scripts/network-denied-validation.sh')
+  assert.equal(packageJson.scripts.test, 'sh scripts/network-denied-launcher.sh')
   assert.ok(NORMAL_TEST_FILES.includes('tests/safe-validation-guard.test.mjs'))
 })

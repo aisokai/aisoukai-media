@@ -1,13 +1,14 @@
 {
   "taskId": "T07",
   "terminalState": "pending_independent_review",
-  "commit": "ce5129afbec29d3dc221ce547f12c6706ae5bc5e",
-  "commands": ["npm test", "node scripts/validate-safe-test-path.mjs"],
+  "commit": "PENDING_FUNCTIONAL_COMMIT",
+  "commands": ["npm test (network-denied-launcher -> inner runner)", "node scripts/validate-safe-test-path.mjs"],
   "observed": {
-    "normalTestCount": 161,
-    "networkDenied": "sandbox-exec deny network* with no localhost exception",
+    "normalTestCount": 137,
+    "networkDenied": "sandbox-exec deny network* with no localhost exception; launcher has no environment bypass",
     "externalSendObserved": 0,
     "scope": "Observed only within this sandboxed validation run; not a system-wide claim."
   },
-  "remaining": "Independent review required; environment-dependent integration tests are outside normal validation."
+  "integrationCoverage": "docs/evidence/t07-integration-coverage.json records all 19 excluded integration files and their mock coverage.",
+  "remaining": "Independent review required; integration files are intentionally not executed by normal validation."
 }

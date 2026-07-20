@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "normalManifest": "scripts/safe-test-manifest.mjs",
+  "integrationFiles": {
+    "scripts/generate-canonical-source.integration.mjs": {"status":"not_run","reason":"provider-capable generation path","mockCoverage":"normal canonical request contract"},
+    "scripts/gmb-readonly-check.integration.mjs": {"status":"not_run","reason":"GMB credential adapter path","mockCoverage":"normal GMB draft contracts"},
+    "scripts/lib/dmp-core-state.integration.mjs": {"status":"not_run","reason":"dynamic adapter graph","mockCoverage":"normal dmp action contract"},
+    "scripts/lib/openai-blog-generator.integration.mjs": {"status":"not_run","reason":"provider-capable generation path","mockCoverage":"normal canonical request contract"},
+    "tests/activation.integration.mjs": {"status":"not_run","reason":"environment credential probing","mockCoverage":"normal gate policy tests"},
+    "tests/content-status-notification.integration.mjs": {"status":"not_run","reason":"process execution fixture","mockCoverage":"normal publication status tests"},
+    "tests/gmb-api.integration.mjs": {"status":"not_run","reason":"credential adapter","mockCoverage":"normal GMB drafts tests"},
+    "tests/gmb-reviews.integration.mjs": {"status":"not_run","reason":"network-capable adapter","mockCoverage":"normal queue policy tests"},
+    "tests/gmb-watcher-setup-pending.integration.mjs": {"status":"not_run","reason":"dynamic adapter graph","mockCoverage":"normal GMB drafts tests"},
+    "tests/instagram-draft.integration.mjs": {"status":"not_run","reason":"provider-capable generator","mockCoverage":"normal SNS schema tests"},
+    "tests/lineworks-adapter.integration.mjs": {"status":"not_run","reason":"credential adapter","mockCoverage":"normal lineworks intake tests"},
+    "tests/media-apply.integration.mjs": {"status":"not_run","reason":"dynamic execution adapter","mockCoverage":"normal queue policy tests"},
+    "tests/media-executor.integration.mjs": {"status":"not_run","reason":"dynamic execution adapter","mockCoverage":"normal queue policy tests"},
+    "tests/media-health.integration.mjs": {"status":"not_run","reason":"notification adapter graph","mockCoverage":"normal health-free queue tests"},
+    "tests/safety-gates.integration.mjs": {"status":"not_run","reason":"credential and notification path","mockCoverage":"normal gate policy tests"},
+    "tests/sns-notify.integration.mjs": {"status":"not_run","reason":"notification CLI graph","mockCoverage":"normal SNS schema tests"},
+    "tests/telegram-instruction.integration.mjs": {"status":"not_run","reason":"dynamic command adapter","mockCoverage":"normal telegram ops static tests"},
+    "tests/telegram-media-commands.integration.mjs": {"status":"not_run","reason":"dynamic command adapter","mockCoverage":"normal queue policy tests"},
+    "tests/theme-blog-flow.integration.mjs": {"status":"not_run","reason":"notification request adapter","mockCoverage":"normal theme fallback tests"}
+  }
+}
