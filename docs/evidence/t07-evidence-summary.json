@@ -1,14 +1,1 @@
-{
-  "taskId": "T07",
-  "terminalState": "pending_independent_review",
-  "commit": "bf7d3f21c28c18bceb8a7cda167a4c1802f05a3a",
-  "commands": ["npm test (network-denied-launcher -> inner runner)", "node scripts/validate-safe-test-path.mjs"],
-  "observed": {
-    "normalTestCount": 137,
-    "networkDenied": "sandbox-exec deny network* with no localhost exception; launcher has no environment bypass",
-    "externalSendObserved": 0,
-    "scope": "Observed only within this sandboxed validation run; not a system-wide claim."
-  },
-  "integrationCoverage": "docs/evidence/t07-integration-coverage.json records all 19 excluded integration files and their mock coverage.",
-  "remaining": "Independent review required; integration files are intentionally not executed by normal validation."
-}
+{"taskId":"T07","terminalState":"pending_independent_review","subjectCommit":"431db0cdd1c1a74740ffb2c3234864356a0ea820","evidenceCommit":"PENDING_EVIDENCE_COMMIT","tests":"PASS (137 strict-sandbox normal tests)","lint":"PASS","build":"PASS","posts":"PASS (31)","integrationCoverage":{"verified":1,"unproven":18},"externalSendObserved":"0 within this sandbox run only","push":"not performed","remaining":"18 integration contracts remain unproven; independent review required."}
