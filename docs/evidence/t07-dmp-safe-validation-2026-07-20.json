@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "t01-evidence-summary/v1-compatible",
+  "taskId": "T07",
+  "sourceTaskId": "019f7d91-48a1-75f3-8581-c266decbded3",
+  "terminalState": "pending_independent_review",
+  "achievement": "Safe validation path is guarded, live Telegram transport is lazy-loaded after two explicit flags, and the full safe suite passed with outbound network denied.",
+  "repository": "/Users/caelus/projects/aisoukai-media",
+  "branch": "main",
+  "implementationCommit": "f5fd2c99e6ca452d17a5c405c5d2a61a82ad3832",
+  "rules": ["R15", "R22", "R31"],
+  "commands": {
+    "guard": "npm run validate:safe-test-path",
+    "networkDenied": "npm run validate:network-denied",
+    "networkProfile": "sandbox-exec deny network* with localhost-only local/remote exceptions",
+    "liveCliNoSend": "env -i PATH=$PATH node scripts/telegram-notify-live-check.mjs"
+  },
+  "results": {
+    "guard": "PASS",
+    "tests": { "status": "PASS", "count": 262 },
+    "lint": "PASS",
+    "build": "PASS",
+    "articleValidation": "PASS (31 posts)",
+    "networkDenied": true,
+    "externalSendCount": 0,
+    "liveCliNoSend": "PASS: exit 1 before dotenv or transport import"
+  },
+  "artifactSha256": {
+    "package.json": "5ffdfcb8aa798b8f42c149225c5414c88714a38bdcdbbde934827555a547d41a",
+    "scripts/validate-safe-test-path.mjs": "70f639e29e82e00b4519c63993c610f8b1859dd2156f25b853d22066f3cc5b10",
+    "scripts/network-denied-validation.sh": "56e3dbd133dfd1827e812731edf15cfbf0c86254683604de563e528fcb676fa9",
+    "scripts/telegram-notify-live-check.mjs": "70a0a75ec1b30bc0ef593bdf8b3b9e13f4177e2130d48d0c4cc260278afd21ff",
+    "scripts/telegram-live-send.mjs": "0bd1343f852df5f1c8984513db9057715691da190a041cecb933b31c35da8983",
+    "scripts/lib/explicit-execution-gate.mjs": "ef5084d33c24adb5d10c8af77a2acab35130cd5466b112d3294d44724b802961",
+    "tests/safe-validation-guard.test.mjs": "5db7f0d27243d11a31895a4119b7aa86cbd687901e82899f04a050e58e66afdc",
+    "tests/telegram-test-safety.test.mjs": "107d2b91cf14f768e0175d313f91536be1e8f4e553c277e0ceaa840561dcb024"
+  },
+  "push": { "performed": false, "reason": "task prohibition and no current-session Human push approval" },
+  "risks": ["Independent review is required before treating this evidence as proven.", "The sandbox permits localhost only for Turbopack internal build IPC; all external outbound networking remains denied."],
+  "remaining": "independent review required"
+}
