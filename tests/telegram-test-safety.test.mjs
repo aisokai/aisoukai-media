@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { runTelegramLiveCheck } from '../scripts/telegram-notify-live-check.mjs'
 
-test('forged flags and env cannot unlock the hard-disabled Telegram CLI', () => {
+test('T07-HARD-DISABLE: forged flags and env cannot unlock the hard-disabled Telegram CLI', () => {
   const result = runTelegramLiveCheck({
     argv: ['--send', '--human-approved'],
     env: { TELEGRAM_BOT_TOKEN: 'synthetic', TELEGRAM_CHAT_ID: 'synthetic' },

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { NORMAL_TEST_FILES } from './safe-test-manifest.mjs'
@@ -64,8 +65,32 @@ export function validateSafeTestPath({ root = ROOT } = {}) {
   const coveragePath = join(root, 'docs/evidence/t07-integration-coverage.json')
   if (!existsSync(coveragePath)) violations.push('missing integration coverage contract')
   else {
-    const contract = JSON.parse(readFileSync(coveragePath, 'utf8')).integrationFiles ?? {}
-    for (const file of INTEGRATION) if (!contract[file]?.reason || !contract[file]?.mockCoverage) violations.push(`missing integration coverage contract entry: ${file}`)
+    const records = JSON.parse(readFileSync(coveragePath, 'utf8')).integrationFiles
+    if (!Array.isArray(records)) violations.push('integration coverage records must be an array')
+    else {
+      const seenIntegration = new Set()
+      const seenMappings = new Set()
+      for (const record of records) {
+        if (!INTEGRATION.has(record.integrationFile) || seenIntegration.has(record.integrationFile)) violations.push(`unknown/duplicate integration coverage: ${record.integrationFile}`)
+        seenIntegration.add(record.integrationFile)
+        if (!record.reason || record.runStatus !== 'not_run' || typeof record.humanGateRequired !== 'boolean' || !['verified', 'unproven'].includes(record.coverageStatus) || !Array.isArray(record.coverage)) violations.push(`invalid integration coverage record: ${record.integrationFile}`)
+        if (record.coverageStatus === 'verified' && record.coverage.length === 0) violations.push(`verified integration lacks coverage: ${record.integrationFile}`)
+        if (record.coverageStatus === 'unproven' && record.coverage.length !== 0) violations.push(`unproven integration has coverage: ${record.integrationFile}`)
+        for (const coverage of record.coverage) {
+          const mapping = `${coverage.normalTestFile}:${coverage.testId}`
+          if (seenMappings.has(mapping)) violations.push(`duplicate coverage mapping: ${mapping}`)
+          seenMappings.add(mapping)
+          if (!NORMAL_TEST_FILES.includes(coverage.normalTestFile)) { violations.push(`unknown normal coverage file: ${coverage.normalTestFile}`); continue }
+          const target = join(root, coverage.normalTestFile)
+          if (lstatSync(target).isSymbolicLink()) violations.push(`coverage normal test must not be symlink: ${coverage.normalTestFile}`)
+          const source = readFileSync(target, 'utf8')
+          const hash = createHash('sha256').update(source).digest('hex')
+          if (hash !== coverage.sourceSha256) violations.push(`coverage hash mismatch: ${coverage.normalTestFile}`)
+          if ((source.match(new RegExp(coverage.testId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length !== 1) violations.push(`coverage testId missing/nonunique: ${mapping}`)
+        }
+      }
+      for (const file of INTEGRATION) if (!seenIntegration.has(file)) violations.push(`missing integration coverage contract entry: ${file}`)
+    }
   }
   for (const entry of NORMAL_TEST_FILES) inspectClosure(root, entry, violations)
   const wrapper = readFileSync(join(root, 'scripts/network-denied-launcher.sh'), 'utf8')
