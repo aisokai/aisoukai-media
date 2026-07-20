@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SAFE_TEST_COMMAND = 'node --test tests/*.test.mjs scripts/*.test.mjs scripts/lib/*.test.mjs'
+const ISOLATED_ENV_TEST_COMMAND = 'node --test tests/activation.integration.mjs tests/gmb-api.integration.mjs tests/lineworks-adapter.integration.mjs tests/safety-gates.integration.mjs'
 const IGNORED_DIRECTORIES = new Set(['.git', '.next', 'node_modules', 'coverage'])
 const LIVE_TEST_NAME = /(?:^|\/)(?:test-[^/]*?(?:live|send|notify)|[^/]*-live\.test)\.mjs$/i
 const ISOLATED_NETWORK_MODULE = /(?:telegram-live-send|telegram-notify-live-check)\.mjs$/i
@@ -45,6 +46,7 @@ export function validateSafeTestPath({ root = ROOT } = {}) {
   const scripts = packageJson.scripts ?? {}
 
   if (scripts.test !== SAFE_TEST_COMMAND) violations.push(`test command must exactly be: ${SAFE_TEST_COMMAND}`)
+  if (scripts['test:isolated-env'] !== ISOLATED_ENV_TEST_COMMAND) violations.push(`isolated environment test command must exactly be: ${ISOLATED_ENV_TEST_COMMAND}`)
   for (const [name, command] of Object.entries(scripts)) {
     if (/\bnode\s+--test\s*$/.test(command)) violations.push(`bare node --test in package script: ${name}`)
     if (/\bnode\s+--test\b[^\n]*\*\*/.test(command)) violations.push(`broad glob in package script: ${name}`)
@@ -56,6 +58,7 @@ export function validateSafeTestPath({ root = ROOT } = {}) {
   for (const file of allFiles) {
     if (!file.endsWith('.mjs')) continue
     if (file.startsWith('scripts/test-')) violations.push(`live-like test filename: ${file}`)
+    if (file.endsWith('.integration.mjs') && !['tests/activation.integration.mjs', 'tests/gmb-api.integration.mjs', 'tests/lineworks-adapter.integration.mjs', 'tests/safety-gates.integration.mjs'].includes(file)) violations.push(`unregistered isolated environment test: ${file}`)
     if (!isNormalTestFile(file) || !file.endsWith('.test.mjs')) continue
     if (LIVE_TEST_NAME.test(file)) violations.push(`live-like test filename: ${file}`)
     const source = readFileSync(join(root, file), 'utf8')

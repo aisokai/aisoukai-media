@@ -21,7 +21,7 @@ function packageJson(scripts) {
 
 test('安全な明示テストと隔離live CLIを受理する', () => {
   const root = fixture({
-    'package.json': packageJson({ test: 'node --test tests/*.test.mjs scripts/*.test.mjs scripts/lib/*.test.mjs', 'telegram:notify:live-check': 'node scripts/telegram-notify-live-check.mjs' }),
+    'package.json': packageJson({ test: 'node --test tests/*.test.mjs scripts/*.test.mjs scripts/lib/*.test.mjs', 'test:isolated-env': 'node --test tests/activation.integration.mjs tests/gmb-api.integration.mjs tests/lineworks-adapter.integration.mjs tests/safety-gates.integration.mjs', 'telegram:notify:live-check': 'node scripts/telegram-notify-live-check.mjs' }),
     'tests/example.test.mjs': "import test from 'node:test'\ntest('safe', () => {})\n",
     'scripts/example.test.mjs': "import test from 'node:test'\ntest('safe', () => {})\n",
     'scripts/lib/example.test.mjs': "import test from 'node:test'\ntest('safe', () => {})\n",
