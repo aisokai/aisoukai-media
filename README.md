@@ -95,8 +95,8 @@ aisoukai-media/
 |--------|------|------|
 | `NEXT_PUBLIC_SITE_URL` | **本番必須** | サイトの公開 URL（末尾スラッシュなし）。sitemap.xml・OGP・canonical の絶対 URL 生成に使用する |
 | `ANTHROPIC_API_KEY` | generate:draft 実行時 | Claude API キー。`.env.local` に記述し commit しないこと |
-| `TELEGRAM_BOT_TOKEN` | test:telegram / 将来の通知連携 | BotFather で取得したトークン。`.env.local` に記述し commit しないこと |
-| `TELEGRAM_CHAT_ID` | test:telegram / 将来の通知連携 | 通知先チャット ID（個人 DM の場合は数値 ID）。`.env.local` に記述し commit しないこと |
+| `TELEGRAM_BOT_TOKEN` | telegram:notify:live-check / 将来の通知連携 | BotFather で取得したトークン。`.env.local` に記述し commit しないこと |
+| `TELEGRAM_CHAT_ID` | telegram:notify:live-check / 将来の通知連携 | 通知先チャット ID（個人 DM の場合は数値 ID）。`.env.local` に記述し commit しないこと |
 | `TELEGRAM_ALLOWED_CHAT_IDS` | telegram:ops | Telegram からの記事リクエスト取得・通知先制限に使用する chat_id または from_id のカンマ区切りリスト。未設定時は `TELEGRAM_CHAT_ID` にフォールバック |
 | `ADMIN_REVIEW_PASSWORD` | スマホ承認フロー | `/admin/pending-review` へログインするための管理者パスワード。Vercel Production に設定する |
 | `ADMIN_REVIEW_COOKIE_SECRET` | スマホ承認フロー | 管理画面ログイン Cookie の署名用秘密鍵。32文字以上のランダム文字列を Vercel Production に設定する |
@@ -124,7 +124,8 @@ TELEGRAM_CHAT_ID=<チャット ID>
 4. `.env.local` に `TELEGRAM_BOT_TOKEN` と `TELEGRAM_CHAT_ID` を設定する
 5. 疎通確認:
    ```bash
-   npm run test:telegram
+   # 外部送信を伴うため、Human が必要時だけ明示実行する
+   npm run telegram:notify:live-check -- --send
    ```
 
 **Vercel へのデプロイ時:**
@@ -203,7 +204,7 @@ tags:
 | `npm run image:license:bulk-template` | TODO 残件を Markdown テーブル（`docs/license-bulk-template.md`）に出力する。一覧を確認しながら `image:license:update` で順次記入 |
 | `npm run image:purchase:list` | 不足カテゴリの購入候補・検索キーワード・医療広告注意点を表示する（読み取り専用） |
 | `npm run image:usage` | 記事 ↔ 画像の対応一覧を表示する（未割当記事・共用画像も表示。読み取り専用） |
-| `npm run test:telegram` | Telegram Bot への疎通確認（要 `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID`） |
+| `npm run telegram:notify:live-check -- --send` | Telegram Bot への疎通確認（外部送信あり。Human の明示実行のみ） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
 | `npm run article:scheduled` | 定期提案フロー: 公開日到来済み・未生成の承認済み topic を 1 件選択 → AI 下書き生成 → 画像確認 → Telegram 通知 |
 | `npm run article:scheduled -- --auto-publish` | 使用禁止。本文確認なしの自動公開を防ぐためエラー終了する |

@@ -198,7 +198,8 @@ npm run generate:draft -- TOPIC-XXXX --force
 1. `.env.local` の `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` を確認
 2. 疎通確認:
    ```bash
-   npm run test:telegram
+   # 外部送信を伴うため、Human が必要時だけ明示実行する
+   npm run telegram:notify:live-check -- --send
    ```
 3. Bot に DM を送ってから再試行（Bot が一度もメッセージを受け取っていないと chatId が無効になる）
 
