@@ -17,13 +17,13 @@ test('ops:mwf generates one scheduled draft before Telegram review notification'
   assert.doesNotMatch(source, /ANTHROPIC_API_KEY/)
   assert.match(source, /本文確認・承認/)
   assert.match(source, /checkScheduledGitReadiness/)
-  assert.match(source, /syncGeneratedDraftToGitHub/)
-  assert.match(source, /生成下書きのGitHub同期/)
+  assert.match(source, /prepareGeneratedDraftForHumanPush/)
+  assert.match(source, /生成下書きのHuman Git同期待ち/)
   assert.match(source, /approve \/ publish は実行していません/)
 
   const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
-  const syncIndex = source.indexOf('draftSyncResult = syncGeneratedDraftToGitHub')
+  const syncIndex = source.indexOf('draftSyncResult = prepareGeneratedDraftForHumanPush')
   const notificationBuildIndex = source.indexOf('const notificationText = buildReviewRequestNotification')
   const sendIndex = source.lastIndexOf('await sendOpsTelegram')
   assert.ok(readinessIndex > 0)
@@ -39,7 +39,7 @@ test('ops:mwf falls back to the canonical theme CSV only after the legacy topic 
 
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
   const fallbackIndex = source.indexOf('runThemeOpsFallback({')
-  const syncIndex = source.indexOf('draftSyncResult = syncGeneratedDraftToGitHub')
+  const syncIndex = source.indexOf('draftSyncResult = prepareGeneratedDraftForHumanPush')
   assert.ok(fallbackIndex > scheduledIndex)
   assert.ok(syncIndex > fallbackIndex)
   assert.match(source, /function isLegacyTopicPoolExhausted/)
@@ -69,27 +69,31 @@ test('ops:mwf has a process lock to prevent cron and launchd double generation',
   assert.match(gitignore, /^logs\/ops-mwf\.lock$/m)
 })
 
-test('ops:mwf only syncs the generated draft path to GitHub for production review', () => {
+test('ops:mwf leaves generated drafts for an explicit Human commit and push', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
   assert.match(source, /isSafeGeneratedPostPath/)
   assert.match(source, /content\\\/posts\\\/\\d\{4\}-\\d\{2\}-\\d\{2\}-\[a-z0-9-\]\+\\\.md/)
-  assert.match(source, /git', \['add', '--', relPath\]/)
-  assert.match(source, /git', \['commit', '-m', `draft: \$\{scheduledResult\.slug\}`\]/)
-  assert.match(source, /git', \['push', 'origin', 'main'\]/)
-  assert.doesNotMatch(source, /git', \['add', '-A'\]/)
+  assert.match(source, /prepareGeneratedDraftForHumanPush/)
+  assert.match(source, /Human commit \/ push待ち/)
+  assert.doesNotMatch(source, /git', \['add'/)
+  assert.doesNotMatch(source, /git', \['commit'/)
+  assert.doesNotMatch(source, /git', \['push'/)
 })
 
 test('ops:mwf stops before generation when git is dirty or out of sync', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const readinessSource = readFileSync('scripts/lib/scheduled-git-readiness.mjs', 'utf8')
 
   assert.match(source, /git', \['status', '--porcelain'\]/)
-  assert.match(source, /未commit変更があります/)
   assert.match(source, /git', \['fetch', 'origin', 'main'\]/)
   assert.match(source, /git', \['rev-list', '--left-right', '--count', 'HEAD\.\.\.origin\/main'\]/)
-  assert.match(source, /GitHub側に未取得commitがあります/)
-  assert.match(source, /ローカルのみのcommitがあります/)
   assert.match(source, /Git同期が安全でないため記事生成を停止/)
+  assert.match(source, /Git: branch \$\{details\.branch/)
+  assert.match(source, /Human push待ち/)
+  assert.match(readinessSource, /未commit変更があります/)
+  assert.match(readinessSource, /GitHub側に未取得commitがあります/)
+  assert.match(readinessSource, /ローカルのみのcommitがあります/)
 
   const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")

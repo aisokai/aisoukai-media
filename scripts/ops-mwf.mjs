@@ -3,7 +3,7 @@
 // 月水金 08:30 の定期記事生成 CLI。
 // やることは 1) selected ネタを承認済み topic に同期 2) 承認済み topic から1記事生成
 // 3) Git が clean / origin 同期済みの時だけ画像設定済みの下書きとして保存
-// 4) レビュー画面に出すため生成下書きだけ GitHub へ同期
+// 4) 生成下書きはローカル保存まで。Git commit / push は Human が明示操作する。
 // 5) Telegram で Human review / approval を依頼、のみ。
 // approve / publish / Telegram request 取得は実行しない。
 import { spawnSync } from 'node:child_process'
@@ -15,6 +15,7 @@ import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { loadContentStatus } from './lib/content-status.mjs'
 import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
+import { assessScheduledGitReadiness } from './lib/scheduled-git-readiness.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -132,37 +133,31 @@ function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
 
 function checkScheduledGitReadiness() {
   const status = runCommand('git', ['status', '--porcelain'])
-  if (!status.ok) {
-    return { ok: false, reason: `git status を確認できません: ${status.output.slice(0, 300)}` }
+  const branch = runCommand('git', ['branch', '--show-current'])
+  const head = runCommand('git', ['rev-parse', '--short', 'HEAD'])
+  const base = {
+    statusOk: status.ok,
+    dirtyCount: status.output.split('\n').filter((line) => line.trim().length > 0).length,
+    branch: branch.ok && branch.output ? branch.output : '不明',
+    head: head.ok && head.output ? head.output : '不明',
   }
-  const dirtyLines = status.output.split('\n').filter((line) => line.trim().length > 0)
-  if (dirtyLines.length > 0) {
-    return { ok: false, reason: `未commit変更があります（${dirtyLines.length}件）。先に整理してください。` }
+  if (!base.statusOk || base.dirtyCount > 0) {
+    return assessScheduledGitReadiness(base)
   }
 
   const fetch = runCommand('git', ['fetch', 'origin', 'main'])
   if (!fetch.ok) {
-    return { ok: false, reason: `origin/main の取得に失敗: ${fetch.output.slice(0, 300)}` }
+    return assessScheduledGitReadiness({ ...base, fetchOk: false })
   }
-
   const divergence = runCommand('git', ['rev-list', '--left-right', '--count', 'HEAD...origin/main'])
-  if (!divergence.ok) {
-    return { ok: false, reason: `GitHubとの差分確認に失敗: ${divergence.output.slice(0, 300)}` }
-  }
-  const [aheadRaw, behindRaw] = divergence.output.trim().split(/\s+/)
-  const ahead = Number(aheadRaw)
-  const behind = Number(behindRaw)
-  if (!Number.isFinite(ahead) || !Number.isFinite(behind)) {
-    return { ok: false, reason: `GitHubとの差分確認結果を読めません: ${divergence.output.slice(0, 120)}` }
-  }
-  if (behind > 0) {
-    return { ok: false, reason: `GitHub側に未取得commitがあります（behind ${behind}）。先にpullしてください。` }
-  }
-  if (ahead > 0) {
-    return { ok: false, reason: `ローカルのみのcommitがあります（ahead ${ahead}）。先にpushまたは整理してください。` }
-  }
-
-  return { ok: true, reason: 'Git状態はcleanでorigin/mainと同期済みです' }
+  return assessScheduledGitReadiness({
+    ...base,
+    fetchOk: fetch.ok,
+    divergenceOk: divergence.ok,
+    divergenceOutput: divergence.output,
+    branch: branch.ok && branch.output ? branch.output : '不明',
+    head: head.ok && head.output ? head.output : '不明',
+  })
 }
 
 function isSafeGeneratedPostPath(path) {
@@ -178,7 +173,7 @@ function isLegacyTopicPoolExhausted(status, result) {
   )
 }
 
-function syncGeneratedDraftToGitHub(scheduledResult) {
+function prepareGeneratedDraftForHumanPush(scheduledResult) {
   const relPath = scheduledResult?.path
   if (!scheduledResult?.generated) {
     return { ok: true, skipped: true, reason: 'generated=false' }
@@ -192,30 +187,7 @@ function syncGeneratedDraftToGitHub(scheduledResult) {
     return { ok: false, reason: `validate:posts に失敗: ${validate.output.slice(0, 300)}` }
   }
 
-  const add = runCommand('git', ['add', '--', relPath])
-  if (!add.ok) {
-    return { ok: false, reason: `git add に失敗: ${add.output.slice(0, 300)}` }
-  }
-
-  const diff = runCommand('git', ['diff', '--cached', '--quiet', '--', relPath])
-  if (diff.status === 0) {
-    return { ok: true, skipped: true, reason: '生成記事は既にGitHub同期済み' }
-  }
-  if (diff.status !== 1) {
-    return { ok: false, reason: `git diff --cached に失敗: ${diff.output.slice(0, 300)}` }
-  }
-
-  const commit = runCommand('git', ['commit', '-m', `draft: ${scheduledResult.slug}`])
-  if (!commit.ok) {
-    return { ok: false, reason: `git commit に失敗: ${commit.output.slice(0, 300)}` }
-  }
-
-  const push = runCommand('git', ['push', 'origin', 'main'])
-  if (!push.ok) {
-    return { ok: false, reason: `git push に失敗: ${push.output.slice(0, 300)}` }
-  }
-
-  return { ok: true, skipped: false, reason: '生成下書きをGitHubへ同期しました' }
+  return { ok: true, skipped: false, reason: '生成下書きはローカルに保存済みです。Human commit / push待ちです。' }
 }
 
 function readJsonIfExists(path) {
@@ -314,13 +286,19 @@ function alreadyLiveTodayNoop({ scheduledResult, contentStatus }) {
   return scheduledResult?.generated === false && findTodayLivePosts(contentStatus).length > 0
 }
 
-function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult }) {
+function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult, gitReadiness }) {
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
   const lines = ['📝 月水金の記事生成']
 
   if (!generateDecision.ok) {
     lines.push('記事生成は実行していません。')
     lines.push(`理由: ${generateDecision.reason}`)
+    if (gitReadiness?.ok === false) {
+      const details = gitReadiness.details ?? {}
+      lines.push(`Git: branch ${details.branch ?? '不明'} / HEAD ${details.head ?? '不明'}`)
+      if (details.aheadSummary) lines.push(details.aheadSummary)
+      if (details.ahead > 0) lines.push('定期処理はGit pushを実行しません。Human push待ちです。')
+    }
     return lines.join('\n')
   }
 
@@ -345,11 +323,11 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult, con
     lines.push(dashboardUrl)
     lines.push('')
     if (draftSyncResult?.ok && !draftSyncResult.skipped) {
-      lines.push('GitHub同期: 完了（本番レビュー画面に反映されます）')
+      lines.push('Git同期: Human push待ち（定期処理はpushしません）')
     } else if (draftSyncResult?.ok && draftSyncResult.skipped) {
-      lines.push(`GitHub同期: スキップ（${draftSyncResult.reason}）`)
+      lines.push(`Git同期: ${draftSyncResult.reason}`)
     } else if (draftSyncResult) {
-      lines.push('GitHub同期: 失敗（ローカルのみの可能性があります）')
+      lines.push('Git同期準備: 失敗（ローカルのみの可能性があります）')
       lines.push(`同期エラー: ${draftSyncResult.reason}`)
     }
 
@@ -460,8 +438,8 @@ if (!generateDecision.ok) {
     process.exitCode = 1
   }
   if (scheduledResult?.generated) {
-    header('2.5/3  生成下書きのGitHub同期')
-    draftSyncResult = syncGeneratedDraftToGitHub(scheduledResult)
+    header('2.5/3  生成下書きのHuman Git同期待ち')
+    draftSyncResult = prepareGeneratedDraftForHumanPush(scheduledResult)
     if (draftSyncResult.ok) {
       console.log(`  ✅ ${draftSyncResult.reason}`)
     } else {
@@ -473,7 +451,7 @@ if (!generateDecision.ok) {
 
 header('3/3  Telegram レビュー依頼')
 const contentStatus = loadContentStatus(join(ROOT, 'content', 'posts'))
-const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult })
+const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult, gitReadiness })
 if (alreadyLiveTodayNoop({ scheduledResult, contentStatus })) {
   process.exitCode = 0
 }
