@@ -1,7 +1,7 @@
 {
   "taskId": "T07",
   "terminalState": "pending_independent_review",
-  "commit": "PENDING_FUNCTIONAL_COMMIT",
+  "commit": "bf7d3f21c28c18bceb8a7cda167a4c1802f05a3a",
   "commands": ["npm test (network-denied-launcher -> inner runner)", "node scripts/validate-safe-test-path.mjs"],
   "observed": {
     "normalTestCount": 137,
