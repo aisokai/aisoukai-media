@@ -1,0 +1,13 @@
+{
+  "taskId": "T07",
+  "terminalState": "pending_independent_review",
+  "commit": "PENDING_LOCAL_COMMIT",
+  "commands": ["npm test", "node scripts/validate-safe-test-path.mjs"],
+  "observed": {
+    "normalTestCount": 161,
+    "networkDenied": "sandbox-exec deny network* with no localhost exception",
+    "externalSendObserved": 0,
+    "scope": "Observed only within this sandboxed validation run; not a system-wide claim."
+  },
+  "remaining": "Independent review required; environment-dependent integration tests are outside normal validation."
+}

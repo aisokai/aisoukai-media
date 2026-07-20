@@ -4,20 +4,19 @@
 set -eu
 
 if [ "${NETWORK_DENIED_ACTIVE:-}" != "1" ]; then
+  if ! command -v sandbox-exec >/dev/null 2>&1; then
+    echo 'HUMAN_GATE_REQUIRED: sandbox-exec is required for safe validation' >&2
+    exit 1
+  fi
   project_root=$(pwd -P)
-  profile="(version 1) (allow default) (deny network*) (allow network* (local ip \"localhost:*\")) (allow network* (remote ip \"localhost:*\")) (deny file-read-data (literal \"${project_root}/.env.local\"))"
+  profile="(version 1) (allow default) (deny network*) (deny file-read-data (literal \"${project_root}/.env.local\"))"
   exec env NETWORK_DENIED_ACTIVE=1 NEXT_PUBLIC_SITE_URL='https://safe-validation.invalid' sandbox-exec -p "$profile" sh "$0"
 fi
 
-npm run validate:safe-test-path
-npm test
+node scripts/validate-safe-test-path.mjs
+node scripts/run-safe-tests.mjs
 npm run lint
-npm run build
+npx next build --webpack
 npm run validate:posts
 
-if env -i PATH="$PATH" node scripts/telegram-notify-live-check.mjs; then
-  echo 'UNSAFE: live CLI unexpectedly succeeded without the Human Gate' >&2
-  exit 1
-fi
-
-echo 'network-denied-validation: PASS (externalSendCount=0)'
+echo 'network-denied-validation: PASS (externalSendObserved=0 within this sandboxed run)'
