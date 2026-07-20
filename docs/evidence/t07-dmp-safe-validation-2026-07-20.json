@@ -6,7 +6,8 @@
   "achievement": "Safe validation path is guarded, live Telegram transport is lazy-loaded after two explicit flags, and the full safe suite passed with outbound network denied.",
   "repository": "/Users/caelus/projects/aisoukai-media",
   "branch": "main",
-  "implementationCommit": "f5fd2c99e6ca452d17a5c405c5d2a61a82ad3832",
+  "implementationCommit": "605f23a4a0c5558fdff27c8611dbe6c82cad2a4f",
+  "implementationCommits": ["f5fd2c99e6ca452d17a5c405c5d2a61a82ad3832", "9274e6d6c539d26a0752f28d25155a6a42d31e2e", "605f23a4a0c5558fdff27c8611dbe6c82cad2a4f"],
   "rules": ["R15", "R22", "R31"],
   "commands": {
     "guard": "npm run validate:safe-test-path",
