@@ -1,46 +1,21 @@
 {
   "schemaVersion": "t01-evidence-summary/v1-compatible",
   "taskId": "T07",
-  "sourceTaskId": "019f7d91-48a1-75f3-8581-c266decbded3",
   "terminalState": "pending_independent_review",
-  "achievement": "Safe validation path is guarded, live Telegram transport is lazy-loaded after two explicit flags, and the full safe suite passed with outbound network denied.",
-  "repository": "/Users/caelus/projects/aisoukai-media",
-  "branch": "main",
-  "implementationCommit": "605f23aaff93f02346b002c02d6dd82cd3a156d0",
-  "implementationCommits": ["f5fd2c99e6ca452d17a5c405c5d2a61a82ad3832", "9274e6d09a88b87e8ee33d7b371d44ee5e624fcd", "605f23aaff93f02346b002c02d6dd82cd3a156d0"],
-  "rules": ["R15", "R22", "R31"],
-  "commands": {
-    "guard": "npm run validate:safe-test-path",
-    "networkDenied": "npm run validate:network-denied",
-    "networkProfile": "sandbox-exec deny network* with localhost-only local/remote exceptions and .env.local read denied",
-    "liveCliNoSend": "env -i PATH=$PATH node scripts/telegram-notify-live-check.mjs"
+  "architecture": {
+    "normalValidation": "npm test -> scripts/network-denied-launcher.sh -> sandbox-exec deny network* -> fixed inline command sequence",
+    "liveTelegram": "scripts/telegram-notify-live-check.mjs is a HUMAN_GATE_REQUIRED tombstone; scripts/telegram-live-send.mjs is absent",
+    "normalManifest": "scripts/safe-test-manifest.mjs",
+    "integrationCoverage": "docs/evidence/t07-integration-coverage.json"
   },
-  "results": {
-    "guard": "PASS",
-    "tests": { "status": "PASS", "count": 232, "isolatedEnvEntrypoints": 4 },
-    "lint": "PASS",
-    "build": "PASS",
-    "articleValidation": "PASS (31 posts)",
-    "networkDenied": true,
-    "productionEnvRead": false,
-    "externalSendCount": 0,
-    "liveCliNoSend": "PASS: exit 1 before dotenv or transport import"
+  "observed": {
+    "normalTestCount": 137,
+    "externalSendObserved": 0,
+    "scope": "Observed only within the named strict sandbox run; not a system-wide assertion.",
+    "networkProfile": "deny network*; no localhost allow; .env.local read denied"
   },
-  "artifactSha256": {
-    "package.json": "c1db52616fb13539a7ffcc1c6c63dd52bacbad722c4718811f2f75af44ed9daf",
-    "scripts/validate-safe-test-path.mjs": "cc81ad34af27ad78000c533b2c7effcb6f67f9cf17bcab490263cc6aa6931f16",
-    "scripts/network-denied-validation.sh": "b1ec628ae73e51f89cc1e767868befa19ea72f9cf63f5eb986eee6a230aaeaf3",
-    "scripts/telegram-notify-live-check.mjs": "70a0a75ec1b30bc0ef593bdf8b3b9e13f4177e2130d48d0c4cc260278afd21ff",
-    "scripts/telegram-live-send.mjs": "0bd1343f852df5f1c8984513db9057715691da190a041cecb933b31c35da8983",
-    "scripts/lib/explicit-execution-gate.mjs": "ef5084d33c24adb5d10c8af77a2acab35130cd5466b112d3294d44724b802961",
-    "tests/safe-validation-guard.test.mjs": "df089367d3c728c9104bb60a40b60230f6c46ee437938ac51b52388e64a1c17f",
-    "tests/telegram-test-safety.test.mjs": "107d2b91cf14f768e0175d313f91536be1e8f4e553c277e0ceaa840561dcb024",
-    "tests/activation.integration.mjs": "572ab85b4952ed36dcefdcfb6840b353d6c51350332d9aa8bc69d387ea5225e8",
-    "tests/gmb-api.integration.mjs": "26a366d322e07a48db625212469083981ec855a4f96ba17084279fbb35616a81",
-    "tests/lineworks-adapter.integration.mjs": "dd4db7091f8ea740b21b14c6513fdf758d76b6d4f9b5ec18c5c33982490b9360",
-    "tests/safety-gates.integration.mjs": "e3fc41c90e7a46ca670a4b34102547845b276c03abe5fa31198b43f55af9ba50"
-  },
-  "push": { "performed": false, "reason": "task prohibition and no current-session Human push approval" },
-  "risks": ["Independent review is required before treating this evidence as proven.", "The sandbox permits localhost only for Turbopack internal build IPC; all external outbound networking remains denied."],
+  "commands": ["npm test", "node scripts/validate-safe-test-path.mjs"],
+  "integration": "19 files are intentionally not run by normal validation; per-file reasons and mapped mock coverage are recorded separately.",
+  "push": "not performed",
   "remaining": "independent review required"
 }

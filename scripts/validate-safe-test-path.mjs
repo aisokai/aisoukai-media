@@ -7,7 +7,7 @@ import { NORMAL_TEST_FILES } from './safe-test-manifest.mjs'
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const SAFE_TEST_COMMAND = 'sh scripts/network-denied-launcher.sh'
 const INTEGRATION = new Set(['scripts/generate-canonical-source.integration.mjs', 'scripts/gmb-readonly-check.integration.mjs', 'scripts/lib/dmp-core-state.integration.mjs', 'scripts/lib/openai-blog-generator.integration.mjs', 'tests/activation.integration.mjs', 'tests/content-status-notification.integration.mjs', 'tests/gmb-api.integration.mjs', 'tests/gmb-reviews.integration.mjs', 'tests/gmb-watcher-setup-pending.integration.mjs', 'tests/instagram-draft.integration.mjs', 'tests/lineworks-adapter.integration.mjs', 'tests/media-apply.integration.mjs', 'tests/media-executor.integration.mjs', 'tests/media-health.integration.mjs', 'tests/safety-gates.integration.mjs', 'tests/sns-notify.integration.mjs', 'tests/telegram-instruction.integration.mjs', 'tests/telegram-media-commands.integration.mjs', 'tests/theme-blog-flow.integration.mjs'])
-const FORBIDDEN = /node:child_process|node:(?:https?|net|tls|dgram)|\b(?:spawn|exec|fork)\s*\(|\.env\.local/i
+const FORBIDDEN = /node:child_process|node:(?:https?|net|tls|dns|dgram)|\b(?:spawn|exec|fork)\s*\(|\bfetch\s*\(|\b(?:WebSocket|EventSource)\s*\(|\b(?:axios|undici)\b|\.env\.local/i
 
 function walk(root, sub = '') {
   const dir = join(root, sub)
@@ -38,7 +38,15 @@ function inspectClosure(root, entry, violations, seen = new Set(), rootEntry = e
   const source = readFileSync(real, 'utf8')
   if (FORBIDDEN.test(source)) violations.push(`forbidden runtime reference from ${rootEntry}: ${relative(root, real)}`)
   const { staticImports, dynamic } = imports(source)
-  for (const expression of dynamic) if (!/^\s*['"]\.{1,2}\//.test(expression)) violations.push(`dynamic nonliteral import from ${rootEntry}: ${relative(root, real)}`)
+  for (const expression of dynamic) {
+    const literal = expression.match(/^\s*['"](\.{1,2}\/[^'"]+)['"]\s*$/)
+    if (!literal) violations.push(`dynamic nonliteral import from ${rootEntry}: ${relative(root, real)}`)
+    else {
+      const target = resolveImport(root, relative(root, real), literal[1])
+      if (!target) violations.push(`unresolved literal dynamic import from ${rootEntry}: ${relative(root, real)} -> ${literal[1]}`)
+      else inspectClosure(root, relative(root, target), violations, seen, rootEntry)
+    }
+  }
   for (const specifier of staticImports) {
     const target = resolveImport(root, relative(root, real), specifier)
     if (!target) violations.push(`unresolved relative import: ${relative(root, real)} -> ${specifier}`)
@@ -63,6 +71,7 @@ export function validateSafeTestPath({ root = ROOT } = {}) {
   const wrapper = readFileSync(join(root, 'scripts/network-denied-launcher.sh'), 'utf8')
   if (!wrapper.includes('(deny network*)') || /allow\s+network\*/.test(wrapper)) violations.push('sandbox must deny all network without localhost allow')
   if (!wrapper.includes('command -v sandbox-exec') || /NETWORK_DENIED_ACTIVE/.test(wrapper)) violations.push('sandbox absence/bypass must fail closed')
+  if (existsSync(join(root, 'scripts/network-denied-inner.sh')) || existsSync(join(root, 'scripts/network-denied-validation.sh'))) violations.push('legacy/direct inner validation runner must not exist')
   const live = readFileSync(join(root, 'scripts/telegram-notify-live-check.mjs'), 'utf8')
   if (!live.includes('HUMAN_GATE_REQUIRED') || /telegram-live-send|\.env|process\.env|--send/.test(live)) violations.push('live CLI is not hard-disabled before env/transport access')
   if (existsSync(join(root, 'scripts/telegram-live-send.mjs'))) violations.push('production live transport module must not exist')
