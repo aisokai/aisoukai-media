@@ -26,9 +26,10 @@ test('scheduled Git readiness fails closed for dirty, fetch failure, and unreada
   assert.equal(assessScheduledGitReadiness({ ...base, divergenceOutput: 'invalid' }).ok, false)
 })
 
-test('scheduled Git readiness blocks ahead commits with safe Human push context', () => {
+test('scheduled Git readiness allows clean ahead-only commits while retaining Human push context', () => {
   const result = assessScheduledGitReadiness({ ...base, divergenceOutput: '1 0' })
-  assert.equal(result.ok, false)
+  assert.equal(result.ok, true)
+  assert.match(result.reason, /origin\/mainと整合/)
   assert.match(result.reason, /ahead 1/)
   assert.match(result.reason, /Human push待ち/)
   assert.deepEqual(result.details, {

@@ -37,7 +37,7 @@ export function assessScheduledGitReadiness({
   }
   if (divergence.ahead > 0) {
     details.aheadSummary = `先行commit: ${head} を含む ${divergence.ahead}件`
-    return { ok: false, reason: `ローカルのみのcommitがあります（ahead ${divergence.ahead}）。Human push待ちです。`, details }
+    return { ok: true, reason: `Git状態はcleanでorigin/mainと整合しています（ahead ${divergence.ahead}、Human push待ち）`, details }
   }
   return { ok: true, reason: 'Git状態はcleanでorigin/mainと同期済みです', details }
 }

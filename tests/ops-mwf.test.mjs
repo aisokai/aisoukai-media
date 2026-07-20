@@ -81,7 +81,7 @@ test('ops:mwf leaves generated drafts for an explicit Human commit and push', ()
   assert.doesNotMatch(source, /git', \['push'/)
 })
 
-test('ops:mwf stops before generation when git is dirty or out of sync', () => {
+test('ops:mwf stops before generation only when Git is dirty, behind, diverged, or unreadable', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
   const readinessSource = readFileSync('scripts/lib/scheduled-git-readiness.mjs', 'utf8')
 
@@ -93,7 +93,8 @@ test('ops:mwf stops before generation when git is dirty or out of sync', () => {
   assert.match(source, /Human push待ち/)
   assert.match(readinessSource, /未commit変更があります/)
   assert.match(readinessSource, /GitHub側に未取得commitがあります/)
-  assert.match(readinessSource, /ローカルのみのcommitがあります/)
+  assert.match(readinessSource, /origin\/mainと整合しています/)
+  assert.match(readinessSource, /Human push待ち/)
 
   const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
