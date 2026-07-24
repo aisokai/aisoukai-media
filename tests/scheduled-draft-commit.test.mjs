@@ -99,17 +99,17 @@ test('owned draft recovery requires a clean remote preflight before validation, 
   assert.equal(calls.some((call) => call[1] === 'add' || call[1] === 'commit' || call[1] === 'push'), false)
 })
 
-test('legacy ops provenance can be adopted only for one exact untracked generated draft', () => {
+test('markerless legacy draft is held even when the ops log has an exact matching path', () => {
   const root = mkdtempSync(join(tmpdir(), 'aisoukai-legacy-draft-'))
   mkdirSync(join(root, 'logs'))
   writeFileSync(join(root, 'logs', 'ops-mwf.log'), `生成記事: ${path}\n`)
   const calls = []
-  const result = recoverOwnedGeneratedDraft({ root, runCommand: successfulGitRunner(calls, { untrackedStatusCalls: 2 }) })
+  const result = recoverOwnedGeneratedDraft({ root, runCommand: successfulGitRunner(calls) })
 
-  assert.equal(result.ok, true)
-  assert.equal(result.recovered, true)
-  assert.equal(result.adoptedLegacyDraft, true)
+  assert.equal(result.ok, false)
+  assert.match(result.reason, /provenance markerがない/)
   assert.equal(existsSync(join(root, 'logs', 'ops-mwf-owned-draft.json')), false)
+  assert.equal(calls.some((call) => call[1] === 'add' || call[1] === 'commit' || call[1] === 'push'), false)
 })
 
 test('owned draft status parser accepts neither mixed nor unsafe index states', () => {

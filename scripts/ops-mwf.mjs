@@ -17,6 +17,7 @@ import { loadContentStatus } from './lib/content-status.mjs'
 import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
 import { assessScheduledGitReadiness } from './lib/scheduled-git-readiness.mjs'
 import { recoverOwnedGeneratedDraft, rememberGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
+import { shouldSendDraftReviewNotification } from './lib/scheduled-draft-notification.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -401,6 +402,7 @@ if (generateDecision.ok) {
       assertGitReady: (marker) => checkScheduledGitReadiness({ ownedDraftPath: marker.path }),
     })
     if (!draftRecoveryResult.ok) {
+      draftSyncResult = draftRecoveryResult
       generateDecision = { ok: false, reason: `管理対象draftの回復を停止: ${draftRecoveryResult.reason}` }
     } else if (draftRecoveryResult.recovered) {
       console.log(`  ✅ ${draftRecoveryResult.reason}`)
@@ -471,7 +473,7 @@ if (alreadyLiveTodayNoop({ scheduledResult, contentStatus })) {
   process.exitCode = 0
 }
 console.log(notificationText.split('\n').map((line) => `  ${line}`).join('\n'))
-if (draftSyncResult?.ok === false) {
+if (!shouldSendDraftReviewNotification(draftSyncResult)) {
   console.log('  ⏭ Git同期準備に失敗したためTelegramレビュー依頼は送信しません')
 } else {
   try {

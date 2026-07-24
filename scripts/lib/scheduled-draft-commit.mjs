@@ -3,7 +3,6 @@ import { join } from 'node:path'
 
 const SAFE_POST_PATH = /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/
 const MARKER_FILE = 'ops-mwf-owned-draft.json'
-const OPS_LOG_FILE = 'ops-mwf.log'
 
 function fail(reason, extra = {}) {
   return { ok: false, committed: false, reason, ...extra }
@@ -40,16 +39,6 @@ function readMarker(root) {
     return normalizeMarker(JSON.parse(readFileSync(path, 'utf8')))
   } catch {
     return null
-  }
-}
-
-function hasLegacyOpsProvenance(root, path) {
-  const logPath = join(root, 'logs', OPS_LOG_FILE)
-  if (!existsSync(logPath)) return false
-  try {
-    return readFileSync(logPath, 'utf8').includes(`生成記事: ${path}`)
-  } catch {
-    return false
   }
 }
 
@@ -94,30 +83,25 @@ export function commitOwnedGeneratedDraft({ marker, runCommand }) {
 }
 
 export function recoverOwnedGeneratedDraft({ root, runCommand, assertGitReady = () => ({ ok: true }) }) {
-  let marker = readMarker(root)
-  let adoptedLegacyDraft = false
+  const marker = readMarker(root)
 
   if (!marker) {
     const status = runCommand('git', ['status', '--porcelain'])
     if (!status.ok) return fail('git status を確認できないため既存draftの回復を停止しました')
-    const line = String(status.output ?? '').trim()
-    const legacyPath = line.startsWith('?? ') ? line.slice(3) : ''
-    if (!isSafeGeneratedPostPath(legacyPath) || !hasLegacyOpsProvenance(root, legacyPath)) {
+    if (!String(status.output ?? '').trim()) {
       return { ok: true, committed: false, recovered: false, reason: '回復対象の管理済みdraftはありません' }
     }
-    marker = { version: 1, path: legacyPath, slug: legacyPath.slice('content/posts/'.length, -'.md'.length) }
-    writeMarker(root, marker)
-    adoptedLegacyDraft = true
+    return fail('provenance markerがない未commit変更は自動回復せずHuman操作待ちにします')
   }
 
   const readiness = assertGitReady(marker)
   if (!readiness?.ok) {
-    return fail(`Git同期が安全でないため管理対象draftの回復を停止しました: ${readiness?.reason ?? '確認不能'}`, { adoptedLegacyDraft })
+    return fail(`Git同期が安全でないため管理対象draftの回復を停止しました: ${readiness?.reason ?? '確認不能'}`)
   }
 
   const result = commitOwnedGeneratedDraft({ marker, runCommand })
   if (result.committed) unlinkSync(markerPath(root))
-  return { ...result, recovered: result.committed, adoptedLegacyDraft }
+  return { ...result, recovered: result.committed }
 }
 
 export function rememberGeneratedDraft({ root, scheduledResult }) {

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { shouldSendDraftReviewNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
 
 test('ops:mwf generates one scheduled draft before Telegram review notification', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
@@ -80,6 +81,16 @@ test('ops:mwf locally commits only provenance-marked drafts after Git preflight 
   assert.doesNotMatch(source, /git', \['add'/)
   assert.doesNotMatch(source, /git', \['commit'/)
   assert.doesNotMatch(source, /git', \['push'/)
+})
+
+test('ops:mwf treats recovery failure as a draft sync failure and suppresses Telegram', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  assert.match(source, /draftSyncResult = draftRecoveryResult/)
+  assert.match(source, /shouldSendDraftReviewNotification\(draftSyncResult\)/)
+  assert.match(source, /Git同期準備に失敗したためTelegramレビュー依頼は送信しません/)
+  assert.equal(shouldSendDraftReviewNotification({ ok: false }), false)
+  assert.equal(shouldSendDraftReviewNotification(null), true)
 })
 
 test('ops:mwf stops before generation only when Git is dirty, behind, diverged, or unreadable', () => {
