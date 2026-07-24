@@ -16,6 +16,7 @@ import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { loadContentStatus } from './lib/content-status.mjs'
 import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
 import { assessScheduledGitReadiness } from './lib/scheduled-git-readiness.mjs'
+import { recoverOwnedGeneratedDraft, rememberGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -131,13 +132,19 @@ function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
   }
 }
 
-function checkScheduledGitReadiness() {
+function checkScheduledGitReadiness({ ownedDraftPath = null } = {}) {
   const status = runCommand('git', ['status', '--porcelain'])
   const branch = runCommand('git', ['branch', '--show-current'])
   const head = runCommand('git', ['rev-parse', '--short', 'HEAD'])
+  const statusLines = status.output.split('\n').filter((line) => line.trim().length > 0)
+  const ownedDraftOnly = ownedDraftPath && statusLines.length === 1 && [
+    `?? ${ownedDraftPath}`,
+    `A  ${ownedDraftPath}`,
+  ].includes(statusLines[0])
   const base = {
     statusOk: status.ok,
-    dirtyCount: status.output.split('\n').filter((line) => line.trim().length > 0).length,
+    dirtyCount: ownedDraftOnly ? 0 : statusLines.length,
+    indexLockPresent: existsSync(join(ROOT, '.git', 'index.lock')),
     branch: branch.ok && branch.output ? branch.output : '不明',
     head: head.ok && head.output ? head.output : '不明',
   }
@@ -160,10 +167,6 @@ function checkScheduledGitReadiness() {
   })
 }
 
-function isSafeGeneratedPostPath(path) {
-  return /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(String(path ?? ''))
-}
-
 function isLegacyTopicPoolExhausted(status, result) {
   if (status !== 2 || String(result?.topicId ?? '').trim() || String(result?.path ?? '').trim()) {
     return false
@@ -174,20 +177,16 @@ function isLegacyTopicPoolExhausted(status, result) {
 }
 
 function prepareGeneratedDraftForHumanPush(scheduledResult) {
-  const relPath = scheduledResult?.path
   if (!scheduledResult?.generated) {
     return { ok: true, skipped: true, reason: 'generated=false' }
   }
-  if (!isSafeGeneratedPostPath(relPath)) {
-    return { ok: false, reason: `生成記事パスが安全な形式ではありません: ${relPath ?? '未設定'}` }
-  }
-
-  const validate = runCommand('npm', ['run', 'validate:posts'])
-  if (!validate.ok) {
-    return { ok: false, reason: `validate:posts に失敗: ${validate.output.slice(0, 300)}` }
-  }
-
-  return { ok: true, skipped: false, reason: '生成下書きはローカルに保存済みです。Human commit / push待ちです。' }
+  const remembered = rememberGeneratedDraft({ root: ROOT, scheduledResult })
+  if (!remembered.ok) return remembered
+  return recoverOwnedGeneratedDraft({
+    root: ROOT,
+    runCommand,
+    assertGitReady: (marker) => checkScheduledGitReadiness({ ownedDraftPath: marker.path }),
+  })
 }
 
 function readJsonIfExists(path) {
@@ -392,6 +391,22 @@ let generateDecision = shouldGenerateScheduledArticle()
 let scheduledResult = null
 let draftSyncResult = null
 let gitReadiness = { ok: true, reason: '記事生成なし' }
+let draftRecoveryResult = null
+
+if (generateDecision.ok) {
+  if (!existsSync(join(ROOT, '.git', 'index.lock'))) {
+    draftRecoveryResult = recoverOwnedGeneratedDraft({
+      root: ROOT,
+      runCommand,
+      assertGitReady: (marker) => checkScheduledGitReadiness({ ownedDraftPath: marker.path }),
+    })
+    if (!draftRecoveryResult.ok) {
+      generateDecision = { ok: false, reason: `管理対象draftの回復を停止: ${draftRecoveryResult.reason}` }
+    } else if (draftRecoveryResult.recovered) {
+      console.log(`  ✅ ${draftRecoveryResult.reason}`)
+    }
+  }
+}
 
 if (generateDecision.ok) {
   gitReadiness = checkScheduledGitReadiness()
@@ -456,11 +471,15 @@ if (alreadyLiveTodayNoop({ scheduledResult, contentStatus })) {
   process.exitCode = 0
 }
 console.log(notificationText.split('\n').map((line) => `  ${line}`).join('\n'))
-try {
-  await sendOpsTelegram(notificationText)
-} catch (error) {
-  console.error(`  ❌ Telegram 送信失敗: ${error.message}`)
-  process.exitCode = 1
+if (draftSyncResult?.ok === false) {
+  console.log('  ⏭ Git同期準備に失敗したためTelegramレビュー依頼は送信しません')
+} else {
+  try {
+    await sendOpsTelegram(notificationText)
+  } catch (error) {
+    console.error(`  ❌ Telegram 送信失敗: ${error.message}`)
+    process.exitCode = 1
+  }
 }
 
 console.log()

@@ -16,10 +16,12 @@ export function assessScheduledGitReadiness({
   fetchOk,
   divergenceOk,
   divergenceOutput,
+  indexLockPresent = false,
   branch = '不明',
   head = '不明',
 }) {
   const details = { branch, head, ahead: 0, behind: 0, aheadSummary: null }
+  if (indexLockPresent) return { ok: false, reason: 'Git index lock が存在するため記事生成を停止します。', details }
   if (!statusOk) return { ok: false, reason: 'git status を確認できません', details }
   if (dirtyCount > 0) return { ok: false, reason: `未commit変更があります（${dirtyCount}件）。先に整理してください。`, details }
   if (!fetchOk) return { ok: false, reason: 'origin/main の取得に失敗しました。安全のため記事生成を停止します。', details }

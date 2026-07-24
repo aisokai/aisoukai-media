@@ -69,13 +69,14 @@ test('ops:mwf has a process lock to prevent cron and launchd double generation',
   assert.match(gitignore, /^logs\/ops-mwf\.lock$/m)
 })
 
-test('ops:mwf leaves generated drafts for an explicit Human commit and push', () => {
+test('ops:mwf locally commits only provenance-marked drafts after Git preflight and never pushes', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
-  assert.match(source, /isSafeGeneratedPostPath/)
-  assert.match(source, /content\\\/posts\\\/\\d\{4\}-\\d\{2\}-\\d\{2\}-\[a-z0-9-\]\+\\\.md/)
+  assert.match(source, /rememberGeneratedDraft/)
+  assert.match(source, /recoverOwnedGeneratedDraft/)
   assert.match(source, /prepareGeneratedDraftForHumanPush/)
-  assert.match(source, /Human commit \/ push待ち/)
+  assert.match(source, /assertGitReady: \(marker\) => checkScheduledGitReadiness\(\{ ownedDraftPath: marker\.path \}\)/)
+  assert.match(source, /Human push待ち/)
   assert.doesNotMatch(source, /git', \['add'/)
   assert.doesNotMatch(source, /git', \['commit'/)
   assert.doesNotMatch(source, /git', \['push'/)
