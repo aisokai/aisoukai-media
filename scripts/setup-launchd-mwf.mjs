@@ -16,10 +16,11 @@ import { spawnSync } from 'node:child_process'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
-const HOME      = homedir()
+const USER_HOME = homedir()
 
 const LABEL           = 'com.mitani.aisoukai-media-ops-mwf'
-const PLIST_PATH      = join(HOME, 'Library', 'LaunchAgents', `${LABEL}.plist`)
+const PLIST_DIR       = join(USER_HOME, 'Library', 'LaunchAgents')
+const PLIST_PATH      = join(PLIST_DIR, `${LABEL}.plist`)
 const LOG_DIR         = join(ROOT, 'logs')
 const LOG_PATH        = join(LOG_DIR, 'ops-mwf.log')
 const ERROR_LOG_PATH  = join(LOG_DIR, 'ops-mwf-error.log')
@@ -83,6 +84,10 @@ function runLaunchctl(args) {
   }
 }
 
+function launchdDomain() {
+  return `gui/${process.getuid()}`
+}
+
 const BAR = '━'.repeat(56)
 
 function install() {
@@ -91,20 +96,24 @@ function install() {
     mkdirSync(LOG_DIR, { recursive: true })
     console.log(`  📁 logs/ を作成しました`)
   }
+  if (!existsSync(PLIST_DIR)) {
+    mkdirSync(PLIST_DIR, { recursive: true })
+    console.log(`  📁 LaunchAgents/ を作成しました`)
+  }
 
-  const alreadyLoaded = runLaunchctl(['list', LABEL])
+  const alreadyLoaded = runLaunchctl(['print', `${launchdDomain()}/${LABEL}`])
   if (alreadyLoaded.ok) {
     console.log('  既存の launchd ジョブをアンロード中...')
-    runLaunchctl(['unload', PLIST_PATH])
+    runLaunchctl(['bootout', launchdDomain(), PLIST_PATH])
   }
 
   writeFileSync(PLIST_PATH, generatePlist(), 'utf8')
   console.log(`  ✅ plist を生成しました`)
   console.log(`     ${PLIST_PATH}`)
 
-  const res = runLaunchctl(['load', PLIST_PATH])
+  const res = runLaunchctl(['bootstrap', launchdDomain(), PLIST_PATH])
   if (!res.ok) {
-    console.error(`  ❌ launchctl load に失敗しました`)
+    console.error(`  ❌ launchctl bootstrap に失敗しました`)
     if (res.stderr) console.error(`     ${res.stderr}`)
     process.exit(1)
   }
@@ -126,9 +135,9 @@ function uninstall() {
     return
   }
 
-  const res = runLaunchctl(['unload', PLIST_PATH])
+  const res = runLaunchctl(['bootout', launchdDomain(), PLIST_PATH])
   if (!res.ok && !res.stderr.includes('Could not find')) {
-    console.warn(`  ⚠️  launchctl unload: ${res.stderr}`)
+    console.warn(`  ⚠️  launchctl bootout: ${res.stderr}`)
   }
 
   unlinkSync(PLIST_PATH)
@@ -170,7 +179,7 @@ function status() {
     console.log(`  plist 読み込みエラー: ${e.message}`)
   }
 
-  const res = runLaunchctl(['list', LABEL])
+  const res = runLaunchctl(['print', `${launchdDomain()}/${LABEL}`])
   if (!res.ok) {
     console.log('  launchd : ❌ 未登録（plist は存在するが load されていない可能性あり）')
     console.log()
@@ -178,10 +187,10 @@ function status() {
     return
   }
 
-  // LastExitStatus を取得する（launchctl list の出力は JSON 形式）
-  // 出力形式: { "LimitLoadToSessionType" = ...; "Label" = ...; "LastExitStatus" = N; ... }
-  const exitStatusMatch = res.stdout.match(/"LastExitStatus"\s*=\s*(\d+)/i)
+  // launchctl print の service state から直近の終了状態を取得する。
+  const exitStatusMatch = res.stdout.match(/last exit code\s*=\s*(\d+)/i)
     ?? res.stdout.match(/LastExitStatus\s*=\s*(\d+)/i)
+    ?? res.stdout.match(/last exit status\s*=\s*(\d+)/i)
   const lastExitStatus = exitStatusMatch ? parseInt(exitStatusMatch[1], 10) : null
 
   if (lastExitStatus === null) {

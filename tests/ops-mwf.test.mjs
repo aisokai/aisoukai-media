@@ -72,12 +72,17 @@ test('ops:mwf has a process lock to prevent cron and launchd double generation',
 
 test('ops:mwf locally commits only provenance-marked drafts after Git preflight and never pushes', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const gitignore = readFileSync('.gitignore', 'utf8')
 
   assert.match(source, /rememberGeneratedDraft/)
   assert.match(source, /recoverOwnedGeneratedDraft/)
+  assert.match(source, /classifyOwnedDraftStatus/)
+  assert.match(source, /classifyOwnedDraftStatus\(status\.output, ownedDraftPath\)/)
   assert.match(source, /prepareGeneratedDraftForHumanPush/)
   assert.match(source, /assertGitReady: \(marker\) => checkScheduledGitReadiness\(\{ ownedDraftPath: marker\.path \}\)/)
   assert.match(source, /Human push待ち/)
+  assert.match(gitignore, /^logs\/ops-mwf-owned-draft\.json$/m)
+  assert.match(gitignore, /^logs\/ops-mwf-owned-draft\.json\.\*\.tmp$/m)
   assert.doesNotMatch(source, /git', \['add'/)
   assert.doesNotMatch(source, /git', \['commit'/)
   assert.doesNotMatch(source, /git', \['push'/)
@@ -112,6 +117,17 @@ test('ops:mwf stops before generation only when Git is dirty, behind, diverged, 
   const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
   assert.ok(readinessIndex > 0)
   assert.ok(scheduledIndex > readinessIndex)
+})
+
+test('ops:mwf launchd setup uses the GUI domain APIs for only its own job', () => {
+  const source = readFileSync('scripts/setup-launchd-mwf.mjs', 'utf8')
+
+  assert.match(source, /return `gui\/\$\{process\.getuid\(\)\}`/)
+  assert.match(source, /runLaunchctl\(\['print', `\$\{launchdDomain\(\)\}\/\$\{LABEL\}`\]\)/)
+  assert.match(source, /runLaunchctl\(\['bootout', launchdDomain\(\), PLIST_PATH\]\)/)
+  assert.match(source, /runLaunchctl\(\['bootstrap', launchdDomain\(\), PLIST_PATH\]\)/)
+  assert.doesNotMatch(source, /runLaunchctl\(\['(?:list|load|unload)'/)
+  assert.doesNotMatch(source, /com\.mitani\.aisoukai-media-(?:telegram-ops|media)/)
 })
 
 test('ops:mwf guards duplicate Telegram review notifications by date, job, and text', () => {

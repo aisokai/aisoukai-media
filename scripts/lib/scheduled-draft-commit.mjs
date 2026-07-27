@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 const SAFE_POST_PATH = /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/
 const MARKER_FILE = 'ops-mwf-owned-draft.json'
+const MARKER_REPO_PATH = `logs/${MARKER_FILE}`
 
 function fail(reason, extra = {}) {
   return { ok: false, committed: false, reason, ...extra }
@@ -44,10 +45,16 @@ function readMarker(root) {
 
 export function classifyOwnedDraftStatus(statusOutput, path) {
   const lines = String(statusOutput ?? '').split(/\r?\n/).filter(Boolean)
-  if (lines.length !== 1) return null
-  if (lines[0] === `?? ${path}`) return 'untracked'
-  if (lines[0] === `A  ${path}`) return 'staged'
+  const draftLines = lines.filter((line) => line !== `?? ${MARKER_REPO_PATH}`)
+  if (draftLines.length !== 1 || lines.length > 2) return null
+  if (draftLines[0] === `?? ${path}`) return 'untracked'
+  if (draftLines[0] === `A  ${path}`) return 'staged'
   return null
+}
+
+function hasOnlyOwnedMarkerStatus(statusOutput) {
+  const lines = String(statusOutput ?? '').split(/\r?\n/).filter(Boolean)
+  return lines.length === 0 || (lines.length === 1 && lines[0] === `?? ${MARKER_REPO_PATH}`)
 }
 
 export function commitOwnedGeneratedDraft({ marker, runCommand }) {
@@ -76,7 +83,7 @@ export function commitOwnedGeneratedDraft({ marker, runCommand }) {
   if (!commit.ok) return fail(`git commit に失敗したため管理対象draftを回復待ちにしました: ${commit.output.slice(0, 300)}`)
 
   const after = runCommand('git', ['status', '--porcelain'])
-  if (!after.ok || after.output.trim()) {
+  if (!after.ok || !hasOnlyOwnedMarkerStatus(after.output)) {
     return fail('draftはlocal commit済みですが、commit後に別の変更が検出されました', { committed: true })
   }
   return { ok: true, committed: true, reason: '生成下書きをローカルcommitしました。Human push待ちです。' }

@@ -53,6 +53,8 @@ logs/telegram-ops.log
 logs/telegram-ops-error.log
 logs/*.log
 logs/ops-mwf.lock
+logs/ops-mwf-owned-draft.json
+logs/ops-mwf-owned-draft.json.*.tmp
 logs/notification-dedupe/
 
 # internal superpowers planning docs (not version-controlled)

@@ -16,7 +16,11 @@ import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { loadContentStatus } from './lib/content-status.mjs'
 import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
 import { assessScheduledGitReadiness } from './lib/scheduled-git-readiness.mjs'
-import { recoverOwnedGeneratedDraft, rememberGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
+import {
+  classifyOwnedDraftStatus,
+  recoverOwnedGeneratedDraft,
+  rememberGeneratedDraft,
+} from './lib/scheduled-draft-commit.mjs'
 import { shouldSendDraftReviewNotification } from './lib/scheduled-draft-notification.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -138,10 +142,7 @@ function checkScheduledGitReadiness({ ownedDraftPath = null } = {}) {
   const branch = runCommand('git', ['branch', '--show-current'])
   const head = runCommand('git', ['rev-parse', '--short', 'HEAD'])
   const statusLines = status.output.split('\n').filter((line) => line.trim().length > 0)
-  const ownedDraftOnly = ownedDraftPath && statusLines.length === 1 && [
-    `?? ${ownedDraftPath}`,
-    `A  ${ownedDraftPath}`,
-  ].includes(statusLines[0])
+  const ownedDraftOnly = ownedDraftPath && classifyOwnedDraftStatus(status.output, ownedDraftPath)
   const base = {
     statusOk: status.ok,
     dirtyCount: ownedDraftOnly ? 0 : statusLines.length,

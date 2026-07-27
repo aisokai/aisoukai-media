@@ -7,6 +7,7 @@ import {
   classifyOwnedDraftStatus,
   commitOwnedGeneratedDraft,
   recoverOwnedGeneratedDraft,
+  rememberGeneratedDraft,
 } from '../scripts/lib/scheduled-draft-commit.mjs'
 
 const path = 'content/posts/2026-07-24-topic-0123456789abcdef.md'
@@ -36,6 +37,45 @@ test('owned generated draft accepts only one exact untracked post and local-comm
   assert.equal(result.committed, true)
   assert.ok(calls.some((call) => call.join(' ') === `git add -- ${path}`))
   assert.ok(calls.some((call) => call.join(' ') === `git commit -m draft: ${marker.slug}`))
+  assert.equal(calls.some((call) => call[0] === 'git' && call[1] === 'push'), false)
+})
+
+test('a marker created by rememberGeneratedDraft does not block exact owned-draft recovery', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aisoukai-owned-draft-'))
+  const remembered = rememberGeneratedDraft({
+    root,
+    scheduledResult: { generated: true, path, slug: marker.slug },
+  })
+  assert.equal(remembered.ok, true)
+  assert.equal(existsSync(join(root, 'logs', 'ops-mwf-owned-draft.json')), true)
+
+  const calls = []
+  let statusCalls = 0
+  const result = recoverOwnedGeneratedDraft({
+    root,
+    runCommand: (command, args) => {
+      calls.push([command, ...args])
+      if (command === 'git' && args[0] === 'status') {
+        statusCalls += 1
+        return {
+          ok: true,
+          output: statusCalls === 1
+            ? `?? ${path}\n?? logs/ops-mwf-owned-draft.json`
+            : '?? logs/ops-mwf-owned-draft.json',
+        }
+      }
+      if (command === 'npm') return { ok: true, output: '' }
+      if (command === 'git' && args[0] === 'add') return { ok: true, output: '' }
+      if (command === 'git' && args[0] === 'diff') return { ok: true, output: path }
+      if (command === 'git' && args[0] === 'commit') return { ok: true, output: '' }
+      throw new Error(`unexpected command: ${command} ${args.join(' ')}`)
+    },
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.committed, true)
+  assert.equal(result.recovered, true)
+  assert.equal(existsSync(join(root, 'logs', 'ops-mwf-owned-draft.json')), false)
   assert.equal(calls.some((call) => call[0] === 'git' && call[1] === 'push'), false)
 })
 
@@ -115,6 +155,14 @@ test('markerless legacy draft is held even when the ops log has an exact matchin
 test('owned draft status parser accepts neither mixed nor unsafe index states', () => {
   assert.equal(classifyOwnedDraftStatus(`?? ${path}`, path), 'untracked')
   assert.equal(classifyOwnedDraftStatus(`A  ${path}`, path), 'staged')
+  assert.equal(
+    classifyOwnedDraftStatus(`?? ${path}\n?? logs/ops-mwf-owned-draft.json`, path),
+    'untracked',
+  )
   assert.equal(classifyOwnedDraftStatus(`?? ${path}\n M README.md`, path), null)
+  assert.equal(
+    classifyOwnedDraftStatus(`?? ${path}\n?? logs/ops-mwf-owned-draft-copy.json`, path),
+    null,
+  )
   assert.equal(classifyOwnedDraftStatus(` M ${path}`, path), null)
 })
