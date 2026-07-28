@@ -18,10 +18,13 @@ test('review action buttons refresh the pending list after a successful action',
 
 test('approve action is idempotent for already reviewed posts', () => {
   const source = readFileSync('src/app/admin/pending-review/actions.ts', 'utf8')
+  const reviewActions = readFileSync('src/lib/reviewActions.ts', 'utf8')
 
   assert.match(source, /isReviewedPost/)
   assert.match(source, /reviewed_at/)
   assert.match(source, /reviewed_by/)
   assert.match(source, /この記事は既に承認済みです/)
   assert.match(source, /return\s*\{\s*ok:\s*true/s)
+  assert.match(reviewActions, /stock_status = 'adopted'/)
+  assert.match(reviewActions, /stock_status = 'rejected'/)
 })

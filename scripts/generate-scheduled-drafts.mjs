@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseCsv } from './csv-parser.mjs'
+import { loadRepoEnv } from './lib/openai-blog-generator.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -15,15 +16,6 @@ const POSTS_DIR = join(ROOT, 'content', 'posts')
 
 function getCurrentMonthJst() {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7)
-}
-
-function loadEnv() {
-  const envPath = join(ROOT, '.env.local')
-  if (!existsSync(envPath)) return
-  for (const line of readFileSync(envPath, 'utf8').split('\n')) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)\s*=\s*(.+)$/)
-    if (m) process.env[m[1]] ??= m[2].trim().replace(/^["']|["']$/g, '')
-  }
 }
 
 function parseArgs(argv) {
@@ -73,7 +65,7 @@ function printUsage() {
 }
 
 function main() {
-  loadEnv()
+  loadRepoEnv(ROOT)
 
   const args = parseArgs(process.argv.slice(2))
   if (args.help) {
@@ -93,8 +85,8 @@ function main() {
     console.error(`エラー: --limit は 1 以上の数値で指定してください: ${args.limit}`)
     process.exit(1)
   }
-  if (!dryRun && !process.env.ANTHROPIC_API_KEY) {
-    console.error('エラー: ANTHROPIC_API_KEY が未設定です')
+  if (!dryRun && !process.env.OPENAI_API_KEY) {
+    console.error('エラー: OPENAI_API_KEY が未設定です（generate:draft と同じ要件です）')
     process.exit(1)
   }
 
@@ -147,4 +139,3 @@ function main() {
 }
 
 main()
-

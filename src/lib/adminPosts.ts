@@ -16,6 +16,10 @@ export type AdminPost = {
   archiveReason?: string
   rejectionReason?: string
   aiGenerated: boolean
+  generatedAt?: string
+  stockStatus: 'ready' | 'hold' | 'rejected' | 'adopted'
+  themeId?: string
+  duplicateOf?: string
   excerpt: string
   raw: string
 }
@@ -29,6 +33,9 @@ function toDateString(val: unknown): string {
 
 function postFromRaw(fileName: string, raw: string): AdminPost {
   const { data } = matter(raw)
+  const stockStatus = data.stock_status === 'ready' || data.stock_status === 'hold' || data.stock_status === 'rejected' || data.stock_status === 'adopted'
+    ? data.stock_status
+    : data.rejection_reason ? 'rejected' : data.reviewed === true ? 'adopted' : 'ready'
   return {
     slug: fileName.replace(/\.md$/, ''),
     fileName,
@@ -42,6 +49,10 @@ function postFromRaw(fileName: string, raw: string): AdminPost {
     archiveReason: data.archive_reason ? String(data.archive_reason) : undefined,
     rejectionReason: data.rejection_reason ? String(data.rejection_reason) : undefined,
     aiGenerated: data.ai_generated === true,
+    generatedAt: data.generated_at ? String(data.generated_at) : undefined,
+    stockStatus,
+    themeId: data.theme_id ? String(data.theme_id) : data.source_theme_topic_id ? String(data.source_theme_topic_id) : undefined,
+    duplicateOf: data.duplicate_of ? String(data.duplicate_of) : undefined,
     excerpt: String(data.excerpt ?? data.description ?? ''),
     raw,
   }

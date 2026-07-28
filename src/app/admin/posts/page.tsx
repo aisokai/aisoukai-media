@@ -5,6 +5,7 @@ import { ArrowLeft, FileEdit } from 'lucide-react'
 import { isAdminAuthenticated } from '@/lib/adminAuth'
 import { type AdminPost, getAdminPosts } from '@/lib/adminPosts'
 import { NOINDEX_METADATA } from '@/lib/seo'
+import { getStockPresentation } from '@/lib/stockPresentation.mjs'
 import PostManagementActions from './PostManagementActions'
 
 export const metadata: Metadata = {
@@ -19,6 +20,7 @@ type PageProps = {
     status?: string
     category?: string
     ai?: string
+    stock?: string
     sort?: string
   }>
 }
@@ -56,6 +58,7 @@ export default async function AdminPostsPage({ searchParams }: PageProps) {
   const statusFilter = params?.status ?? 'all'
   const categoryFilter = params?.category ?? 'all'
   const aiFilter = params?.ai ?? 'all'
+  const stockFilter = params?.stock ?? 'all'
   const sort = params?.sort ?? 'newest'
   const posts = await getAdminPosts()
   const live = posts.filter((post) => post.reviewed && !post.draft && !post.archived && !post.rejectionReason).length
@@ -69,6 +72,7 @@ export default async function AdminPostsPage({ searchParams }: PageProps) {
       if (categoryFilter !== 'all' && post.category !== categoryFilter) return false
       if (aiFilter === 'yes' && !post.aiGenerated) return false
       if (aiFilter === 'no' && post.aiGenerated) return false
+      if (stockFilter !== 'all' && post.stockStatus !== stockFilter) return false
       return true
     }),
     sort,
@@ -96,7 +100,7 @@ export default async function AdminPostsPage({ searchParams }: PageProps) {
         <Metric label="アーカイブ" value={archived} tone="slate" />
       </section>
 
-      <form method="get" className="mt-6 grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-5">
+      <form method="get" className="mt-6 grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-6">
         <FilterSelect label="状態" name="status" value={statusFilter}>
           <option value="all">すべて</option>
           <option value="pending">未承認</option>
@@ -115,6 +119,13 @@ export default async function AdminPostsPage({ searchParams }: PageProps) {
           <option value="yes">AI生成のみ</option>
           <option value="no">AI生成以外</option>
         </FilterSelect>
+        <FilterSelect label="ストック" name="stock" value={stockFilter}>
+          <option value="all">すべて</option>
+          <option value="ready">レビュー可能</option>
+          <option value="hold">保留</option>
+          <option value="rejected">却下</option>
+          <option value="adopted">採用済み</option>
+        </FilterSelect>
         <FilterSelect label="並び順" name="sort" value={sort}>
           <option value="newest">新しい順</option>
           <option value="oldest">古い順</option>
@@ -131,12 +142,15 @@ export default async function AdminPostsPage({ searchParams }: PageProps) {
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
         {filteredPosts.map((post) => {
           const status = statusLabel(getAdminPostStatus(post))
+          const stockPresentation = getStockPresentation(post.stockStatus)
           return (
             <article key={post.slug} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusStyle(status)}`}>{status}</span>
                 <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">{post.category}</span>
                 {post.aiGenerated && <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">AI生成</span>}
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${stockPresentation.className}`}>ストック: {stockPresentation.label}</span>
+                {post.duplicateOf && <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">重複候補: {post.duplicateOf}</span>}
               </div>
               <h2 className="mt-3 text-base font-bold leading-snug text-gray-900">{post.title}</h2>
               <p className="mt-1 font-mono text-xs text-gray-500">{post.slug}</p>
@@ -144,6 +158,8 @@ export default async function AdminPostsPage({ searchParams }: PageProps) {
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                 <span>date: {post.date}</span>
                 {post.publishAt && <span>publish_at: {post.publishAt}</span>}
+                {post.generatedAt && <span>generated_at: {post.generatedAt}</span>}
+                {post.themeId && <span>theme_id: {post.themeId}</span>}
               </div>
               {post.archiveReason && <p className="mt-2 text-xs text-slate-600">archive: {post.archiveReason}</p>}
               {post.rejectionReason && <p className="mt-2 text-xs text-red-600">reject: {post.rejectionReason}</p>}

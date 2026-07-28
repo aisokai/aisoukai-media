@@ -19,6 +19,7 @@ const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-.+\.md$/
 const VALID_MEDICAL_RISK = ['low', 'medium', 'high']
 const VALID_CHECK_STATUS = ['pending', 'passed', 'failed']
 const VALID_PUBLICATION_STATUS = ['draft', 'pending_review', 'auto_approved', 'human_approved']
+const VALID_STOCK_STATUS = ['ready', 'hold', 'rejected', 'adopted']
 
 function detectGeneratedDraftQualityIssues(body) {
   const text = String(body ?? '')
@@ -148,6 +149,10 @@ function validatePost(filename) {
 
   if (data.publication_status !== undefined && !VALID_PUBLICATION_STATUS.includes(data.publication_status)) {
     errors.push(`publication_status が無効です: "${data.publication_status}"`)
+  }
+
+  if (data.stock_status !== undefined && !VALID_STOCK_STATUS.includes(data.stock_status)) {
+    errors.push(`stock_status が無効です: "${data.stock_status}"`)
   }
 
   if (data.tags !== undefined && !Array.isArray(data.tags)) {

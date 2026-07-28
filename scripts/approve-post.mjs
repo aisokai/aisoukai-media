@@ -134,6 +134,7 @@ function main() {
   data.draft        = false
   data.reviewed_at  = today
   data.reviewed_by  = by
+  data.stock_status = 'adopted'
 
   const slug = filePath.split('/').pop().replace(/\.md$/, '')
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
