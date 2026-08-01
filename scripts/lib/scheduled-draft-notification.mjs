@@ -44,11 +44,14 @@ export function classifyScheduledDraftOutcome({
   }
   if (draftSyncResult?.ok === true
     && draftSyncResult.committed === true
-    && draftSyncResult.skipped !== true) {
+    && (draftSyncResult.skipped === undefined || draftSyncResult.skipped === false)) {
     return {
       kind: 'review-ready',
       reviewReady: true,
       exitCode: 0,
+      generated: true,
+      syncSucceeded: true,
+      syncCommitted: true,
       reason: '生成下書きのGit同期準備が完了しました',
     }
   }
@@ -61,7 +64,12 @@ export function classifyScheduledDraftOutcome({
 }
 
 export function scheduledDraftNotificationBoundary(outcome) {
-  if (outcome?.kind === 'review-ready' && outcome.reviewReady === true) {
+  if (outcome?.kind === 'review-ready'
+    && outcome.reviewReady === true
+    && outcome.exitCode === 0
+    && outcome.generated === true
+    && outcome.syncSucceeded === true
+    && outcome.syncCommitted === true) {
     return { kind: 'review-request', shouldSend: true, job: 'ops-mwf-review-request' }
   }
   if (outcome?.kind === 'incident' || outcome?.kind === 'sync-failure') {

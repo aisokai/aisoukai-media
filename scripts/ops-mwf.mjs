@@ -156,6 +156,42 @@ function attachChildRunEvidence(outcome, childRunResult) {
   }
 }
 
+function classifyTopicSyncFailure(childRunResult) {
+  if (childRunResult?.status === 0) return null
+  const exitCode = Number.isInteger(childRunResult?.status) && childRunResult.status > 0
+    ? childRunResult.status
+    : 1
+  const signal = typeof childRunResult?.signal === 'string' && childRunResult.signal
+    ? childRunResult.signal
+    : null
+  const termination = typeof childRunResult?.termination === 'string' && childRunResult.termination
+    ? childRunResult.termination
+    : null
+  const incident = {
+    kind: 'incident',
+    reviewReady: false,
+    exitCode,
+    reason: signal
+      ? `selected topic sync が ${signal} で停止しました (exit ${exitCode})`
+      : `selected topic sync が exit ${exitCode} で停止しました`,
+  }
+  if (signal) incident.childSignal = signal
+  if (termination) incident.childTermination = termination
+  return incident
+}
+
+function classifyPreGenerationFailure(input) {
+  const stage = input?.stage
+  const reason = input?.reason
+  if (!['owned_draft_recovery', 'git_readiness'].includes(stage)) return null
+  return {
+    kind: 'incident',
+    reviewReady: false,
+    exitCode: 1,
+    reason: `${stage}_failed:${String(reason ?? 'unknown')}`,
+  }
+}
+
 function run(script, extraArgs = []) {
   const result = spawnSync(
     process.execPath,
@@ -486,6 +522,11 @@ if (generateDecision.ok) {
     if (!draftRecoveryResult.ok) {
       draftSyncResult = draftRecoveryResult
       generateDecision = { ok: false, reason: `管理対象draftの回復を停止: ${draftRecoveryResult.reason}` }
+      scheduledOutcome = classifyPreGenerationFailure({
+        stage: 'owned_draft_recovery',
+        reason: draftRecoveryResult.reason,
+      })
+      process.exitCode = scheduledOutcome.exitCode
     } else if (draftRecoveryResult.recovered) {
       console.log(`  ✅ ${draftRecoveryResult.reason}`)
     }
@@ -496,11 +537,16 @@ if (generateDecision.ok) {
   gitReadiness = checkScheduledGitReadiness()
   if (!gitReadiness.ok) {
     generateDecision = { ok: false, reason: `Git同期が安全でないため記事生成を停止: ${gitReadiness.reason}` }
+    scheduledOutcome = classifyPreGenerationFailure({
+      stage: 'git_readiness',
+      reason: gitReadiness.reason,
+    })
+    process.exitCode = scheduledOutcome.exitCode
   }
 }
 
 header('1/3  ネタリスト selected 同期')
-let syncFailed = false
+let syncIncident = null
 if (!generateDecision.ok) {
   console.log(`  ⏭ ${generateDecision.reason}`)
 } else if (!gitReadiness.ok) {
@@ -508,12 +554,15 @@ if (!generateDecision.ok) {
 } else {
   for (const month of topicSyncMonths()) {
     const childRunResult = run('convert-selected-topics.mjs', ['--month', month, '--yes', '--if-exists', '--allow-empty'])
-    if (childRunResult.status !== 0) syncFailed = true
+    syncIncident = classifyTopicSyncFailure(childRunResult)
+    if (syncIncident) break
   }
 }
 
-if (syncFailed) {
+if (syncIncident) {
   generateDecision = { ok: false, reason: 'ネタリスト selected 同期に失敗したため記事生成を停止' }
+  scheduledOutcome = syncIncident
+  process.exitCode = syncIncident.exitCode
 }
 
 header('2/3  承認済みネタから記事生成')

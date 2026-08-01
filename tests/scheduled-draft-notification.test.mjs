@@ -22,6 +22,9 @@ test('only a zero-exit generated draft with successful sync is review-ready', ()
   assert.equal(shouldSendDraftReviewNotification(awaitingSync), false)
   assert.equal(reviewReady.kind, 'review-ready')
   assert.equal(reviewReady.exitCode, 0)
+  assert.equal(reviewReady.generated, true)
+  assert.equal(reviewReady.syncSucceeded, true)
+  assert.equal(reviewReady.syncCommitted, true)
   assert.equal(shouldSendDraftReviewNotification(reviewReady), true)
   assert.deepEqual(scheduledDraftNotificationBoundary(reviewReady), {
     kind: 'review-request',
@@ -30,8 +33,8 @@ test('only a zero-exit generated draft with successful sync is review-ready', ()
   })
 })
 
-test('nonzero child exits are distinct incidents and preserve their exact exit code', () => {
-  for (const childStatus of [1, 2, 17, 130]) {
+test('nonzero and normalized signal exits are incidents preserving their exact exit code', () => {
+  for (const childStatus of [1, 2, 17, 130, 143]) {
     const outcome = classifyScheduledDraftOutcome({
       childStatus,
       scheduledResult: { ok: false, generated: false },
@@ -86,6 +89,11 @@ test('no-draft and sync-failure outcomes have zero review-request sends', () => 
     scheduledResult: { ok: true, generated: true },
     draftSyncResult: { ok: true },
   })
+  const malformedSkippedSync = classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: { ok: true, generated: true },
+    draftSyncResult: { ok: true, committed: true, skipped: 'no' },
+  })
 
   assert.equal(noDraft.kind, 'no-draft')
   assert.equal(noDraft.exitCode, 0)
@@ -97,8 +105,24 @@ test('no-draft and sync-failure outcomes have zero review-request sends', () => 
   assert.equal(skippedSync.kind, 'sync-failure')
   assert.equal(uncommittedSync.kind, 'sync-failure')
   assert.equal(incompleteSync.kind, 'sync-failure')
+  assert.equal(malformedSkippedSync.kind, 'sync-failure')
   assert.equal(shouldSendDraftReviewNotification(uncommittedSync), false)
   assert.equal(shouldSendDraftReviewNotification(incompleteSync), false)
+})
+
+test('review notification boundary rejects incomplete review-ready shapes', () => {
+  const incompleteReviewReady = {
+    kind: 'review-ready',
+    reviewReady: true,
+    exitCode: 0,
+  }
+
+  assert.equal(shouldSendDraftReviewNotification(incompleteReviewReady), false)
+  assert.deepEqual(scheduledDraftNotificationBoundary(incompleteReviewReady), {
+    kind: 'suppressed',
+    shouldSend: false,
+    job: null,
+  })
 })
 
 test('review requests and incidents use separate stable dedupe identities', () => {

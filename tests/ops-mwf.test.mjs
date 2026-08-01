@@ -115,6 +115,86 @@ test('ops:mwf guards selected-topic persistence behind the generation decision a
   assert.ok(queueSyncIndex > gitGuardIndex)
 })
 
+test('ops:mwf promotes a nonzero selected-topic sync result to a fail-closed incident', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const classifyTopicSyncFailure = loadPureFunction(source, 'classifyTopicSyncFailure')
+
+  const incident = classifyTopicSyncFailure({ status: 17, signal: null, termination: null })
+  assert.deepEqual(incident, {
+    kind: 'incident',
+    reviewReady: false,
+    exitCode: 17,
+    reason: 'selected topic sync が exit 17 で停止しました',
+  })
+
+  const syncIndex = source.indexOf("run('convert-selected-topics.mjs'")
+  const incidentIndex = source.indexOf('syncIncident = classifyTopicSyncFailure', syncIndex)
+  const exitIndex = source.indexOf('process.exitCode = syncIncident.exitCode', incidentIndex)
+  const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'")
+  assert.ok(syncIndex > 0)
+  assert.ok(incidentIndex > syncIndex)
+  assert.ok(exitIndex > incidentIndex)
+  assert.ok(exitIndex < generationIndex)
+})
+
+test('ops:mwf promotes owned-draft recovery failure to a fail-closed incident', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const classifyPreGenerationFailure = loadPureFunction(source, 'classifyPreGenerationFailure')
+
+  assert.deepEqual(classifyPreGenerationFailure({
+    stage: 'owned_draft_recovery',
+    reason: 'marker_unreadable',
+  }), {
+    kind: 'incident',
+    reviewReady: false,
+    exitCode: 1,
+    reason: 'owned_draft_recovery_failed:marker_unreadable',
+  })
+  assert.equal(classifyPreGenerationFailure({
+    stage: 'no_generate',
+    reason: 'manual_skip',
+  }), null)
+
+  const recoveryFailureIndex = source.indexOf('if (!draftRecoveryResult.ok)')
+  const incidentIndex = source.indexOf('scheduledOutcome = classifyPreGenerationFailure({', recoveryFailureIndex)
+  const stageIndex = source.indexOf("stage: 'owned_draft_recovery'", incidentIndex)
+  const exitIndex = source.indexOf('process.exitCode = scheduledOutcome.exitCode', stageIndex)
+  const gitReadinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness()')
+  assert.ok(recoveryFailureIndex > 0)
+  assert.ok(incidentIndex > recoveryFailureIndex)
+  assert.ok(stageIndex > incidentIndex)
+  assert.ok(exitIndex > stageIndex)
+  assert.ok(exitIndex < gitReadinessIndex)
+})
+
+test('ops:mwf promotes Git readiness failure to a fail-closed incident', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const classifyPreGenerationFailure = loadPureFunction(source, 'classifyPreGenerationFailure')
+
+  assert.deepEqual(classifyPreGenerationFailure({
+    stage: 'git_readiness',
+    reason: 'origin_behind',
+  }), {
+    kind: 'incident',
+    reviewReady: false,
+    exitCode: 1,
+    reason: 'git_readiness_failed:origin_behind',
+  })
+
+  const gitReadinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness()')
+  const readinessFailureIndex = source.indexOf('if (!gitReadiness.ok)', gitReadinessIndex)
+  const incidentIndex = source.indexOf('scheduledOutcome = classifyPreGenerationFailure({', readinessFailureIndex)
+  const stageIndex = source.indexOf("stage: 'git_readiness'", incidentIndex)
+  const exitIndex = source.indexOf('process.exitCode = scheduledOutcome.exitCode', stageIndex)
+  const syncHeaderIndex = source.indexOf("header('1/3  ネタリスト selected 同期')")
+  assert.ok(gitReadinessIndex > 0)
+  assert.ok(readinessFailureIndex > gitReadinessIndex)
+  assert.ok(incidentIndex > readinessFailureIndex)
+  assert.ok(stageIndex > incidentIndex)
+  assert.ok(exitIndex > stageIndex)
+  assert.ok(exitIndex < syncHeaderIndex)
+})
+
 test('ops:mwf has a process lock to prevent cron and launchd double generation', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
   const gitignore = readFileSync('.gitignore', 'utf8')
@@ -145,7 +225,7 @@ test('ops:mwf locally commits only provenance-marked drafts after Git preflight 
   assert.doesNotMatch(source, /git', \['push'/)
 })
 
-test('ops:mwf treats recovery failure as a draft sync failure and suppresses Telegram', () => {
+test('ops:mwf suppresses the review request when owned-draft recovery fails', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
   assert.match(source, /draftSyncResult = draftRecoveryResult/)
