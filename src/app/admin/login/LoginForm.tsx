@@ -5,7 +5,7 @@ import { loginAdmin, type LoginState } from './actions'
 
 const initialState: LoginState = { ok: true, message: '' }
 
-export default function LoginForm() {
+export default function LoginForm({ returnTo }: { returnTo?: string }) {
   const [state, formAction, pending] = useActionState(loginAdmin, initialState)
 
   return (
@@ -14,16 +14,20 @@ export default function LoginForm() {
       <p className="mt-2 text-sm leading-relaxed text-gray-500">
         承認・却下を行うには管理用パスコードを入力してください。
       </p>
-      <input
-        name="password"
-        type="password"
-        autoComplete="current-password"
-        className="mt-5 w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-[#1e3a5f] focus:outline-none"
-        placeholder="パスコード"
-        required
-      />
+      {returnTo && <input type="hidden" name="returnTo" value={returnTo} />}
+      <label className="mt-5 block">
+        <span className="sr-only">管理用パスコード</span>
+        <input
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          className="w-full rounded-xl border border-gray-200 px-4 py-3 text-base focus:border-[#1e3a5f] focus:outline-none"
+          placeholder="パスコード"
+          required
+        />
+      </label>
       {!state.ok && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+        <p aria-live="polite" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
           {state.message}
         </p>
       )}

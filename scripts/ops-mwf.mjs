@@ -21,7 +21,12 @@ import {
   recoverOwnedGeneratedDraft,
   rememberGeneratedDraft,
 } from './lib/scheduled-draft-commit.mjs'
-import { shouldSendDraftReviewNotification } from './lib/scheduled-draft-notification.mjs'
+import {
+  classifyScheduledDraftOutcome,
+  scheduledDraftNotificationBoundary,
+  shouldSendDraftReviewNotification,
+  shouldSendScheduledIncidentNotification,
+} from './lib/scheduled-draft-notification.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -34,11 +39,20 @@ const DAY_NAMES_JA = ['日', '月', '火', '水', '木', '金', '土']
 const cliArgs = process.argv.slice(2)
 const force = cliArgs.includes('--force')
 const noGenerate = cliArgs.includes('--no-generate')
+const dryRun = cliArgs.includes('--dry-run')
 const ignoredAutoPublish = cliArgs.includes('--auto-publish')
 
 if (ignoredAutoPublish) {
   console.error('  ❌ ops:mwf では --auto-publish を受け付けません。本文確認後に承認してください。')
   process.exit(1)
+}
+
+// launchd の復旧確認用。実キュー・環境変数・Git・外部サービスへは触れずに終了する。
+// 本文生成を伴う通常モードへの切替は、別の Human Gate を必要とする。
+if (dryRun) {
+  console.log('ops:mwf dry-run: 安全確認のみ完了（生成・CSV更新・Git・通知は実行していません）')
+  console.log('DRY_RUN_RESULT {"ok":true,"generated":false,"queue_mutated":false,"notified":false}')
+  process.exit(0)
 }
 
 const nowJst = new Date(Date.now() + 9 * 3600 * 1000)
@@ -110,16 +124,53 @@ function header(title) {
   console.log('━'.repeat(60))
 }
 
+function normalizeSpawnSyncResult(result) {
+  const signalExitCodes = { SIGINT: 130, SIGTERM: 143 }
+  const signal = typeof result?.signal === 'string' && result.signal ? result.signal : null
+  if (signal) {
+    return {
+      status: signalExitCodes[signal] ?? 1,
+      signal,
+      termination: 'signal_' + signal,
+    }
+  }
+  if (Number.isInteger(result?.status) && result.status >= 0) {
+    return { status: result.status, signal: null, termination: null }
+  }
+  if (result?.error) {
+    return { status: 1, signal: null, termination: 'spawn_error' }
+  }
+  return { status: 1, signal: null, termination: 'unknown_result' }
+}
+
+function attachChildRunEvidence(outcome, childRunResult) {
+  if (outcome?.kind !== 'incident' || !childRunResult?.termination) return outcome
+  const reason = childRunResult.signal
+    ? 'scheduled child が ' + childRunResult.signal + ' で停止しました (exit ' + childRunResult.status + ')'
+    : 'scheduled child の実行結果が ' + childRunResult.termination + ' でした'
+  return {
+    ...outcome,
+    childSignal: childRunResult.signal,
+    childTermination: childRunResult.termination,
+    reason,
+  }
+}
+
 function run(script, extraArgs = []) {
   const result = spawnSync(
     process.execPath,
     [join(ROOT, 'scripts', script), ...extraArgs],
     { stdio: 'inherit', cwd: ROOT, env: process.env },
   )
-  if (result.error) {
+  const normalized = normalizeSpawnSyncResult(result)
+  if (normalized.signal) {
+    console.error(`  ❌ 実行停止 (${script}): ${normalized.signal} / exit ${normalized.status}`)
+  } else if (result.error) {
     console.error(`  ❌ 実行エラー (${script}): ${result.error.message}`)
+  } else if (normalized.termination) {
+    console.error(`  ❌ 実行状態不明 (${script}): ${normalized.termination}`)
   }
-  return result.status ?? (result.error ? 1 : 0)
+  return normalized
 }
 
 function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
@@ -129,9 +180,12 @@ function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
     encoding: 'utf8',
     stdio,
   })
+  const normalized = normalizeSpawnSyncResult(result)
   return {
-    ok: result.status === 0,
-    status: result.status ?? (result.error ? 1 : 0),
+    ok: normalized.status === 0,
+    status: normalized.status,
+    signal: normalized.signal,
+    termination: normalized.termination,
     output: `${result.stdout ?? ''}${result.stderr ?? ''}`.trim(),
     error: result.error,
   }
@@ -189,6 +243,17 @@ function prepareGeneratedDraftForHumanPush(scheduledResult) {
     runCommand,
     assertGitReady: (marker) => checkScheduledGitReadiness({ ownedDraftPath: marker.path }),
   })
+}
+
+function requireCommittedDraftSync(draftSyncResult) {
+  if (draftSyncResult?.ok === true && draftSyncResult.committed !== true) {
+    return {
+      ...draftSyncResult,
+      ok: false,
+      reason: '生成下書きのlocal commitを確認できないためレビュー通知を停止しました',
+    }
+  }
+  return draftSyncResult
 }
 
 function readJsonIfExists(path) {
@@ -365,6 +430,19 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult, con
   return lines.join('\n')
 }
 
+function buildScheduledIncidentNotification({ scheduledOutcome, scheduledResult }) {
+  const lines = ['🚨 月水金の記事生成インシデント']
+  lines.push(`種別: ${scheduledOutcome.kind}`)
+  lines.push(`終了コード: ${scheduledOutcome.exitCode}`)
+  if (scheduledOutcome.childSignal) lines.push(`signal: ${scheduledOutcome.childSignal}`)
+  if (scheduledOutcome.childTermination) lines.push(`child終了状態: ${scheduledOutcome.childTermination}`)
+  lines.push(`理由: ${scheduledOutcome.reason}`)
+  if (scheduledResult?.topicId) lines.push(`topic: ${scheduledResult.topicId}`)
+  if (scheduledResult?.path) lines.push(`生成候補: ${scheduledResult.path}`)
+  lines.push('Telegramレビュー依頼は送信していません。ログを確認してください。')
+  return lines.join('\n')
+}
+
 loadEnv()
 
 console.log(WIDE)
@@ -394,6 +472,9 @@ let scheduledResult = null
 let draftSyncResult = null
 let gitReadiness = { ok: true, reason: '記事生成なし' }
 let draftRecoveryResult = null
+let scheduledChildStatus = null
+let scheduledChildRunResult = null
+let scheduledOutcome = null
 
 if (generateDecision.ok) {
   if (!existsSync(join(ROOT, '.git', 'index.lock'))) {
@@ -420,12 +501,14 @@ if (generateDecision.ok) {
 
 header('1/3  ネタリスト selected 同期')
 let syncFailed = false
-if (!gitReadiness.ok) {
+if (!generateDecision.ok) {
+  console.log(`  ⏭ ${generateDecision.reason}`)
+} else if (!gitReadiness.ok) {
   console.log(`  ⏭ ${gitReadiness.reason}`)
 } else {
   for (const month of topicSyncMonths()) {
-    const status = run('convert-selected-topics.mjs', ['--month', month, '--yes', '--if-exists', '--allow-empty'])
-    if (status !== 0) syncFailed = true
+    const childRunResult = run('convert-selected-topics.mjs', ['--month', month, '--yes', '--if-exists', '--allow-empty'])
+    if (childRunResult.status !== 0) syncFailed = true
   }
 }
 
@@ -438,51 +521,80 @@ if (!generateDecision.ok) {
   console.log(`  ⏭ ${generateDecision.reason}`)
 } else {
   const resultPath = join(tmpdir(), `aisoukai-scheduled-result-${process.pid}.json`)
-  const status = run('scheduled-article-flow.mjs', ['--publish-today', '--no-notify', '--result-json', resultPath])
+  scheduledChildRunResult = run('scheduled-article-flow.mjs', ['--publish-today', '--no-notify', '--result-json', resultPath])
+  scheduledChildStatus = scheduledChildRunResult.status
   scheduledResult = readJsonIfExists(resultPath)
-  if (isLegacyTopicPoolExhausted(status, scheduledResult)) {
+  if (isLegacyTopicPoolExhausted(scheduledChildStatus, scheduledResult)) {
     console.log('  従来ネタCSVに候補がないため、テーマリサーチから補充します ...')
     scheduledResult = runThemeOpsFallback({
       today: TODAY,
       runProcess: runCommand,
     })
+    scheduledChildStatus = scheduledResult?.ok === true ? 0 : 1
+    scheduledChildRunResult = {
+      status: scheduledChildStatus,
+      signal: null,
+      termination: scheduledResult?.ok === true ? null : 'fallback_failure',
+    }
     if (!scheduledResult.ok) {
       console.log(`  ⚠️ ${scheduledResult.reason}`)
-      process.exitCode = 1
     }
-  } else if (status !== 0) {
-    const reason = scheduledResult?.reasons?.[0] ?? `scheduled-article-flow.mjs が exit ${status} で停止`
-    console.log(`  ⚠️ ${reason}`)
-    process.exitCode = 1
   }
-  if (scheduledResult?.generated) {
+
+  scheduledOutcome = attachChildRunEvidence(classifyScheduledDraftOutcome({
+    childStatus: scheduledChildStatus,
+    scheduledResult,
+  }), scheduledChildRunResult)
+  if (scheduledOutcome.kind === 'incident') {
+    const detail = scheduledResult?.reasons?.[0] ?? scheduledOutcome.reason
+    console.log(`  ⚠️ ${detail}`)
+    process.exitCode = scheduledOutcome.exitCode
+  }
+
+  if (scheduledOutcome.kind === 'generated-awaiting-sync') {
     header('2.5/3  生成下書きのHuman Git同期待ち')
     draftSyncResult = prepareGeneratedDraftForHumanPush(scheduledResult)
+    draftSyncResult = requireCommittedDraftSync(draftSyncResult)
+    scheduledOutcome = classifyScheduledDraftOutcome({
+      childStatus: scheduledChildStatus,
+      scheduledResult,
+      draftSyncResult,
+    })
     if (draftSyncResult.ok) {
       console.log(`  ✅ ${draftSyncResult.reason}`)
     } else {
       console.log(`  ⚠️ ${draftSyncResult.reason}`)
-      process.exitCode = 1
+      process.exitCode = scheduledOutcome.exitCode
     }
   }
 }
 
 header('3/3  Telegram レビュー依頼')
 const contentStatus = loadContentStatus(join(ROOT, 'content', 'posts'))
-const notificationText = buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult, gitReadiness })
-if (alreadyLiveTodayNoop({ scheduledResult, contentStatus })) {
-  process.exitCode = 0
-}
+const notificationBoundary = scheduledDraftNotificationBoundary(scheduledOutcome)
+const notificationText = shouldSendScheduledIncidentNotification(scheduledOutcome)
+  ? buildScheduledIncidentNotification({ scheduledOutcome, scheduledResult })
+  : buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult, gitReadiness })
+const alreadyLiveNoop = alreadyLiveTodayNoop({ scheduledResult, contentStatus })
 console.log(notificationText.split('\n').map((line) => `  ${line}`).join('\n'))
-if (!shouldSendDraftReviewNotification(draftSyncResult)) {
-  console.log('  ⏭ Git同期準備に失敗したためTelegramレビュー依頼は送信しません')
-} else {
+if (shouldSendDraftReviewNotification(scheduledOutcome)) {
   try {
-    await sendOpsTelegram(notificationText)
+    await sendOpsTelegram(notificationText, { job: notificationBoundary.job })
   } catch (error) {
     console.error(`  ❌ Telegram 送信失敗: ${error.message}`)
     process.exitCode = 1
   }
+} else if (shouldSendScheduledIncidentNotification(scheduledOutcome)) {
+  try {
+    await sendOpsTelegram(notificationText, { job: notificationBoundary.job })
+  } catch (error) {
+    console.error(`  ❌ Telegram インシデント通知失敗: ${error.message}`)
+    if (!process.exitCode) process.exitCode = 1
+  }
+} else if (alreadyLiveNoop) {
+  console.log('  ⏭ 本日分は公開済みのためTelegramレビュー依頼は送信しません')
+} else {
+  console.log('  ⏭ レビュー可能な生成下書きがないためTelegramレビュー依頼は送信しません')
 }
 
 console.log()

@@ -26,12 +26,44 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+type PageProps = {
+  searchParams?: Promise<{ month?: string | string[] }>
+}
+
 function currentJstMonth() {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 7)
 }
 
-export default async function AdminDashboardPage() {
-  if (!(await isAdminAuthenticated())) redirect('/admin/login')
+function normalizeMonth(value: string | string[] | undefined): string | null {
+  return typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : null
+}
+
+function shiftMonth(month: string, offset: -1 | 1): string {
+  const [yearText, monthText] = month.split('-')
+  const year = Number(yearText)
+  const monthNumber = Number(monthText)
+  const nextYear = monthNumber === 1 && offset === -1
+    ? year - 1
+    : monthNumber === 12 && offset === 1
+      ? year + 1
+      : year
+  const nextMonth = monthNumber === 1 && offset === -1
+    ? 12
+    : monthNumber === 12 && offset === 1
+      ? 1
+      : monthNumber + offset
+
+  if (nextYear < 0 || nextYear > 9999) return month
+  return `${String(nextYear).padStart(4, '0')}-${String(nextMonth).padStart(2, '0')}`
+}
+
+export default async function AdminDashboardPage({ searchParams }: PageProps) {
+  const params = await searchParams
+  const requestedMonth = normalizeMonth(params?.month)
+  const returnTo = requestedMonth ? `/admin?month=${requestedMonth}` : '/admin'
+  if (!(await isAdminAuthenticated())) {
+    redirect(`/admin/login?returnTo=${encodeURIComponent(returnTo)}`)
+  }
 
   const pendingPosts = await getPendingReviewPostsForAdmin()
   const allPosts = await getAdminPosts()
@@ -40,10 +72,14 @@ export default async function AdminDashboardPage() {
   const archivedPosts = allPosts.filter((post) => post.archived).length
   const topicRows = getArticleTopics()
   const topicSummary = buildArticleTopicSummary(topicRows)
-  const month = currentJstMonth()
-  const topicFile = await getMonthlyTopicCandidatesForAdmin(month)
-    ?? await getMonthlyTopicCandidatesForAdmin(getDefaultTopicCandidateMonth())
+  const month = requestedMonth ?? currentJstMonth()
+  const requestedTopicFile = await getMonthlyTopicCandidatesForAdmin(month)
+  const topicFile = requestedTopicFile
+    ?? (requestedMonth ? null : await getMonthlyTopicCandidatesForAdmin(getDefaultTopicCandidateMonth()))
   const monthlySummary = topicFile ? buildTopicCandidateSummary(topicFile) : null
+  const displayMonth = monthlySummary?.month ?? month
+  const previousMonth = shiftMonth(displayMonth, -1)
+  const nextMonth = shiftMonth(displayMonth, 1)
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
@@ -60,9 +96,26 @@ export default async function AdminDashboardPage() {
           </p>
         </div>
         <div className="rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600 shadow-sm">
-          <span className="font-bold text-gray-900">対象月:</span> {monthlySummary?.month ?? month}
+          <span className="font-bold text-gray-900">対象月:</span> {displayMonth}
         </div>
       </div>
+
+      <nav aria-label="対象月を変更" className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Link
+          href={`/admin?month=${previousMonth}`}
+          aria-label={`${previousMonth} の管理画面へ`}
+          className="flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 shadow-sm hover:bg-gray-50"
+        >
+          ← 前月（{previousMonth}）
+        </Link>
+        <Link
+          href={`/admin?month=${nextMonth}`}
+          aria-label={`${nextMonth} の管理画面へ`}
+          className="flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 shadow-sm hover:bg-gray-50"
+        >
+          次月（{nextMonth}）→
+        </Link>
+      </nav>
 
       <section className="mt-6 grid gap-3 md:grid-cols-4">
         <Metric label="レビュー待ち" value={pendingCount} tone="amber" href="/admin/pending-review?status=pending" />
@@ -71,7 +124,7 @@ export default async function AdminDashboardPage() {
           label="今月採用"
           value={monthlySummary ? `${monthlySummary.selectedCount}/${monthlySummary.targetPostCount}` : 'なし'}
           tone="blue"
-          href={`/admin/topic-candidates?month=${monthlySummary?.month ?? month}&status=selected`}
+          href={`/admin/topic-candidates?month=${displayMonth}&status=selected`}
         />
         <Metric label="採用CSV" value={`${topicSummary.approved}件`} tone="green" href="/admin/article-topics?status=approved" />
       </section>
@@ -89,7 +142,7 @@ export default async function AdminDashboardPage() {
           icon={<PencilLine className="h-5 w-5" />}
           title="ネタの採用・予備・保留・却下"
           description="月次ネタ候補を確認し、今月採用を確定して記事ネタCSVへ送ります。"
-          href={`/admin/topic-candidates?month=${monthlySummary?.month ?? month}`}
+          href={`/admin/topic-candidates?month=${displayMonth}`}
           badge={monthlySummary ? `${monthlySummary.selectedCount}/${monthlySummary.targetPostCount} 採用` : '候補なし'}
           tone="blue"
         />

@@ -19,15 +19,25 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic'
 
+type SearchParamValue = string | string[] | undefined
+
 type PageProps = {
   searchParams?: Promise<{
-    month?: string
-    status?: string
-    risk?: string
-    duplicate?: string
-    priority?: string
-    sort?: string
+    month?: SearchParamValue
+    status?: SearchParamValue
+    risk?: SearchParamValue
+    duplicate?: SearchParamValue
+    priority?: SearchParamValue
+    sort?: SearchParamValue
   }>
+}
+
+type CandidateFilters = {
+  status: string
+  risk: string
+  duplicate: string
+  priority: string
+  sort: string
 }
 
 const STATUS_LABELS = {
@@ -52,6 +62,46 @@ const RISK_STYLES = {
   high: 'bg-red-100 text-red-700',
 }
 
+const FILTER_VALUES = {
+  status: ['all', 'pending', 'selected', 'backup', 'hold', 'rejected'],
+  risk: ['all', 'low', 'medium', 'high'],
+  duplicate: ['all', 'low', 'medium', 'high'],
+  priority: ['all', 'high', 'medium', 'low'],
+  sort: ['date', 'priority', 'status', 'risk', 'title'],
+} as const
+
+function normalizeMonth(value: SearchParamValue): string | null {
+  return typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : null
+}
+
+function normalizeFilter(value: SearchParamValue, allowed: readonly string[], fallback: string): string {
+  return typeof value === 'string' && allowed.includes(value) ? value : fallback
+}
+
+function shiftMonth(month: string, offset: -1 | 1): string {
+  const [yearText, monthText] = month.split('-')
+  const year = Number(yearText)
+  const monthNumber = Number(monthText)
+  const nextYear = monthNumber === 1 && offset === -1
+    ? year - 1
+    : monthNumber === 12 && offset === 1
+      ? year + 1
+      : year
+  const nextMonth = monthNumber === 1 && offset === -1
+    ? 12
+    : monthNumber === 12 && offset === 1
+      ? 1
+      : monthNumber + offset
+
+  if (nextYear < 0 || nextYear > 9999) return month
+  return `${String(nextYear).padStart(4, '0')}-${String(nextMonth).padStart(2, '0')}`
+}
+
+function buildTopicCandidateHref(month: string, filters: CandidateFilters): string {
+  const query = new URLSearchParams({ month, ...filters })
+  return `/admin/topic-candidates?${query.toString()}`
+}
+
 function sortTopicCandidatesForAdmin(topics: MonthlyTopicCandidate[], sort: string) {
   return [...topics].sort((a, b) => {
     if (sort === 'title') return a.title.localeCompare(b.title, 'ja')
@@ -63,21 +113,33 @@ function sortTopicCandidatesForAdmin(topics: MonthlyTopicCandidate[], sort: stri
 }
 
 export default async function TopicCandidatesPage({ searchParams }: PageProps) {
-  if (!(await isAdminAuthenticated())) redirect('/admin/login')
-
   const params = await searchParams
-  const month = params?.month ?? getDefaultTopicCandidateMonth()
-  const statusFilter = params?.status ?? 'all'
-  const riskFilter = params?.risk ?? 'all'
-  const duplicateFilter = params?.duplicate ?? 'all'
-  const priorityFilter = params?.priority ?? 'all'
-  const sort = params?.sort ?? 'date'
+  const month = normalizeMonth(params?.month) ?? getDefaultTopicCandidateMonth()
+  const statusFilter = normalizeFilter(params?.status, FILTER_VALUES.status, 'all')
+  const riskFilter = normalizeFilter(params?.risk, FILTER_VALUES.risk, 'all')
+  const duplicateFilter = normalizeFilter(params?.duplicate, FILTER_VALUES.duplicate, 'all')
+  const priorityFilter = normalizeFilter(params?.priority, FILTER_VALUES.priority, 'all')
+  const sort = normalizeFilter(params?.sort, FILTER_VALUES.sort, 'date')
+  const filters = {
+    status: statusFilter,
+    risk: riskFilter,
+    duplicate: duplicateFilter,
+    priority: priorityFilter,
+    sort,
+  }
+  const returnTo = buildTopicCandidateHref(month, filters)
+
+  if (!(await isAdminAuthenticated())) {
+    redirect(`/admin/login?returnTo=${encodeURIComponent(returnTo)}`)
+  }
+
   const file = await getMonthlyTopicCandidatesForAdmin(month)
 
   if (!file) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-8">
         <h1 className="text-2xl font-bold text-gray-900">月次ネタ候補</h1>
+        <MonthNavigation month={month} filters={filters} />
         <div className="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
           <p>{month} のネタ候補はまだありません。</p>
           <p className="mt-2 font-mono">npm run topic-candidates:generate -- --month {month} --yes</p>
@@ -115,6 +177,8 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
           候補を確認する
         </Link>
       </div>
+
+      <MonthNavigation month={file.month} filters={filters} />
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
@@ -226,6 +290,30 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
         )}
       </section>
     </main>
+  )
+}
+
+function MonthNavigation({ month, filters }: { month: string; filters: CandidateFilters }) {
+  const previousMonth = shiftMonth(month, -1)
+  const nextMonth = shiftMonth(month, 1)
+
+  return (
+    <nav aria-label="対象月を変更" className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <Link
+        href={buildTopicCandidateHref(previousMonth, filters)}
+        aria-label={`${previousMonth} のネタ候補へ`}
+        className="flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 shadow-sm hover:bg-gray-50"
+      >
+        ← 前月（{previousMonth}）
+      </Link>
+      <Link
+        href={buildTopicCandidateHref(nextMonth, filters)}
+        aria-label={`${nextMonth} のネタ候補へ`}
+        className="flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-bold text-gray-800 shadow-sm hover:bg-gray-50"
+      >
+        次月（{nextMonth}）→
+      </Link>
+    </nav>
   )
 }
 
