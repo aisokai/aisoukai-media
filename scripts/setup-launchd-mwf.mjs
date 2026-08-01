@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // setup-launchd-mwf.mjs
-// macOS launchd を使って ops:mwf を月水金 08:30 に自動実行するセットアップスクリプト。
 // Human が手動で実行する。AI が自動実行してはならない。
+// macOS launchd を使って ops:mwf の通常生成を月水金 08:30 に自動実行するセットアップスクリプト。
+// Git preflight と記事レビュー境界は ops-mwf 側で維持する。
 //
 // 使い方:
-//   npm run ops:mwf:install    — launchd に登録（月水金 08:30 自動実行）
+//   npm run ops:mwf:install    — launchd に登録（月水金 08:30 通常生成）
 //   npm run ops:mwf:uninstall  — launchd から解除
 //   npm run ops:mwf:status     — 登録状態を確認
 
@@ -26,9 +27,37 @@ const LOG_PATH        = join(LOG_DIR, 'ops-mwf.log')
 const ERROR_LOG_PATH  = join(LOG_DIR, 'ops-mwf-error.log')
 const NODE_BIN        = process.execPath   // /usr/local/bin/node など
 const SCRIPT_PATH     = join(ROOT, 'scripts', 'ops-mwf.mjs')
+const MEDIA_GATE_PATH = join(ROOT, 'config', 'media-gate.json')
+
+function readTelegramNotifyGate() {
+  try {
+    const config = JSON.parse(readFileSync(MEDIA_GATE_PATH, 'utf8'))
+    if (!config || typeof config !== 'object' || Array.isArray(config)) return { enabled: false, valid: false }
+    if (!config.flags || typeof config.flags !== 'object' || Array.isArray(config.flags)) return { enabled: false, valid: false }
+    if (typeof config.flags.telegram_notify !== 'boolean') return { enabled: false, valid: false }
+    return { enabled: config.flags.telegram_notify, valid: true }
+  } catch {
+    return { enabled: false, valid: false }
+  }
+}
+
+function telegramEnvironmentXml(gate) {
+  if (gate.enabled === true) return ''
+  return `
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>TELEGRAM_BOT_TOKEN</key>
+    <string></string>
+    <key>TELEGRAM_CHAT_ID</key>
+    <string></string>
+  </dict>
+`
+}
 
 // plist 生成（StartCalendarInterval: 月=1, 水=3, 金=5 / 08:30 ローカル時刻）
+// 通常モードは --force で曜日判定のみを通過させる。Git preflight と記事レビュー境界は ops-mwf 側で維持する。
 function generatePlist() {
+  const telegramGate = readTelegramNotifyGate()
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -45,6 +74,8 @@ function generatePlist() {
 
   <key>WorkingDirectory</key>
   <string>${ROOT}</string>
+
+${telegramEnvironmentXml(telegramGate)}
 
   <key>StartCalendarInterval</key>
   <array>
@@ -120,7 +151,7 @@ function install() {
 
   console.log('  ✅ launchd に登録しました')
   console.log()
-  console.log('  スケジュール: 月・水・金 08:30（Mac システム時刻）')
+  console.log('  スケジュール: 月・水・金 08:30（通常生成、Mac システム時刻）')
   console.log(`  ログ     : ${LOG_PATH}`)
   console.log(`  エラーログ: ${ERROR_LOG_PATH}`)
   console.log()
@@ -175,6 +206,22 @@ function status() {
     const scriptPath = progArgs[2] ?? '（取得失敗）'
     const scriptOk = scriptPath === SCRIPT_PATH
     console.log(`  スクリプト: ${scriptOk ? '✅' : '❌ 旧パス!'} ${scriptPath}`)
+    const normalMode = progArgs.includes('--force') && !progArgs.includes('--dry-run')
+    console.log(`  実行モード: ${normalMode ? '✅ 通常生成（--force、Git preflight・Human reviewあり）' : '❌ 想定外の引数'}`)
+    if (!normalMode) {
+      console.log('    → npm run ops:mwf:install で通常モードのジョブへ更新してください')
+    }
+
+    const telegramEnvDisabled = /<key>EnvironmentVariables<\/key>\s*<dict>[\s\S]*?<key>TELEGRAM_BOT_TOKEN<\/key>\s*<string><\/string>[\s\S]*?<key>TELEGRAM_CHAT_ID<\/key>\s*<string><\/string>[\s\S]*?<\/dict>/.test(plistContent)
+    const telegramGate = readTelegramNotifyGate()
+    const notificationsOff = telegramGate.enabled !== true && telegramEnvDisabled
+    const telegramBoundary = telegramGate.valid
+      ? `media-gate telegram_notify=${telegramGate.enabled ? 'true' : 'false'}`
+      : 'media-gate 読込/検証失敗（fail-closed）'
+    console.log(`  Telegram通知: ${notificationsOff ? `✅ 無効（${telegramBoundary} / Telegram環境変数を空に固定）` : '⚠️ 要確認（通知OFF境界が未反映）'}`)
+    if (!notificationsOff) {
+      console.log('    → telegram_notify がOFFまたは設定を検証できない場合は、再インストールしてください')
+    }
   } catch (e) {
     console.log(`  plist 読み込みエラー: ${e.message}`)
   }
@@ -241,7 +288,7 @@ if (args.includes('--install')) {
 } else {
   console.log()
   console.log('  使い方:')
-  console.log('    npm run ops:mwf:install    — launchd に登録（月水金 08:30 自動実行）')
+  console.log('    npm run ops:mwf:install    — launchd に登録（月水金 08:30 通常生成）')
   console.log('    npm run ops:mwf:uninstall  — launchd から解除')
   console.log('    npm run ops:mwf:status     — 登録状態を確認')
 }
