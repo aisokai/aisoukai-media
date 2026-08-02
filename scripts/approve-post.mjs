@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
 import { getTodayJst } from './lib/post-publication-status.mjs'
+import { getReviewedContentFingerprint } from '../src/lib/reviewContentFingerprint.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT      = join(__dirname, '..')
@@ -135,6 +136,9 @@ function main() {
   data.reviewed_at  = today
   data.reviewed_by  = by
   data.stock_status = 'adopted'
+  delete data.review_invalidated_at
+  delete data.review_invalidation_reason
+  data.reviewed_content_hash = getReviewedContentFingerprint(data, parsed.content)
 
   const slug = filePath.split('/').pop().replace(/\.md$/, '')
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')

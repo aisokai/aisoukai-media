@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import matter from 'gray-matter'
+import { hasStaleReviewedContent } from '../../src/lib/reviewContentFingerprint.mjs'
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000
 
@@ -19,7 +20,7 @@ function addBlocker(blockers, code, message) {
   blockers.push({ code, message })
 }
 
-export function getPostPublicationStatus(data, { today = getTodayJst() } = {}) {
+export function getPostPublicationStatus(data, { today = getTodayJst(), content = '' } = {}) {
   const blockers = []
   const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
   const humanApproved =
@@ -47,6 +48,10 @@ export function getPostPublicationStatus(data, { today = getTodayJst() } = {}) {
       'approval_missing',
       '本文確認済みではありません（reviewed:true / reviewed_at / reviewed_by が必要）',
     )
+  }
+
+  if (hasStaleReviewedContent(data, content)) {
+    addBlocker(blockers, 'review_content_stale', '承認後に内容が変更されています。Human review をやり直してください')
   }
 
   if (data.publish_at) {
@@ -77,7 +82,7 @@ export function getPostPublicationStatus(data, { today = getTodayJst() } = {}) {
 export function evaluatePostFile(filePath, options = {}) {
   const raw = readFileSync(filePath, 'utf8')
   const parsed = matter(raw)
-  const status = getPostPublicationStatus(parsed.data, options)
+  const status = getPostPublicationStatus(parsed.data, { ...options, content: parsed.content })
 
   return {
     ...status,

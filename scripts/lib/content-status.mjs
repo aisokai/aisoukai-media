@@ -35,9 +35,9 @@ function buildContentStatus(entries) {
   const rejected = []
 
   for (const entry of entries) {
-    const { data } = matter(entry.raw)
+    const { data, content } = matter(entry.raw)
     const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
-    const publicationStatus = getPostPublicationStatus(data, { today })
+    const publicationStatus = getPostPublicationStatus(data, { today, content })
     const isFuture = publicationStatus.isFuture
     const approved = publicationStatus.approved
     const hasReject = !!data.rejection_reason

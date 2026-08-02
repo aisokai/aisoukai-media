@@ -57,3 +57,8 @@ datetime: 2026-07-28T13:45:47.465+09:00
 action: edit
 slug: 2026-07-22-topic-090fbe37c5607d3d
 
+## 2026-08-02T00:00:00.000+09:00
+datetime: 2026-08-02T00:00:00.000+09:00
+action: edit-rereview-required
+slug: 2026-07-22-topic-090fbe37c5607d3d
+reason: approved content material edit detected; restored to Human review pending without deleting approval history

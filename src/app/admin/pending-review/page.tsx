@@ -107,6 +107,13 @@ function renderReviewPostCard({
           </div>
         )}
 
+        {post.reviewInvalidationReason && (
+          <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+            <p className="text-xs font-bold text-amber-900">再レビューが必要です</p>
+            <p className="mt-1 text-xs leading-5 text-amber-800">{post.reviewInvalidationReason}</p>
+          </div>
+        )}
+
         {isFutureScheduled && (
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 px-3 py-2">
             <span>⚠️</span>
@@ -289,12 +296,13 @@ export default async function PendingReviewPage({ searchParams }: PageProps) {
           <div className="space-y-3">
             {recentLog.map((entry) => {
               const isApprove = entry.action === 'approve'
+              const isRereviewRequired = entry.action === 'rereview_required'
               const cardStyle = isApprove
                 ? 'border-green-200 bg-green-50/70'
-                : 'border-red-200 bg-red-50/70'
+                : isRereviewRequired ? 'border-amber-200 bg-amber-50/70' : 'border-red-200 bg-red-50/70'
               const badgeStyle = isApprove
                 ? 'bg-green-600 text-white'
-                : 'bg-red-600 text-white'
+                : isRereviewRequired ? 'bg-amber-600 text-white' : 'bg-red-600 text-white'
 
               return (
                 <div key={`${entry.datetime}-${entry.slug}`} className={`rounded-2xl border p-4 ${cardStyle}`}>

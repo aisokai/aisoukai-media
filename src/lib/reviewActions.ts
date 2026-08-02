@@ -1,4 +1,5 @@
 import matter from 'gray-matter'
+import { getReviewedContentFingerprint } from './reviewContentFingerprint.mjs'
 
 export type ReviewAction = 'approve' | 'reject'
 
@@ -65,8 +66,11 @@ export function approvePostMarkdown(raw: string, slug: string, reviewedBy: strin
   data.draft = false
   data.reviewed_at = today
   data.reviewed_by = reviewedBy
+  delete data.review_invalidated_at
+  delete data.review_invalidation_reason
   data.stock_status = 'adopted'
   delete data.rejection_reason
+  data.reviewed_content_hash = getReviewedContentFingerprint(data, parsed.content)
 
   return {
     nextPostMarkdown: matter.stringify(parsed.content, data),

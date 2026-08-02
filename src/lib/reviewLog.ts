@@ -5,7 +5,7 @@ import { readGitHubFile } from './githubContents'
 export type ReviewLogEntry = {
   datetime: string
   timestamp: string
-  action: 'approve' | 'reject'
+  action: 'approve' | 'reject' | 'rereview_required'
   slug: string
   reviewedBy?: string
   reason?: string
@@ -31,7 +31,7 @@ function parseReviewLog(raw: string, limit: number): ReviewLogEntry[] {
     return {
       datetime,
       timestamp: datetime,
-      action:       (fields['action'] as 'approve' | 'reject') ?? 'approve',
+      action:       (fields['action'] as ReviewLogEntry['action']) ?? 'approve',
       slug:         fields['slug'] ?? '',
       reviewedBy:   fields['reviewed_by'],
       reason:       fields['reason'] ?? fields['reject_reason'],

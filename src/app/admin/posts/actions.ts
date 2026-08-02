@@ -4,6 +4,7 @@ import matter from 'gray-matter'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/adminAuth'
 import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
+import { applyAdminEditReviewState } from '@/lib/reviewContentFingerprint.mjs'
 
 export type AdminPostActionResult = {
   ok: boolean
@@ -11,6 +12,7 @@ export type AdminPostActionResult = {
 }
 
 const LOG_PATH = 'logs/admin-post-history.md'
+const REVIEW_LOG_PATH = 'logs/review-history.md'
 
 function sanitizeError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error)
@@ -61,6 +63,20 @@ async function loadAdminLog() {
   return fs.existsSync(logLocalPath) ? fs.readFileSync(logLocalPath, 'utf8') : ''
 }
 
+async function loadReviewLog() {
+  if (process.env.GITHUB_REVIEW_TOKEN) {
+    try {
+      return (await readGitHubFile(REVIEW_LOG_PATH)).content
+    } catch {
+      return ''
+    }
+  }
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const logLocalPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'logs', 'review-history.md')
+  return fs.existsSync(logLocalPath) ? fs.readFileSync(logLocalPath, 'utf8') : ''
+}
+
 async function readPost(slug: string) {
   const postPath = `content/posts/${slug}.md`
   if (process.env.GITHUB_REVIEW_TOKEN) {
@@ -85,8 +101,8 @@ async function writeFiles(message: string, files: Array<{ path: string; content:
     let localPath: string
     if (file.path.startsWith('content/posts/')) {
       localPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'content', 'posts', path.basename(file.path))
-    } else if (file.path === LOG_PATH) {
-      localPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'logs', 'admin-post-history.md')
+    } else if (file.path === LOG_PATH || file.path === REVIEW_LOG_PATH) {
+      localPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'logs', path.basename(file.path))
     } else {
       throw new Error(`許可されていない書き込み先です: ${file.path}`)
     }
@@ -108,13 +124,25 @@ export async function savePostMarkdownAction(slug: string, rawMarkdown: string):
     if (!rawMarkdown.trim()) throw new Error('Markdown が空です')
 
     // gray-matter でパース可能な Markdown だけ保存する。
-    matter(rawMarkdown)
-
-    const { postPath } = await readPost(slug)
-    const log = appendLog(await loadAdminLog(), 'edit', slug)
+    const submitted = matter(rawMarkdown)
+    const { postPath, raw: currentRaw } = await readPost(slug)
+    const current = matter(currentRaw)
+    const { data, requiresRereview } = applyAdminEditReviewState({
+      currentData: normalizeMatterDates(current.data),
+      currentContent: current.content,
+      submittedData: normalizeMatterDates(submitted.data),
+      submittedContent: submitted.content,
+      invalidatedAt: new Date(Date.now() + 9 * 3600 * 1000).toISOString().replace('Z', '+09:00'),
+    })
+    const nextPostMarkdown = matter.stringify(submitted.content, data)
+    const log = appendLog(await loadAdminLog(), requiresRereview ? 'edit-rereview-required' : 'edit', slug)
+    const reviewLog = requiresRereview
+      ? appendLog(await loadReviewLog(), 'rereview_required', slug, '承認後に記事内容が編集されたため、Human review をやり直してください')
+      : null
     const result = await writeFiles(`edit post: ${slug}`, [
-      { path: postPath, content: rawMarkdown.endsWith('\n') ? rawMarkdown : `${rawMarkdown}\n` },
+      { path: postPath, content: nextPostMarkdown },
       { path: LOG_PATH, content: log },
+      ...(reviewLog ? [{ path: REVIEW_LOG_PATH, content: reviewLog }] : []),
     ])
 
     revalidatePath('/admin/posts')

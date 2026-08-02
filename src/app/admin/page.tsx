@@ -121,8 +121,8 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
         <Metric label="レビュー待ち" value={pendingCount} tone="amber" href="/admin/pending-review?status=pending" />
         <Metric label="差し戻し" value={rejectedCount} tone="red" href="/admin/pending-review?status=rejected" />
         <Metric
-          label="今月採用"
-          value={monthlySummary ? `${monthlySummary.selectedCount}/${monthlySummary.targetPostCount}` : 'なし'}
+          label="今月採用（候補）"
+          value={monthlySummary ? `${monthlySummary.selectedCount}/${monthlySummary.targetPostCount}（候補 ${monthlySummary.candidateCount}件・pending ${monthlySummary.pendingCount}件）` : 'なし'}
           tone="blue"
           href={`/admin/topic-candidates?month=${displayMonth}&status=selected`}
         />
@@ -143,7 +143,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
           title="ネタの採用・予備・保留・却下"
           description="月次ネタ候補を確認し、今月採用を確定して記事ネタCSVへ送ります。"
           href={`/admin/topic-candidates?month=${displayMonth}`}
-          badge={monthlySummary ? `${monthlySummary.selectedCount}/${monthlySummary.targetPostCount} 採用` : '候補なし'}
+          badge={monthlySummary ? `採用 ${monthlySummary.selectedCount}/${monthlySummary.targetPostCount}・候補 ${monthlySummary.candidateCount}件（pending ${monthlySummary.pendingCount}件）` : '候補なし'}
           tone="blue"
         />
         <ToolCard

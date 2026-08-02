@@ -392,3 +392,11 @@ reviewed_by: 三谷
 date: 2026-07-22
 publish_at: 2026-07-22
 
+## 2026-08-02T00:00:00.000+09:00
+datetime: 2026-08-02T00:00:00.000+09:00
+action: rereview_required
+slug: 2026-07-22-topic-090fbe37c5607d3d
+reviewed_by: 三谷
+reason: 承認後にtitle/excerptが編集されたため、Human review をやり直してください
+date: 2026-07-22
+publish_at: 2026-07-22

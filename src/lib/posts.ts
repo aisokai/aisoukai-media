@@ -4,6 +4,7 @@ import matter from 'gray-matter';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
 import { readGitHubDirectory, readGitHubFile } from './githubContents';
+import { hasStaleReviewedContent } from './reviewContentFingerprint.mjs';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
@@ -15,7 +16,7 @@ function getTodayJst(): string {
 // publish_at または date が今日より未来の場合は公開しない（スケジュール公開）。
 // AI生成記事は生成時 reviewed/auto_approved とも false で作られ、
 // Human approval 後に reviewed: true / reviewed_at / reviewed_by へ変更する。
-function isPublishReady(data: Record<string, unknown>): boolean {
+function isPublishReady(data: Record<string, unknown>, content = ''): boolean {
   if (data['draft'] === true) return false
   if (data['archived'] === true) return false
 
@@ -24,6 +25,7 @@ function isPublishReady(data: Record<string, unknown>): boolean {
   const humanApproved = data['reviewed'] === true && hasReviewedAt && hasReviewedBy
 
   if (!humanApproved) return false
+  if (hasStaleReviewedContent(data, content)) return false
 
   const today = getTodayJst()
 
@@ -76,8 +78,8 @@ export function getAllPosts(): PostMeta[] {
   const posts = fileNames
     .filter((fileName) => {
       const fullPath = path.join(POSTS_DIR, fileName);
-      const { data } = matter(fs.readFileSync(fullPath, 'utf8'));
-      return isPublishReady(data as Record<string, unknown>);
+      const { data, content } = matter(fs.readFileSync(fullPath, 'utf8'));
+      return isPublishReady(data as Record<string, unknown>, content);
     })
     .map((fileName): PostMeta => {
       const slug = fileName.replace(/\.md$/, '');
@@ -120,6 +122,7 @@ export type PendingReviewPost = {
   excerpt: string;
   contentHtml: string;
   rejectionReason?: string;
+  reviewInvalidationReason?: string;
   image?: string;
 };
 
@@ -132,7 +135,7 @@ async function buildPendingReviewPost(fileName: string, raw: string): Promise<Pe
   const { data, content } = matter(raw);
 
   if (data['archived'] === true) return null;
-  if (data['reviewed'] === true) return null;
+  if (data['reviewed'] === true && !hasStaleReviewedContent(data as Record<string, unknown>, content)) return null;
 
   const processed = await remark()
     .use(remarkHtml, { sanitize: true })
@@ -149,6 +152,7 @@ async function buildPendingReviewPost(fileName: string, raw: string): Promise<Pe
     excerpt:         String(data['excerpt'] ?? data['description'] ?? ''),
     contentHtml:     processed.toString(),
     rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
+    reviewInvalidationReason: data['review_invalidation_reason'] ? String(data['review_invalidation_reason']) : undefined,
     image:           data['image'] ? String(data['image']) : undefined,
   };
 }
@@ -208,7 +212,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
   const fileContents = fs.readFileSync(fullPath, 'utf8');
   const { data, content } = matter(fileContents);
 
-  if (!isPublishReady(data as Record<string, unknown>)) return null;
+  if (!isPublishReady(data as Record<string, unknown>, content)) return null;
 
   const processed = await remark()
     .use(remarkHtml, { sanitize: true })

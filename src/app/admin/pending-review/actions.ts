@@ -5,6 +5,7 @@ import matter from 'gray-matter'
 import { requireAdmin } from '@/lib/adminAuth'
 import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
 import { approvePostMarkdown, rejectPostMarkdown } from '@/lib/reviewActions'
+import { hasStaleReviewedContent } from '@/lib/reviewContentFingerprint.mjs'
 import { notifyPostApprovedTelegram } from '@/lib/reviewApprovalNotification.mjs'
 
 export type ReviewActionResult = {
@@ -42,11 +43,12 @@ function getTodayJst() {
 }
 
 function isReviewedPost(raw: string) {
-  const { data } = matter(raw)
+  const { data, content } = matter(raw)
   return (
     data.reviewed === true &&
     Boolean(String(data.reviewed_at ?? '').trim()) &&
-    Boolean(String(data.reviewed_by ?? '').trim())
+    Boolean(String(data.reviewed_by ?? '').trim()) &&
+    !hasStaleReviewedContent(data, content)
   )
 }
 
