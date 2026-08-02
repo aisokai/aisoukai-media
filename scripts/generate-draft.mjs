@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { parseCsv } from './csv-parser.mjs'
 import { buildArticlePrompt } from './prompts/dental-article-prompt.mjs'
 import { pickArticleImage } from './lib/auto-post-image.mjs'
+import { findStockDuplicateCandidates } from './lib/stock-duplicate-check.mjs'
 import {
   OPENAI_MODEL,
   generateBlogArticleText,
@@ -106,6 +107,7 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const topicId = String(args.topic_id ?? args._[0] ?? '').trim()
   const force = args.force === true
+  const allowDuplicate = args.allow_duplicate === true
   const publish_date_override = String(args.publish_date ?? '').trim()
   const topicsPath = String(args.topics_path ?? TOPICS_PATH).trim() || TOPICS_PATH
   const postsDir = String(args.posts_dir ?? DEFAULT_POSTS_DIR).trim() || DEFAULT_POSTS_DIR
@@ -192,6 +194,25 @@ async function main() {
   const filename = `${publishDate}-${slug}.md`
   const filePath = join(postsDir, filename)
 
+  // Deterministic duplicate signals are intentionally fail-closed. This does
+  // not judge semantic similarity or reject anything; a Human may opt in with
+  // --allow-duplicate after checking the named candidates.
+  const duplicateCandidates = findStockDuplicateCandidates({
+    postsDir,
+    topicId,
+    title,
+    keyword,
+    ignoreFilePath: filePath,
+  })
+  if (duplicateCandidates.length > 0 && !allowDuplicate) {
+    console.error('エラー: 既存記事との重複候補を検出したため、生成前に安全停止しました。')
+    for (const candidate of duplicateCandidates) {
+      console.error(`  - ${candidate.slug} (${candidate.reasons.join(', ')})`)
+    }
+    console.error('内容を確認し、意図した重複なら Human が --allow-duplicate を明示してください。')
+    process.exit(3)
+  }
+
   // 既存ファイルチェック（--force なしは安全停止）
   if (existsSync(filePath)) {
     if (!force) {
@@ -262,6 +283,10 @@ ${tagsYaml}
 author: 藍想会メディア編集部
 reviewed: false
 draft: true
+generated_at: "${new Date().toISOString()}"
+stock_status: ready
+theme_id: "${esc(sourceThemeTopicId)}"
+duplicate_of: "${esc(duplicateCandidates[0]?.slug ?? '')}"
 review_mode: auto
 auto_approved: false
 publication_status: draft
@@ -277,6 +302,7 @@ source_theme_snapshot_id: "${esc(sourceThemeSnapshotId)}"
 source_theme_snapshot_hash: "${esc(sourceThemeSnapshotHash)}"
 source_theme_row_version: "${esc(sourceThemeRowVersion)}"
 source_notes: "${esc(notes)}"
+target_keyword: "${esc(keyword)}"
 ---
 
 ${body}

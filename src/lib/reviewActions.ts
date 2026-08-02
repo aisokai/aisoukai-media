@@ -65,6 +65,7 @@ export function approvePostMarkdown(raw: string, slug: string, reviewedBy: strin
   data.draft = false
   data.reviewed_at = today
   data.reviewed_by = reviewedBy
+  data.stock_status = 'adopted'
   delete data.rejection_reason
 
   return {
@@ -90,6 +91,7 @@ export function rejectPostMarkdown(
 
   data.reviewed = false
   data.rejection_reason = reason
+  data.stock_status = 'rejected'
 
   return {
     nextPostMarkdown: matter.stringify(parsed.content, data),

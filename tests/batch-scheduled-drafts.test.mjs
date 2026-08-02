@@ -9,10 +9,10 @@ test('batch scheduled draft script is exposed and only generates approved missin
   assert.equal(pkg.scripts['article:batch-scheduled'], 'node scripts/generate-scheduled-drafts.mjs')
   assert.match(source, /--month 2026-06/)
   assert.match(source, /dry-run/)
-  assert.match(source, /ANTHROPIC_API_KEY/)
+  assert.match(source, /OPENAI_API_KEY/)
+  assert.match(source, /loadRepoEnv/)
   assert.match(source, /status.*approved/s)
   assert.match(source, /publish_date/)
   assert.match(source, /generate-draft\.mjs/)
   assert.match(source, /isGenerated/)
 })
-

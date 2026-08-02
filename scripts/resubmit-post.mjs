@@ -127,6 +127,7 @@ function main() {
   data.reviewed    = false
   delete data.reviewed_at
   delete data.reviewed_by
+  data.stock_status = 'ready'
 
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
 

@@ -108,6 +108,7 @@ function main() {
 
   const slug = filePath.split('/').pop().replace(/\.md$/, '')
   data.reviewed = false
+  data.stock_status = 'rejected'
   if (reason) data.rejection_reason = reason
 
   writeFileSync(filePath, matter.stringify(parsed.content, data), 'utf8')
