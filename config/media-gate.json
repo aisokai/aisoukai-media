@@ -4,7 +4,7 @@
   "fallback": "human_gate",
   "flags": {
     "telegram_media_approve": false,
-    "telegram_notify": false,
+    "telegram_notify": true,
     "health_notify": false,
     "launchd_apply_jobs": false,
     "gmb_post_auto": false,

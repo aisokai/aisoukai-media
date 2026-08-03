@@ -8,11 +8,11 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const CONFIG_PATH = resolve(ROOT, 'config/media-gate.json')
 const SETUP_PATH = resolve(ROOT, 'scripts/setup-launchd-mwf.mjs')
 
-test('launchd cleanup keeps Telegram notifications off and normal generation copy aligned', () => {
+test('launchd cleanup honors the approved Telegram notification gate and keeps normal generation copy aligned', () => {
   const mediaGate = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
   const setupSource = readFileSync(SETUP_PATH, 'utf8')
 
-  assert.equal(mediaGate.flags.telegram_notify, false)
+  assert.equal(mediaGate.flags.telegram_notify, true)
   assert.match(setupSource, /const MEDIA_GATE_PATH = join\(ROOT, 'config', 'media-gate\.json'\)/)
   assert.match(setupSource, /function readTelegramNotifyGate\(\)/)
   assert.match(setupSource, /JSON\.parse\(readFileSync\(MEDIA_GATE_PATH, 'utf8'\)\)/)

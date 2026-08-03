@@ -155,8 +155,8 @@ test('telegram_notify flag ON のときのみ送信処理に進む', async () =>
   }
 })
 
-test('通知系flagは実configで初期OFF', () => {
-  assert.equal(config.flags.telegram_notify, false)
+test('実configは承認済みTelegram通知のみONで、他の通知系flagはOFF', () => {
+  assert.equal(config.flags.telegram_notify, true)
   assert.equal(config.flags.health_notify, false)
   assert.equal(config.flags.lineworks_internal_auto, false)
 })

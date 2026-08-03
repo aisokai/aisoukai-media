@@ -12,10 +12,12 @@ import {
 
 const config = loadGateConfig()
 
-test('gate config が存在し、自動実行フラグは初期状態で全てOFF', () => {
+test('gate config は承認済みTelegram通知のみONで、残りの自動実行フラグは全てOFF', () => {
   assert.ok(config)
+  assert.equal(config.flags.telegram_notify, true, 'Telegram通知は先生の承認によりON')
   for (const [flag, value] of Object.entries(config.flags)) {
-    assert.equal(value, false, `flag ${flag} は初期OFFであるべき`)
+    if (flag === 'telegram_notify') continue
+    assert.equal(value, false, `flag ${flag} はOFFであるべき`)
   }
 })
 
