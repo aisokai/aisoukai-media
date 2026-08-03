@@ -18,6 +18,7 @@ import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
 import { assessScheduledGitReadiness } from './lib/scheduled-git-readiness.mjs'
 import {
   classifyOwnedDraftStatus,
+  readOwnedGeneratedDraftMarker,
   recoverOwnedGeneratedDraft,
   rememberGeneratedDraft,
 } from './lib/scheduled-draft-commit.mjs'
@@ -507,6 +508,7 @@ let generateDecision = shouldGenerateScheduledArticle()
 let scheduledResult = null
 let draftSyncResult = null
 let gitReadiness = { ok: true, reason: '記事生成なし' }
+let gitPreflightCompleted = false
 let draftRecoveryResult = null
 let scheduledChildStatus = null
 let scheduledChildRunResult = null
@@ -514,10 +516,26 @@ let scheduledOutcome = null
 
 if (generateDecision.ok) {
   if (!existsSync(join(ROOT, '.git', 'index.lock'))) {
+    const ownedMarker = readOwnedGeneratedDraftMarker(ROOT)
+    gitReadiness = checkScheduledGitReadiness({ ownedDraftPath: ownedMarker?.path ?? null })
+    gitPreflightCompleted = true
+    if (!gitReadiness.ok) {
+      generateDecision = { ok: false, reason: `Git同期が安全でないため記事生成を停止: ${gitReadiness.reason}` }
+      scheduledOutcome = classifyPreGenerationFailure({
+        stage: 'git_readiness',
+        reason: gitReadiness.reason,
+      })
+      process.exitCode = scheduledOutcome.exitCode
+    }
+  }
+}
+
+if (generateDecision.ok) {
+  if (!existsSync(join(ROOT, '.git', 'index.lock'))) {
     draftRecoveryResult = recoverOwnedGeneratedDraft({
       root: ROOT,
       runCommand,
-      assertGitReady: (marker) => checkScheduledGitReadiness({ ownedDraftPath: marker.path }),
+      assertGitReady: () => gitReadiness,
     })
     if (!draftRecoveryResult.ok) {
       draftSyncResult = draftRecoveryResult
@@ -533,8 +551,9 @@ if (generateDecision.ok) {
   }
 }
 
-if (generateDecision.ok) {
+if (generateDecision.ok && !gitPreflightCompleted) {
   gitReadiness = checkScheduledGitReadiness()
+  gitPreflightCompleted = true
   if (!gitReadiness.ok) {
     generateDecision = { ok: false, reason: `Git同期が安全でないため記事生成を停止: ${gitReadiness.reason}` }
     scheduledOutcome = classifyPreGenerationFailure({

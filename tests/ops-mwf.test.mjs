@@ -159,12 +159,12 @@ test('ops:mwf promotes owned-draft recovery failure to a fail-closed incident', 
   const incidentIndex = source.indexOf('scheduledOutcome = classifyPreGenerationFailure({', recoveryFailureIndex)
   const stageIndex = source.indexOf("stage: 'owned_draft_recovery'", incidentIndex)
   const exitIndex = source.indexOf('process.exitCode = scheduledOutcome.exitCode', stageIndex)
-  const gitReadinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness()')
+  const gitReadinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness({ ownedDraftPath')
   assert.ok(recoveryFailureIndex > 0)
   assert.ok(incidentIndex > recoveryFailureIndex)
   assert.ok(stageIndex > incidentIndex)
   assert.ok(exitIndex > stageIndex)
-  assert.ok(exitIndex < gitReadinessIndex)
+  assert.ok(gitReadinessIndex < recoveryFailureIndex)
 })
 
 test('ops:mwf promotes Git readiness failure to a fail-closed incident', () => {
@@ -212,6 +212,7 @@ test('ops:mwf locally commits only provenance-marked drafts after Git preflight 
   const gitignore = readFileSync('.gitignore', 'utf8')
 
   assert.match(source, /rememberGeneratedDraft/)
+  assert.match(source, /readOwnedGeneratedDraftMarker/)
   assert.match(source, /recoverOwnedGeneratedDraft/)
   assert.match(source, /classifyOwnedDraftStatus/)
   assert.match(source, /classifyOwnedDraftStatus\(status\.output, ownedDraftPath\)/)
@@ -223,6 +224,21 @@ test('ops:mwf locally commits only provenance-marked drafts after Git preflight 
   assert.doesNotMatch(source, /git', \['add'/)
   assert.doesNotMatch(source, /git', \['commit'/)
   assert.doesNotMatch(source, /git', \['push'/)
+})
+
+test('ops:mwf completes remote preflight before stale-marker recovery and before generation', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+
+  const markerIndex = source.indexOf('const ownedMarker = readOwnedGeneratedDraftMarker(ROOT)')
+  const preflightIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness', markerIndex)
+  const recoveryIndex = source.indexOf('draftRecoveryResult = recoverOwnedGeneratedDraft', preflightIndex)
+  const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'", recoveryIndex)
+  assert.ok(markerIndex > 0)
+  assert.ok(preflightIndex > markerIndex)
+  assert.ok(recoveryIndex > preflightIndex)
+  assert.ok(generationIndex > recoveryIndex)
+  assert.match(source, /draftRecoveryResult\.recovered/)
+  assert.match(source, /acquireRunLock/)
 })
 
 test('ops:mwf suppresses the review request when owned-draft recovery fails', () => {
