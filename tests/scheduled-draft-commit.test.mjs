@@ -86,7 +86,9 @@ function commitRunner(calls, entries, {
       return { ok: true, output: path }
     }
     if (command === 'git' && args[0] === 'diff' && args[1] === '--quiet') return { ok: true, output: '' }
-    if (command === 'npm') return { ok: true, output: '' }
+    if (command === process.execPath && args[0].endsWith('/scripts/validate-posts.mjs')) {
+      return { ok: true, output: '' }
+    }
     if (command === 'git' && args[0] === 'add') return { ok: true, output: '' }
     if (command === 'git' && args[0] === 'diff' && args[1] === '--cached') {
       return { ok: true, output: entries.filter((item) => initialStatus.includes(item.path)).map((item) => item.path).join('\n') }
@@ -431,6 +433,60 @@ test('two pending owned drafts commit together and the ledger is removed only af
   assert.ok(calls.some((call) => call.join(' ') === 'git commit -m drafts: stock 2 scheduled articles'))
   assert.equal(calls.some((call) => call[0] === 'git' && call[1] === 'push'), false)
   assert.equal(calls.some((call) => ['approve', 'publish'].includes(call[1])), false)
+})
+
+test('post validation uses the current absolute Node executable and repo-local validator without npm lookup', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+  const calls = []
+
+  const result = recoverOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    runCommand: commitRunner(calls, entries, { initialStatus: `?? ${path1}` }),
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(process.execPath.startsWith('/'), true)
+  assert.ok(calls.some((call) => (
+    call[0] === process.execPath
+    && call[1] === join(root, 'scripts', 'validate-posts.mjs')
+    && call.length === 2
+  )))
+  assert.equal(calls.some((call) => call[0] === 'npm'), false)
+})
+
+test('repo-local validator failure remains blocking and actionable before Git mutation', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+  const calls = []
+  const gitRunner = commitRunner(calls, entries, { initialStatus: `?? ${path1}` })
+  const runCommand = (command, args) => {
+    if (command !== process.execPath) return gitRunner(command, args)
+    calls.push([command, ...args])
+    return {
+      ok: false,
+      status: 2,
+      output: 'synthetic validation failure',
+    }
+  }
+
+  const result = recoverOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    runCommand,
+  })
+
+  assert.equal(result.ok, false)
+  assert.equal(result.pendingSync, true)
+  assert.match(result.reason, /記事検証に失敗/)
+  assert.match(result.reason, /synthetic validation failure/)
+  assert.equal(calls.some((call) => call[1] === 'add' || call[1] === 'commit'), false)
+  assert.equal(existsSync(ledgerFile(root)), true)
 })
 
 test('post-commit foreign path, parent mismatch, or committed blob mismatch retains the ledger', () => {

@@ -311,7 +311,7 @@ export function recoverOwnedGeneratedDraft({
     }
   }
 
-  const validate = runCommand('npm', ['run', 'validate:posts'])
+  const validate = runCommand(process.execPath, [join(root, 'scripts', 'validate-posts.mjs')])
   if (!validate.ok) return fail(`記事検証に失敗したため同期を保留しました: ${validate.output.slice(0, 300)}`)
 
   const untrackedPaths = pendingEntries
