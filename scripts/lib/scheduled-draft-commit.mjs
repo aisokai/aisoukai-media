@@ -3,290 +3,401 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { join } from 'node:path'
 
 const SAFE_POST_PATH = /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/
-const MARKER_FILE = 'ops-mwf-owned-draft.json'
-const MARKER_REPO_PATH = `logs/${MARKER_FILE}`
+const LEDGER_VERSION = 3
+const LEDGER_FILE = 'ops-mwf-owned-draft.json'
+const LEDGER_REPO_PATH = `logs/${LEDGER_FILE}`
 
 function fail(reason, extra = {}) {
-  return { ok: false, committed: false, reason, ...extra }
+  return { ok: false, committed: false, pendingSync: true, reason, ...extra }
 }
 
 function isSafeGeneratedPostPath(path) {
   return SAFE_POST_PATH.test(String(path ?? ''))
 }
 
-function markerPath(root) {
-  return join(root, 'logs', MARKER_FILE)
+function ledgerPath(root) {
+  return join(root, 'logs', LEDGER_FILE)
 }
 
-function normalizeMarker(marker) {
-  const path = String(marker?.path ?? '')
-  const slug = String(marker?.slug ?? '')
-  if (!isSafeGeneratedPostPath(path) || slug !== path.slice('content/posts/'.length, -'.md'.length)) return null
-  if (marker?.version === 2) {
-    const contentSha256 = String(marker?.contentSha256 ?? '').toLowerCase()
-    if (!/^[a-f0-9]{64}$/.test(contentSha256)) return null
-    return { version: 2, path, slug, contentSha256 }
+function sha256(buffer) {
+  return createHash('sha256').update(buffer).digest('hex')
+}
+
+function gitBlobSha1(buffer) {
+  return createHash('sha1')
+    .update(`blob ${buffer.length}\0`)
+    .update(buffer)
+    .digest('hex')
+}
+
+function parseUnapprovedDraft(raw) {
+  const frontmatter = raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1]
+  if (!frontmatter) return false
+  const required = new Map()
+  for (const line of frontmatter.split(/\r?\n/)) {
+    const relevant = line.match(/^(reviewed|draft|auto_approved):/)
+    if (!relevant) continue
+    const field = line.match(/^(reviewed|draft|auto_approved):\s*(true|false)\s*$/)
+    if (!field || field[1] !== relevant[1] || required.has(field[1])) return false
+    required.set(field[1], field[2] === 'true')
   }
-  if (marker?.version === undefined || marker?.version === 1) {
-    return { version: 1, path, slug }
-  }
-  return null
+  return required.get('reviewed') === false
+    && required.get('draft') === true
+    && required.get('auto_approved') === false
 }
 
-function writeMarker(root, marker) {
-  const logs = join(root, 'logs')
-  mkdirSync(logs, { recursive: true })
-  const destination = markerPath(root)
-  const temporary = `${destination}.${process.pid}.tmp`
-  writeFileSync(temporary, `${JSON.stringify(marker)}\n`, { encoding: 'utf8', mode: 0o600 })
-  renameSync(temporary, destination)
+function normalizePathAndSlug(value) {
+  const path = String(value?.path ?? '')
+  const slug = String(value?.slug ?? '')
+  if (!isSafeGeneratedPostPath(path)) return null
+  if (slug !== path.slice('content/posts/'.length, -'.md'.length)) return null
+  return { path, slug }
 }
 
-function readMarker(root) {
-  const path = markerPath(root)
-  if (!existsSync(path)) return null
+function normalizeLedgerEntry(value) {
+  const identity = normalizePathAndSlug(value)
+  if (!identity) return null
+  const contentSha256 = String(value?.contentSha256 ?? '').toLowerCase()
+  const gitBlob = String(value?.gitBlob ?? '').toLowerCase()
+  const provenance = String(value?.provenance ?? '')
+  if (!/^[a-f0-9]{64}$/.test(contentSha256) || !/^[a-f0-9]{40}$/.test(gitBlob)) return null
+  if (!['generated', 'legacy-v2', 'legacy-v1'].includes(provenance)) return null
+  return { ...identity, contentSha256, gitBlob, provenance }
+}
+
+function identityFromFile(root, value, { expectedSha256 = null, provenance = 'generated' } = {}) {
+  const identity = normalizePathAndSlug(value)
+  if (!identity || !existsSync(join(root, identity.path))) return null
   try {
-    return normalizeMarker(JSON.parse(readFileSync(path, 'utf8')))
+    const content = readFileSync(join(root, identity.path))
+    if (!parseUnapprovedDraft(content.toString('utf8'))) return null
+    const contentSha256 = sha256(content)
+    if (expectedSha256 && contentSha256 !== expectedSha256) return null
+    return { ...identity, contentSha256, gitBlob: gitBlobSha1(content), provenance }
   } catch {
     return null
   }
 }
 
-export function readOwnedGeneratedDraftMarker(root) {
-  return readMarker(root)
+function normalizeLedger(root, value) {
+  let entries
+  let migrated = false
+  if (value?.version === LEDGER_VERSION && Array.isArray(value.entries)) {
+    entries = value.entries.map(normalizeLedgerEntry)
+  } else if (value?.version === 2) {
+    const expectedSha256 = String(value?.contentSha256 ?? '').toLowerCase()
+    if (!/^[a-f0-9]{64}$/.test(expectedSha256)) return null
+    entries = [identityFromFile(root, value, { expectedSha256, provenance: 'legacy-v2' })]
+    migrated = true
+  } else if (value?.version === undefined || value?.version === 1) {
+    entries = [identityFromFile(root, value, { provenance: 'legacy-v1' })]
+    migrated = true
+  } else {
+    return null
+  }
+  if (entries.some((entry) => !entry)) return null
+  const paths = new Set()
+  for (const entry of entries) {
+    if (paths.has(entry.path)) return null
+    paths.add(entry.path)
+  }
+  return { ledger: { version: LEDGER_VERSION, entries }, migrated }
 }
 
-function contentSha256(root, path) {
-  return createHash('sha256').update(readFileSync(join(root, path))).digest('hex')
-}
-
-function hasMatchingContentHash(root, marker) {
-  if (marker.version !== 2) return false
-  if (!existsSync(join(root, marker.path))) return false
-  try {
-    return contentSha256(root, marker.path) === marker.contentSha256
-  } catch {
-    return false
+function normalizeLedgerIo(overrides = {}) {
+  return {
+    writeFileSync: overrides.writeFileSync ?? writeFileSync,
+    renameSync: overrides.renameSync ?? renameSync,
+    unlinkSync: overrides.unlinkSync ?? unlinkSync,
   }
 }
 
-function isFailClosedLegacyDraft(root, marker) {
-  if (marker.version !== 1 || !existsSync(join(root, marker.path))) return false
+function writeLedger(root, ledger, ledgerIo) {
+  const io = normalizeLedgerIo(ledgerIo)
+  const logs = join(root, 'logs')
+  const destination = ledgerPath(root)
+  const temporary = `${destination}.${process.pid}.tmp`
   try {
-    const raw = readFileSync(join(root, marker.path), 'utf8')
-    const frontmatter = raw.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1]
-    if (!frontmatter) return false
-    const required = new Map()
-    for (const line of frontmatter.split(/\r?\n/)) {
-      const relevant = line.match(/^(reviewed|draft|auto_approved):/)
-      if (!relevant) continue
-      const field = line.match(/^(reviewed|draft|auto_approved):\s*(true|false)\s*$/)
-      if (!field || field[1] !== relevant[1]) return false
-      if (required.has(field[1])) return false
-      required.set(field[1], field[2] === 'true')
+    mkdirSync(logs, { recursive: true })
+    io.writeFileSync(temporary, `${JSON.stringify(ledger)}\n`, { encoding: 'utf8', mode: 0o600 })
+    io.renameSync(temporary, destination)
+    return { ok: true }
+  } catch (error) {
+    try {
+      if (existsSync(temporary)) io.unlinkSync(temporary)
+    } catch {}
+    return { ok: false, reason: `provenance ledgerの書き込みに失敗しました: ${error.message}` }
+  }
+}
+
+function removeOrWriteLedger(root, entries, ledgerIo) {
+  const io = normalizeLedgerIo(ledgerIo)
+  if (entries.length > 0) {
+    return writeLedger(root, { version: LEDGER_VERSION, entries }, io)
+  } else if (existsSync(ledgerPath(root))) {
+    try {
+      io.unlinkSync(ledgerPath(root))
+    } catch (error) {
+      return { ok: false, reason: `provenance ledgerの解消に失敗しました: ${error.message}` }
     }
-    return required.get('reviewed') === false
-      && required.get('draft') === true
-      && required.get('auto_approved') === false
-  } catch {
-    return false
-  }
-}
-
-export function classifyOwnedDraftStatus(statusOutput, path) {
-  const lines = String(statusOutput ?? '').split(/\r?\n/).filter(Boolean)
-  const draftLines = lines.filter((line) => line !== `?? ${MARKER_REPO_PATH}`)
-  if (draftLines.length === 0 && lines.length <= 1) return 'clean'
-  if (draftLines.length !== 1 || lines.length > 2) return null
-  if (draftLines[0] === `?? ${path}`) return 'untracked'
-  if (draftLines[0] === `A  ${path}`) return 'staged'
-  return null
-}
-
-function hasOnlyOwnedMarkerStatus(statusOutput) {
-  const lines = String(statusOutput ?? '').split(/\r?\n/).filter(Boolean)
-  return lines.length === 0 || (lines.length === 1 && lines[0] === `?? ${MARKER_REPO_PATH}`)
-}
-
-function verifyTrackedCleanBlob({ root, marker, runCommand }) {
-  if (!existsSync(join(root, marker.path))) {
-    return fail('管理対象draftが見つからないためGit同期を停止しました')
-  }
-
-  const tracked = runCommand('git', ['ls-files', '--error-unmatch', '--', marker.path])
-  if (!tracked.ok || tracked.output.trim() !== marker.path) {
-    return fail('管理対象draftが追跡済みでないためGit同期を停止しました')
-  }
-  const clean = runCommand('git', ['diff', '--quiet', 'HEAD', '--', marker.path])
-  if (!clean.ok) {
-    return fail('管理対象draftの内容がHEADと一致しないためGit同期を停止しました')
-  }
-  const currentBlob = runCommand('git', ['hash-object', '--', marker.path])
-  const headBlob = runCommand('git', ['rev-parse', `HEAD:${marker.path}`])
-  if (!currentBlob.ok || !headBlob.ok || !currentBlob.output.trim()
-    || currentBlob.output.trim() !== headBlob.output.trim()) {
-    return fail('管理対象draftのblobがHEADと一致しないためGit同期を停止しました')
   }
   return { ok: true }
 }
 
-function verifyStagedOwnedBlob({ root, marker, runCommand }) {
-  if (!hasMatchingContentHash(root, marker)) {
-    return fail('管理対象draftのcontent hashがmarkerと一致しないためGit同期を停止しました')
+function readLedgerState(root) {
+  const path = ledgerPath(root)
+  if (!existsSync(path)) return { exists: false, ledger: null, migrated: false }
+  try {
+    const normalized = normalizeLedger(root, JSON.parse(readFileSync(path, 'utf8')))
+    return normalized ? { exists: true, ...normalized } : { exists: true, ledger: null, migrated: false }
+  } catch {
+    return { exists: true, ledger: null, migrated: false }
   }
-  const currentBlob = runCommand('git', ['hash-object', '--', marker.path])
-  const stagedBlob = runCommand('git', ['rev-parse', `:${marker.path}`])
-  if (!currentBlob.ok || !stagedBlob.ok || !currentBlob.output.trim()
-    || currentBlob.output.trim() !== stagedBlob.output.trim()) {
-    return fail('stage済みdraftのblobがmarker対象内容と一致しないためGit commitを停止しました')
-  }
-  return { ok: true, blob: stagedBlob.output.trim() }
 }
 
-function verifyOwnedCommitResult({ owned, preCommitHead, stagedBlob, runCommand }) {
-  const committed = { committed: true }
-  const newHead = runCommand('git', ['rev-parse', 'HEAD'])
-  if (!newHead.ok || !newHead.output.trim() || newHead.output.trim() === preCommitHead) {
-    return fail('commit後のHEADを安全に確認できないためmarkerを保持しました', committed)
-  }
-  const commitHead = newHead.output.trim()
-  const parent = runCommand('git', ['rev-parse', `${commitHead}^`])
-  if (!parent.ok || parent.output.trim() !== preCommitHead) {
-    return fail('commit後HEADのparentがcommit前HEADと一致しないためmarkerを保持しました', committed)
-  }
-  const changed = runCommand('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', commitHead])
-  if (!changed.ok || changed.output.trim() !== owned.path) {
-    return fail('commitに管理対象draft以外のpathが含まれるためmarkerを保持しました', committed)
-  }
-  const committedBlob = runCommand('git', ['rev-parse', `${commitHead}:${owned.path}`])
-  if (!committedBlob.ok || committedBlob.output.trim() !== stagedBlob) {
-    return fail('commit済みdraftのblobが検証済みstage内容と一致しないためmarkerを保持しました', committed)
-  }
-  return { ok: true, committed: true }
+export function readOwnedGeneratedDraftLedger(root) {
+  return readLedgerState(root).ledger
 }
 
-export function commitOwnedGeneratedDraft({ root = process.cwd(), marker, runCommand }) {
-  const owned = normalizeMarker(marker)
-  if (!owned) return fail('管理対象draftの識別情報が不正なためGit同期を停止しました')
+// Compatibility for diagnostic callers. New code must use the full ledger.
+export function readOwnedGeneratedDraftMarker(root) {
+  return readOwnedGeneratedDraftLedger(root)?.entries?.[0] ?? null
+}
 
-  const status = runCommand('git', ['status', '--porcelain'])
-  if (!status.ok) return fail('git status を確認できないためGit同期を停止しました')
-  const state = classifyOwnedDraftStatus(status.output, owned.path)
-  if (!state) return fail('管理対象draft以外の変更または不明なGit状態があるためGit同期を停止しました')
+function parseStatus(statusOutput) {
+  return String(statusOutput ?? '').split(/\r?\n/).filter(Boolean).map((line) => ({
+    code: line.slice(0, 2),
+    path: line.slice(3),
+    line,
+  }))
+}
 
-  if (state === 'clean') {
-    const trackedClean = verifyTrackedCleanBlob({ root, marker: owned, runCommand })
-    if (!trackedClean.ok) return trackedClean
-    if (owned.version === 2 && !hasMatchingContentHash(root, owned)) {
-      return fail('管理対象draftのcontent hashがmarkerと一致しないためGit同期を停止しました')
+export function classifyOwnedDraftStatus(statusOutput, ownedPaths) {
+  const paths = new Set(Array.isArray(ownedPaths) ? ownedPaths : [ownedPaths])
+  const items = parseStatus(statusOutput).filter((item) => item.path !== LEDGER_REPO_PATH)
+  const foreign = items.filter((item) => !paths.has(item.path))
+  if (foreign.length > 0) return null
+  const states = new Map()
+  for (const item of items) {
+    if (states.has(item.path)) return null
+    if (item.code === '??') states.set(item.path, 'untracked')
+    else if (item.code === 'A ') states.set(item.path, 'staged')
+    else return null
+  }
+  if (!Array.isArray(ownedPaths)) return states.get(ownedPaths) ?? 'clean'
+  return Object.fromEntries([...paths].map((path) => [path, states.get(path) ?? 'clean']))
+}
+
+function verifyEntryFile(root, entry) {
+  const path = join(root, entry.path)
+  if (!existsSync(path)) return fail(`管理対象draftが見つかりません: ${entry.path}`)
+  try {
+    const content = readFileSync(path)
+    if (sha256(content) !== entry.contentSha256) {
+      return fail(`管理対象draftのcontent hashが一致しません: ${entry.path}`)
     }
-    if (owned.version === 1 && !isFailClosedLegacyDraft(root, owned)) {
-      return fail('legacy markerの管理対象draftが未承認の安全な下書きではないためGit同期を停止しました')
+    if (gitBlobSha1(content) !== entry.gitBlob) {
+      return fail(`管理対象draftのblobが一致しません: ${entry.path}`)
     }
-    return {
-      ok: true,
-      committed: true,
-      alreadyCommitted: true,
-      reason: '管理対象draftは既にlocal commit済みです。markerを照合・解消しました。',
+    if (!parseUnapprovedDraft(content.toString('utf8'))) {
+      return fail(`管理対象draftが未承認draft条件を満たしません: ${entry.path}`)
     }
+    return { ok: true }
+  } catch {
+    return fail(`管理対象draftを安全に検証できません: ${entry.path}`)
   }
+}
 
-  if (owned.version !== 2) {
-    return fail('legacy markerの未commit draftは自動回復せずHuman操作待ちにします')
+function verifyTrackedCleanBlob({ entry, runCommand }) {
+  const tracked = runCommand('git', ['ls-files', '--error-unmatch', '--', entry.path])
+  if (!tracked.ok || tracked.output.trim() !== entry.path) return fail(`管理対象draftを追跡確認できません: ${entry.path}`)
+  const clean = runCommand('git', ['diff', '--quiet', 'HEAD', '--', entry.path])
+  if (!clean.ok) return fail(`管理対象draftがHEADと一致しません: ${entry.path}`)
+  const headBlob = runCommand('git', ['rev-parse', `HEAD:${entry.path}`])
+  if (!headBlob.ok || headBlob.output.trim() !== entry.gitBlob) {
+    return fail(`管理対象draftのHEAD blobが一致しません: ${entry.path}`)
   }
-  if (!hasMatchingContentHash(root, owned)) {
-    return fail('管理対象draftのcontent hashがmarkerと一致しないためGit同期を停止しました')
-  }
+  return { ok: true }
+}
 
-  const validate = runCommand('npm', ['run', 'validate:posts'])
-  if (!validate.ok) return fail(`validate:posts に失敗したためGit同期を停止しました: ${validate.output.slice(0, 300)}`)
+function samePaths(actualOutput, expectedPaths) {
+  const actual = String(actualOutput ?? '').split(/\r?\n/).filter(Boolean).sort()
+  return JSON.stringify(actual) === JSON.stringify([...expectedPaths].sort())
+}
 
-  if (state === 'untracked') {
-    const add = runCommand('git', ['add', '--', owned.path])
-    if (!add.ok) return fail(`git add に失敗したためGit同期を停止しました: ${add.output.slice(0, 300)}`)
-  }
-
-  const staged = runCommand('git', ['diff', '--cached', '--name-only'])
-  if (!staged.ok || staged.output.trim() !== owned.path) {
-    return fail('stage対象が管理対象draftだけでないためGit commitを停止しました')
-  }
-  const stagedIdentity = verifyStagedOwnedBlob({ root, marker: owned, runCommand })
-  if (!stagedIdentity.ok) return stagedIdentity
-
-  const preCommitHead = runCommand('git', ['rev-parse', 'HEAD'])
-  if (!preCommitHead.ok || !preCommitHead.output.trim()) {
-    return fail('commit前HEADを確認できないためGit commitを停止しました')
-  }
-
-  const commit = runCommand('git', ['commit', '-m', `draft: ${owned.slug}`])
-  if (!commit.ok) return fail(`git commit に失敗したため管理対象draftを回復待ちにしました: ${commit.output.slice(0, 300)}`)
-
-  const verifiedCommit = verifyOwnedCommitResult({
-    owned,
-    preCommitHead: preCommitHead.output.trim(),
-    stagedBlob: stagedIdentity.blob,
-    runCommand,
-  })
-  if (!verifiedCommit.ok) return verifiedCommit
-
-  const after = runCommand('git', ['status', '--porcelain'])
-  if (!after.ok || !hasOnlyOwnedMarkerStatus(after.output)) {
-    return fail('draftはlocal commit済みですが、commit後に別の変更が検出されました', { committed: true })
-  }
-  return { ok: true, committed: true, reason: '生成下書きをローカルcommitしました。Human push待ちです。' }
+function retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, ledgerIo) {
+  const unresolved = entries.filter((entry) => !resolvedPaths.has(entry.path))
+  const persisted = removeOrWriteLedger(root, unresolved, ledgerIo)
+  return { unresolvedCount: unresolved.length, persisted }
 }
 
 export function recoverOwnedGeneratedDraft({
   root,
   runCommand,
   assertGitReady = () => ({ ok: false, reason: 'remote preflight未指定' }),
+  ledgerIo,
 }) {
-  const markerExists = existsSync(markerPath(root))
-  const marker = readMarker(root)
-
-  if (!marker) {
-    if (markerExists) {
-      return fail('provenance markerが不正または読み取れないため既存draftの回復を停止しました')
-    }
-    const status = runCommand('git', ['status', '--porcelain'])
-    if (!status.ok) return fail('git status を確認できないため既存draftの回復を停止しました')
-    if (!String(status.output ?? '').trim()) {
-      return { ok: true, committed: false, recovered: false, reason: '回復対象の管理済みdraftはありません' }
-    }
-    return fail('provenance markerがない未commit変更は自動回復せずHuman操作待ちにします')
+  const state = readLedgerState(root)
+  if (!state.ledger) {
+    if (state.exists) return fail('provenance ledgerが不正または読み取れないため同期を保留しました')
+    return { ok: true, committed: false, recovered: false, reason: '同期対象の管理済みdraftはありません' }
+  }
+  if (state.migrated) {
+    const migration = writeLedger(root, state.ledger, ledgerIo)
+    if (!migration.ok) return fail(migration.reason, { stocked: true })
+  }
+  const entries = state.ledger.entries
+  if (entries.length === 0) {
+    const cleanup = removeOrWriteLedger(root, [], ledgerIo)
+    if (!cleanup.ok) return fail(cleanup.reason, { stocked: true })
+    return { ok: true, committed: false, recovered: false, reason: '同期対象の管理済みdraftはありません' }
   }
 
-  const readiness = assertGitReady(marker)
+  for (const entry of entries) {
+    const verified = verifyEntryFile(root, entry)
+    if (!verified.ok) return verified
+  }
+
+  const readiness = assertGitReady(state.ledger)
   if (!readiness?.ok) {
-    return fail(`Git同期が安全でないため管理対象draftの回復を停止しました: ${readiness?.reason ?? '確認不能'}`)
+    return fail(`ローカル同期を保留しました: ${readiness?.reason ?? '確認不能'}`)
   }
 
-  const result = commitOwnedGeneratedDraft({ root, marker, runCommand })
-  if (result.ok && result.committed) unlinkSync(markerPath(root))
-  return { ...result, recovered: result.committed }
+  const status = runCommand('git', ['status', '--porcelain'])
+  if (!status.ok) return fail('ローカル状態を確認できないため同期を保留しました')
+  const states = classifyOwnedDraftStatus(status.output, entries.map((entry) => entry.path))
+  if (!states) return fail('管理対象外の変更または不明な状態があるため同期を保留しました')
+
+  const resolvedPaths = new Set()
+  const pendingEntries = []
+  for (const entry of entries) {
+    if (states[entry.path] === 'clean') {
+      const tracked = verifyTrackedCleanBlob({ entry, runCommand })
+      if (!tracked.ok) {
+        const retained = retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, ledgerIo)
+        return {
+          ...tracked,
+          reason: retained.persisted.ok ? tracked.reason : `${tracked.reason}; ${retained.persisted.reason}`,
+          retainedEntries: retained.unresolvedCount,
+          resolvedEntries: resolvedPaths.size,
+        }
+      }
+      resolvedPaths.add(entry.path)
+    } else {
+      if (entry.provenance === 'legacy-v1') {
+        const retained = retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, ledgerIo)
+        return fail('legacy v1 marker由来の未反映draftは内容provenanceが不足するためHuman同期待ちにします', {
+          reason: retained.persisted.ok
+            ? 'legacy v1 marker由来の未反映draftは内容provenanceが不足するためHuman同期待ちにします'
+            : `legacy v1 marker由来の未反映draftは内容provenanceが不足します; ${retained.persisted.reason}`,
+          retainedEntries: retained.unresolvedCount,
+          resolvedEntries: resolvedPaths.size,
+        })
+      }
+      pendingEntries.push(entry)
+    }
+  }
+
+  if (pendingEntries.length === 0) {
+    const cleanup = removeOrWriteLedger(root, [], ledgerIo)
+    if (!cleanup.ok) return fail(cleanup.reason, { committed: true, stocked: true })
+    return {
+      ok: true,
+      committed: true,
+      alreadyCommitted: true,
+      recovered: true,
+      resolvedEntries: resolvedPaths.size,
+      reason: '管理対象draftは管理画面へ反映済みです。',
+    }
+  }
+
+  const validate = runCommand('npm', ['run', 'validate:posts'])
+  if (!validate.ok) return fail(`記事検証に失敗したため同期を保留しました: ${validate.output.slice(0, 300)}`)
+
+  const untrackedPaths = pendingEntries
+    .filter((entry) => states[entry.path] === 'untracked')
+    .map((entry) => entry.path)
+  if (untrackedPaths.length > 0) {
+    const add = runCommand('git', ['add', '--', ...untrackedPaths])
+    if (!add.ok) return fail(`生成draftのstageに失敗したため同期を保留しました: ${add.output.slice(0, 300)}`)
+  }
+
+  const pendingPaths = pendingEntries.map((entry) => entry.path)
+  const staged = runCommand('git', ['diff', '--cached', '--name-only'])
+  if (!staged.ok || !samePaths(staged.output, pendingPaths)) {
+    return fail('stage対象が管理対象draftだけではないため同期を保留しました')
+  }
+  for (const entry of pendingEntries) {
+    const stagedBlob = runCommand('git', ['rev-parse', `:${entry.path}`])
+    if (!stagedBlob.ok || stagedBlob.output.trim() !== entry.gitBlob) {
+      return fail(`stage済みdraftのblobが一致しないため同期を保留しました: ${entry.path}`)
+    }
+  }
+
+  const preCommitHead = runCommand('git', ['rev-parse', 'HEAD'])
+  if (!preCommitHead.ok || !preCommitHead.output.trim()) return fail('同期前HEADを確認できません')
+  const commit = runCommand('git', ['commit', '-m', `drafts: stock ${pendingEntries.length} scheduled article${pendingEntries.length === 1 ? '' : 's'}`])
+  if (!commit.ok) return fail(`生成draftのlocal commitに失敗したため同期を保留しました: ${commit.output.slice(0, 300)}`)
+
+  const newHead = runCommand('git', ['rev-parse', 'HEAD'])
+  if (!newHead.ok || !newHead.output.trim() || newHead.output.trim() === preCommitHead.output.trim()) {
+    return fail('同期後HEADを確認できないためledgerを保持しました', { committed: true })
+  }
+  const commitHead = newHead.output.trim()
+  const parent = runCommand('git', ['rev-parse', `${commitHead}^`])
+  if (!parent.ok || parent.output.trim() !== preCommitHead.output.trim()) {
+    return fail('同期後HEADのparentが一致しないためledgerを保持しました', { committed: true })
+  }
+  const changed = runCommand('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', commitHead])
+  if (!changed.ok || !samePaths(changed.output, pendingPaths)) {
+    return fail('local commitに管理対象draft以外が含まれるためledgerを保持しました', { committed: true })
+  }
+  for (const entry of pendingEntries) {
+    const committedBlob = runCommand('git', ['rev-parse', `${commitHead}:${entry.path}`])
+    if (!committedBlob.ok || committedBlob.output.trim() !== entry.gitBlob) {
+      return fail(`commit済みdraftのblobが一致しないためledgerを保持しました: ${entry.path}`, { committed: true })
+    }
+  }
+  const after = runCommand('git', ['status', '--porcelain'])
+  if (!after.ok || String(after.output ?? '').split(/\r?\n/).filter(Boolean)
+    .some((line) => line.slice(3) !== LEDGER_REPO_PATH)) {
+    return fail('draftはlocal commit済みですが、同期後に別の変更を検出したためledgerを保持しました', { committed: true })
+  }
+
+  const cleanup = removeOrWriteLedger(root, [], ledgerIo)
+  if (!cleanup.ok) return fail(cleanup.reason, { committed: true, stocked: true })
+  return {
+    ok: true,
+    committed: true,
+    recovered: true,
+    resolvedEntries: entries.length,
+    reason: '新しい記事を管理画面へ反映しました。',
+  }
 }
 
-export function rememberGeneratedDraft({ root, scheduledResult }) {
-  const identity = normalizeMarker({
-    version: 1,
+export function rememberGeneratedDraft({ root, scheduledResult, ledgerIo }) {
+  const identity = identityFromFile(root, {
     path: scheduledResult?.path,
     slug: scheduledResult?.slug,
   })
-  if (!identity) return fail('生成記事パスが安全な形式ではないためGit同期を停止しました')
-  if (!existsSync(join(root, identity.path))) {
-    return fail('生成記事が見つからないためprovenance markerを作成できません')
+  if (!identity) return fail('生成記事を安全な未承認draftとして記録できません', { stocked: false, pendingSync: false })
+
+  const state = readLedgerState(root)
+  if (state.exists && !state.ledger) {
+    return fail('既存provenance ledgerを安全に移行できません', { stocked: false, pendingSync: false })
   }
-  let marker
-  try {
-    marker = {
-      version: 2,
-      path: identity.path,
-      slug: identity.slug,
-      contentSha256: contentSha256(root, identity.path),
+  const entries = state.ledger?.entries ?? []
+  const samePath = entries.find((entry) => entry.path === identity.path)
+  if (samePath) {
+    if (samePath.contentSha256 !== identity.contentSha256 || samePath.gitBlob !== identity.gitBlob) {
+      return fail('既存draftと同じpathに異なる内容が生成されました', { stocked: false, pendingSync: false })
     }
-  } catch {
-    return fail('生成記事のcontent hashを計算できないためGit同期を停止しました')
+    const persisted = writeLedger(root, { version: LEDGER_VERSION, entries }, ledgerIo)
+    if (!persisted.ok) return fail(persisted.reason, { stocked: false, pendingSync: false })
+    return { ok: true, stocked: true, idempotent: true, ledger: { version: LEDGER_VERSION, entries }, entry: samePath }
   }
-  writeMarker(root, marker)
-  return { ok: true, marker }
+  const next = { version: LEDGER_VERSION, entries: [...entries, identity] }
+  const persisted = writeLedger(root, next, ledgerIo)
+  if (!persisted.ok) return fail(persisted.reason, { stocked: false, pendingSync: false })
+  return { ok: true, stocked: true, ledger: next, entry: identity, migrated: state.migrated }
 }

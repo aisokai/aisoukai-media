@@ -2,11 +2,15 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  buildScheduledFailureNotification,
+  buildScheduledStockNotification,
   classifyScheduledDraftOutcome,
   shouldSendDraftReviewNotification,
+  shouldSendScheduledIncidentNotification,
+  shouldSendStockUpdateNotification,
 } from '../scripts/lib/scheduled-draft-notification.mjs'
 
-function loadPureFunction(source, name) {
+function functionDeclaration(source, name) {
   const start = source.indexOf(`function ${name}(`)
   assert.ok(start >= 0, `${name} declaration is missing`)
   const bodyStart = source.indexOf('{', start)
@@ -15,112 +19,60 @@ function loadPureFunction(source, name) {
     if (source[index] === '{') depth += 1
     if (source[index] !== '}') continue
     depth -= 1
-    if (depth === 0) {
-      const declaration = source.slice(start, index + 1)
-      return Function(`"use strict"; ${declaration}; return ${name}`)()
-    }
+    if (depth === 0) return source.slice(start, index + 1)
   }
   throw new Error(`${name} declaration is incomplete`)
 }
 
-test('ops:mwf generates one scheduled draft before Telegram review notification', () => {
+function loadPureFunction(source, name, globals = {}) {
+  const names = Object.keys(globals)
+  const values = Object.values(globals)
+  return Function(...names, `"use strict"; ${functionDeclaration(source, name)}; return ${name}`)(...values)
+}
+
+test('ops:mwf generates and durably stocks before any Git readiness assessment', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /月水金 08:30 の定期記事生成 CLI/)
-  assert.match(source, /scheduled-article-flow\.mjs/)
-  assert.match(source, /runThemeOpsFallback/)
-  assert.match(source, /--no-generate/)
-  assert.match(source, /--auto-publish/)
-  assert.match(source, /--result-json/)
-  assert.match(source, /--no-notify/)
-  assert.match(source, /--publish-today/)
-  assert.match(source, /OPENAI_API_KEY 未設定/)
-  assert.doesNotMatch(source, /ANTHROPIC_API_KEY/)
-  assert.match(source, /本文確認・承認/)
-  assert.match(source, /checkScheduledGitReadiness/)
-  assert.match(source, /prepareGeneratedDraftForHumanPush/)
-  assert.match(source, /生成下書きのHuman Git同期待ち/)
-  assert.match(source, /approve \/ publish は実行していません/)
-
-  const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
-  const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
-  const classificationIndex = source.indexOf('scheduledOutcome = attachChildRunEvidence(classifyScheduledDraftOutcome')
-  const syncIndex = source.indexOf('draftSyncResult = prepareGeneratedDraftForHumanPush')
-  const notificationBuildIndex = source.indexOf('const notificationText = shouldSendScheduledIncidentNotification')
-  const sendIndex = source.lastIndexOf('await sendOpsTelegram')
-  assert.ok(readinessIndex > 0)
-  assert.ok(scheduledIndex > 0)
-  assert.ok(readinessIndex < scheduledIndex)
-  assert.ok(classificationIndex > scheduledIndex)
-  assert.ok(classificationIndex < syncIndex)
-  assert.ok(syncIndex > scheduledIndex)
-  assert.ok(notificationBuildIndex > scheduledIndex)
-  assert.ok(sendIndex > notificationBuildIndex)
-})
-
-test('ops:mwf falls back to the canonical theme CSV only after the legacy topic pool is exhausted', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
-  const fallbackIndex = source.indexOf('runThemeOpsFallback({')
-  const syncIndex = source.indexOf('draftSyncResult = prepareGeneratedDraftForHumanPush')
-  assert.ok(fallbackIndex > scheduledIndex)
-  assert.ok(syncIndex > fallbackIndex)
-  assert.match(source, /function isLegacyTopicPoolExhausted/)
-  assert.match(source, /isLegacyTopicPoolExhausted\(scheduledChildStatus, scheduledResult\)/)
-  assert.match(source, /未生成 approved topic はありません/)
-  assert.match(source, /テーマリサーチから補充します/)
-})
-
-test('ops:mwf rejects auto-publish and keeps article approval as body review only', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /ops:mwf では --auto-publish を受け付けません/)
-  assert.match(source, /process\.exit\(1\)/)
-  assert.match(source, /本文確認後に承認/)
-  assert.doesNotMatch(source, /--auto-publish', '--no-notify/)
-})
-
-test('ops:mwf dry-run exits before all queue, generation, Git, and notification effects', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  const dryRunIndex = source.indexOf("const dryRun = cliArgs.includes('--dry-run')")
-  const exitIndex = source.indexOf('process.exit(0)', dryRunIndex)
-  const lockIndex = source.indexOf('const runLock = acquireRunLock()')
-  const envIndex = source.indexOf('loadEnv()')
   const queueSyncIndex = source.indexOf("run('convert-selected-topics.mjs'")
   const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'")
-  const notificationIndex = source.indexOf('await sendOpsTelegram')
+  const prepareCallIndex = source.indexOf('const prepared = prepareGeneratedDraftForHumanPush', generationIndex)
+  const prepareSource = functionDeclaration(source, 'prepareGeneratedDraftForHumanPush')
+  const rememberIndex = prepareSource.indexOf('const stockResult = rememberGeneratedDraft')
+  const readinessIndex = prepareSource.indexOf('const gitReadiness = checkScheduledGitReadiness')
+  const recoveryIndex = prepareSource.indexOf('const draftSyncResult = recoverOwnedGeneratedDraft')
+  const notificationIndex = source.indexOf('const notificationText = shouldSendScheduledIncidentNotification')
 
-  assert.ok(dryRunIndex > 0)
-  assert.ok(exitIndex > dryRunIndex)
-  for (const sideEffectIndex of [lockIndex, envIndex, queueSyncIndex, generationIndex, notificationIndex]) {
-    assert.ok(sideEffectIndex > exitIndex)
-  }
-  assert.ok(source.includes('"queue_mutated":false'))
-  assert.ok(source.includes('"notified":false'))
+  assert.ok(queueSyncIndex > 0)
+  assert.ok(generationIndex > queueSyncIndex)
+  assert.ok(prepareCallIndex > generationIndex)
+  assert.ok(rememberIndex > 0)
+  assert.ok(readinessIndex > rememberIndex)
+  assert.ok(recoveryIndex > readinessIndex)
+  assert.ok(notificationIndex > prepareCallIndex)
+  assert.doesNotMatch(source, /classifyPreGenerationFailure/)
+  assert.doesNotMatch(source, /Git同期が安全でないため記事生成を停止/)
 })
 
-test('ops:mwf guards selected-topic persistence behind the generation decision and Git preflight', () => {
+test('selected-topic persistence depends on generation safety, never Git preflight', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
   const syncHeaderIndex = source.indexOf("header('1/3  ネタリスト selected 同期')")
-  const generationGuardIndex = source.indexOf('if (!generateDecision.ok)', syncHeaderIndex)
-  const gitGuardIndex = source.indexOf('else if (!gitReadiness.ok)', generationGuardIndex)
-  const queueSyncIndex = source.indexOf("run('convert-selected-topics.mjs'", gitGuardIndex)
+  const generateGuardIndex = source.indexOf('if (!generateDecision.ok)', syncHeaderIndex)
+  const queueSyncIndex = source.indexOf("run('convert-selected-topics.mjs'", generateGuardIndex)
+  const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'", queueSyncIndex)
+  const prepareCallIndex = source.indexOf('const prepared = prepareGeneratedDraftForHumanPush', generationIndex)
+  const guardedBlock = source.slice(syncHeaderIndex, generationIndex)
 
   assert.ok(syncHeaderIndex > 0)
-  assert.ok(generationGuardIndex > syncHeaderIndex)
-  assert.ok(gitGuardIndex > generationGuardIndex)
-  assert.ok(queueSyncIndex > gitGuardIndex)
+  assert.ok(generateGuardIndex > syncHeaderIndex)
+  assert.ok(queueSyncIndex > generateGuardIndex)
+  assert.ok(generationIndex > queueSyncIndex)
+  assert.ok(prepareCallIndex > generationIndex)
+  assert.doesNotMatch(guardedBlock, /gitReadiness|checkScheduledGitReadiness|recoverOwnedGeneratedDraft/)
 })
 
-test('ops:mwf promotes a nonzero selected-topic sync result to a fail-closed incident', () => {
+test('nonzero selected-topic sync remains a fail-closed generation incident before article generation', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
   const classifyTopicSyncFailure = loadPureFunction(source, 'classifyTopicSyncFailure')
-
-  const incident = classifyTopicSyncFailure({ status: 17, signal: null, termination: null })
-  assert.deepEqual(incident, {
+  assert.deepEqual(classifyTopicSyncFailure({ status: 17, signal: null, termination: null }), {
     kind: 'incident',
     reviewReady: false,
     exitCode: 17,
@@ -128,294 +80,210 @@ test('ops:mwf promotes a nonzero selected-topic sync result to a fail-closed inc
   })
 
   const syncIndex = source.indexOf("run('convert-selected-topics.mjs'")
-  const incidentIndex = source.indexOf('syncIncident = classifyTopicSyncFailure', syncIndex)
-  const exitIndex = source.indexOf('process.exitCode = syncIncident.exitCode', incidentIndex)
+  const classifyIndex = source.indexOf('syncIncident = classifyTopicSyncFailure', syncIndex)
+  const exitIndex = source.indexOf('process.exitCode = syncIncident.exitCode', classifyIndex)
   const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'")
   assert.ok(syncIndex > 0)
-  assert.ok(incidentIndex > syncIndex)
-  assert.ok(exitIndex > incidentIndex)
-  assert.ok(exitIndex < generationIndex)
+  assert.ok(classifyIndex > syncIndex)
+  assert.ok(exitIndex > classifyIndex)
+  assert.ok(generationIndex > exitIndex)
 })
 
-test('ops:mwf promotes owned-draft recovery failure to a fail-closed incident', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const classifyPreGenerationFailure = loadPureFunction(source, 'classifyPreGenerationFailure')
+test('dirty, ahead, behind, diverged, fetch failure, index lock, and unknown Git states classify as stocked pending sync exit zero', () => {
+  for (const reason of ['dirty tracked', 'dirty untracked', 'dirty staged', 'ahead-only', 'behind', 'diverged', 'fetch failure', 'index lock', 'unknown']) {
+    const outcome = classifyScheduledDraftOutcome({
+      childStatus: 0,
+      scheduledResult: { ok: true, generated: true },
+      stockResult: { ok: true, stocked: true },
+      draftSyncResult: { ok: false, reason },
+    })
+    assert.equal(outcome.kind, 'stocked-pending-sync')
+    assert.equal(outcome.exitCode, 0)
+    assert.equal(shouldSendStockUpdateNotification(outcome), true)
+    assert.equal(shouldSendScheduledIncidentNotification(outcome), false)
+  }
+})
 
-  assert.deepEqual(classifyPreGenerationFailure({
-    stage: 'owned_draft_recovery',
-    reason: 'marker_unreadable',
-  }), {
-    kind: 'incident',
-    reviewReady: false,
-    exitCode: 1,
-    reason: 'owned_draft_recovery_failed:marker_unreadable',
+test('Telegram copy exposes only the three plain-language stock outcomes', () => {
+  const reflected = buildScheduledStockNotification({
+    outcome: { kind: 'review-ready' },
+    dashboardUrl: 'https://aisoukai-media.vercel.app/admin/pending-review',
   })
-  assert.equal(classifyPreGenerationFailure({
-    stage: 'no_generate',
-    reason: 'manual_skip',
-  }), null)
+  const pending = buildScheduledStockNotification({ outcome: { kind: 'stocked-pending-sync' } })
+  const failure = buildScheduledFailureNotification()
 
-  const recoveryFailureIndex = source.indexOf('if (!draftRecoveryResult.ok)')
-  const incidentIndex = source.indexOf('scheduledOutcome = classifyPreGenerationFailure({', recoveryFailureIndex)
-  const stageIndex = source.indexOf("stage: 'owned_draft_recovery'", incidentIndex)
-  const exitIndex = source.indexOf('process.exitCode = scheduledOutcome.exitCode', stageIndex)
-  const gitReadinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness({ ownedDraftPath')
-  assert.ok(recoveryFailureIndex > 0)
-  assert.ok(incidentIndex > recoveryFailureIndex)
-  assert.ok(stageIndex > incidentIndex)
-  assert.ok(exitIndex > stageIndex)
-  assert.ok(gitReadinessIndex < recoveryFailureIndex)
+  assert.equal(reflected, '新しい記事を1件ストックしました。管理画面で確認できます。\nhttps://aisoukai-media.vercel.app/admin/pending-review')
+  assert.equal(pending, '新しい記事を1件ストックしました。管理画面への反映待ちです。')
+  assert.equal(failure, '記事ストックを更新できませんでした。次回再試行します。')
+  assert.match(reflected, /admin\/pending-review/)
+  assert.doesNotMatch(pending, /https?:\/\//)
+  for (const text of [reflected, pending, failure]) {
+    assert.doesNotMatch(text, /Git|git|dirty|commit|exit|code|コード|ログ|HEAD|branch|push/i)
+  }
+
+  const notificationSource = readFileSync('scripts/lib/scheduled-draft-notification.mjs', 'utf8')
+  for (const name of ['buildScheduledStockNotification', 'buildScheduledFailureNotification']) {
+    assert.doesNotMatch(functionDeclaration(notificationSource, name), /終了コード|Git同期|dirty|commit|ログを確認/)
+  }
 })
 
-test('ops:mwf promotes Git readiness failure to a fail-closed incident', () => {
+test('Git-only pending sends a normal deduplicated stock update, never an incident notification', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const classifyPreGenerationFailure = loadPureFunction(source, 'classifyPreGenerationFailure')
+  const notificationSource = readFileSync('scripts/lib/scheduled-draft-notification.mjs', 'utf8')
+  assert.match(source, /shouldSendStockUpdateNotification\(scheduledOutcome\)/)
+  assert.match(notificationSource, /ops-mwf-stock-update/)
+  assert.match(notificationSource, /ops-mwf-review-request/)
+  assert.match(notificationSource, /ops-mwf-incident/)
+  assert.match(source, /reserveNotificationSend/)
+  assert.match(source, /reservation\.commit\(\)/)
+  assert.match(source, /reservation\.release\(\)/)
+})
 
-  assert.deepEqual(classifyPreGenerationFailure({
-    stage: 'git_readiness',
-    reason: 'origin_behind',
-  }), {
-    kind: 'incident',
-    reviewReady: false,
-    exitCode: 1,
-    reason: 'git_readiness_failed:origin_behind',
+test('true generation or stocking failures use the failure update and retain nonzero exit', () => {
+  const generationFailure = classifyScheduledDraftOutcome({
+    childStatus: 17,
+    scheduledResult: { ok: false, generated: false },
+  })
+  const stockFailure = classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: { ok: true, generated: true },
+    stockResult: { ok: false, stocked: false, reason: 'unsafe path' },
+  })
+  assert.equal(generationFailure.kind, 'incident')
+  assert.equal(generationFailure.exitCode, 17)
+  assert.equal(stockFailure.kind, 'incident')
+  assert.equal(stockFailure.exitCode, 1)
+  assert.equal(shouldSendScheduledIncidentNotification(stockFailure), true)
+})
+
+test('child signal and exit evidence is preserved before stock handling and already-live checks', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const normalizeSpawnSyncResult = loadPureFunction(source, 'normalizeSpawnSyncResult')
+  const attachChildRunEvidence = loadPureFunction(source, 'attachChildRunEvidence')
+  for (const [signal, exitCode] of [['SIGINT', 130], ['SIGTERM', 143]]) {
+    const child = normalizeSpawnSyncResult({ status: null, signal, error: undefined })
+    const outcome = attachChildRunEvidence(classifyScheduledDraftOutcome({
+      childStatus: child.status,
+      scheduledResult: { ok: false, generated: false },
+    }), child)
+    assert.equal(child.status, exitCode)
+    assert.equal(outcome.exitCode, exitCode)
+    assert.equal(outcome.childSignal, signal)
+    assert.match(outcome.reason, new RegExp(`${signal}.*exit ${exitCode}`))
+  }
+  assert.deepEqual(normalizeSpawnSyncResult({ status: 17, signal: null }), {
+    status: 17,
+    signal: null,
+    termination: null,
+  })
+  assert.deepEqual(normalizeSpawnSyncResult({ status: null, signal: null }), {
+    status: 1,
+    signal: null,
+    termination: 'unknown_result',
   })
 
-  const gitReadinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness()')
-  const readinessFailureIndex = source.indexOf('if (!gitReadiness.ok)', gitReadinessIndex)
-  const incidentIndex = source.indexOf('scheduledOutcome = classifyPreGenerationFailure({', readinessFailureIndex)
-  const stageIndex = source.indexOf("stage: 'git_readiness'", incidentIndex)
-  const exitIndex = source.indexOf('process.exitCode = scheduledOutcome.exitCode', stageIndex)
-  const syncHeaderIndex = source.indexOf("header('1/3  ネタリスト selected 同期')")
-  assert.ok(gitReadinessIndex > 0)
-  assert.ok(readinessFailureIndex > gitReadinessIndex)
-  assert.ok(incidentIndex > readinessFailureIndex)
-  assert.ok(stageIndex > incidentIndex)
-  assert.ok(exitIndex > stageIndex)
-  assert.ok(exitIndex < syncHeaderIndex)
+  const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'")
+  const outcomeIndex = source.indexOf('scheduledOutcome = attachChildRunEvidence(classifyScheduledDraftOutcome', generationIndex)
+  const stockIndex = source.indexOf('const prepared = prepareGeneratedDraftForHumanPush', outcomeIndex)
+  const alreadyLiveIndex = source.indexOf('const alreadyLiveNoop = alreadyLiveTodayNoop', stockIndex)
+  assert.ok(outcomeIndex > generationIndex)
+  assert.ok(stockIndex > outcomeIndex)
+  assert.ok(alreadyLiveIndex > stockIndex)
+  assert.doesNotMatch(source, /if \(alreadyLiveTodayNoop[\s\S]{0,120}process\.exitCode = 0/)
+  assert.doesNotMatch(source, /process\.exitCode = 0/)
 })
 
-test('ops:mwf has a process lock to prevent cron and launchd double generation', () => {
+test('ops:mwf never pushes, approves, or publishes and rejects auto-publish', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const commitSource = readFileSync('scripts/lib/scheduled-draft-commit.mjs', 'utf8')
+  assert.match(source, /ops:mwf では --auto-publish を受け付けません/)
+  assert.match(source, /approve \/ publish は実行していません/)
+  assert.doesNotMatch(source, /git', \['push'/)
+  assert.doesNotMatch(commitSource, /git', \['push'/)
+  assert.doesNotMatch(source, /approve-post|publish-post|auto-review-post/)
+  assert.doesNotMatch(commitSource, /runCommand\('(?:approve|publish)'/)
+})
+
+test('ops:mwf preserves process lock, weekday, no-generate, already-live, and child-failure semantics', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
   const gitignore = readFileSync('.gitignore', 'utf8')
-
-  assert.match(source, /ops-mwf\.lock/)
-  assert.match(source, /acquireRunLock/)
   assert.match(source, /openSync\(LOCK_PATH, 'wx'\)/)
   assert.match(source, /別の ops:mwf が実行中です/)
   assert.match(source, /process\.on\('exit', releaseRunLock\)/)
+  assert.match(source, /SEND_DAYS/)
+  assert.match(source, /--no-generate/)
+  assert.match(source, /OPENAI_API_KEY 未設定/)
+  assert.match(source, /alreadyLiveTodayNoop/)
+  assert.match(source, /normalizeSpawnSyncResult/)
   assert.match(gitignore, /^logs\/ops-mwf\.lock$/m)
-})
-
-test('ops:mwf locally commits only provenance-marked drafts after Git preflight and never pushes', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const gitignore = readFileSync('.gitignore', 'utf8')
-
-  assert.match(source, /rememberGeneratedDraft/)
-  assert.match(source, /readOwnedGeneratedDraftMarker/)
-  assert.match(source, /recoverOwnedGeneratedDraft/)
-  assert.match(source, /classifyOwnedDraftStatus/)
-  assert.match(source, /classifyOwnedDraftStatus\(status\.output, ownedDraftPath\)/)
-  assert.match(source, /prepareGeneratedDraftForHumanPush/)
-  assert.match(source, /assertGitReady: \(marker\) => checkScheduledGitReadiness\(\{ ownedDraftPath: marker\.path \}\)/)
-  assert.match(source, /Human push待ち/)
   assert.match(gitignore, /^logs\/ops-mwf-owned-draft\.json$/m)
-  assert.match(gitignore, /^logs\/ops-mwf-owned-draft\.json\.\*\.tmp$/m)
-  assert.doesNotMatch(source, /git', \['add'/)
-  assert.doesNotMatch(source, /git', \['commit'/)
-  assert.doesNotMatch(source, /git', \['push'/)
 })
 
-test('ops:mwf completes remote preflight before stale-marker recovery and before generation', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  const markerIndex = source.indexOf('const ownedMarker = readOwnedGeneratedDraftMarker(ROOT)')
-  const preflightIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness', markerIndex)
-  const recoveryIndex = source.indexOf('draftRecoveryResult = recoverOwnedGeneratedDraft', preflightIndex)
-  const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'", recoveryIndex)
-  assert.ok(markerIndex > 0)
-  assert.ok(preflightIndex > markerIndex)
-  assert.ok(recoveryIndex > preflightIndex)
-  assert.ok(generationIndex > recoveryIndex)
-  assert.match(source, /draftRecoveryResult\.recovered/)
-  assert.match(source, /acquireRunLock/)
-})
-
-test('ops:mwf suppresses the review request when owned-draft recovery fails', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /draftSyncResult = draftRecoveryResult/)
-  assert.match(source, /shouldSendDraftReviewNotification\(scheduledOutcome\)/)
-  assert.match(source, /レビュー可能な生成下書きがないためTelegramレビュー依頼は送信しません/)
-  const syncFailure = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: false },
-  })
-  assert.equal(shouldSendDraftReviewNotification(syncFailure), false)
-})
-
-test('ops:mwf requires a confirmed local draft commit before review notification classification', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /function requireCommittedDraftSync/)
-  assert.match(source, /draftSyncResult\.committed !== true/)
-  assert.match(source, /local commitを確認できないためレビュー通知を停止/)
-  assert.match(source, /draftSyncResult = requireCommittedDraftSync\(draftSyncResult\)/)
-
-  const guardIndex = source.indexOf('draftSyncResult.committed !== true')
-  const classifyIndex = source.lastIndexOf('scheduledOutcome = classifyScheduledDraftOutcome')
-  assert.ok(guardIndex > 0)
-  assert.ok(classifyIndex > guardIndex)
-})
-
-test('ops:mwf stops before generation only when Git is dirty, behind, diverged, or unreadable', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const readinessSource = readFileSync('scripts/lib/scheduled-git-readiness.mjs', 'utf8')
-
-  assert.match(source, /git', \['status', '--porcelain'\]/)
-  assert.match(source, /git', \['fetch', 'origin', 'main'\]/)
-  assert.match(source, /git', \['rev-list', '--left-right', '--count', 'HEAD\.\.\.origin\/main'\]/)
-  assert.match(source, /Git同期が安全でないため記事生成を停止/)
-  assert.match(source, /Git: branch \$\{details\.branch/)
-  assert.match(source, /Human push待ち/)
-  assert.match(readinessSource, /未commit変更があります/)
-  assert.match(readinessSource, /GitHub側に未取得commitがあります/)
-  assert.match(readinessSource, /origin\/mainと整合しています/)
-  assert.match(readinessSource, /Human push待ち/)
-
-  const readinessIndex = source.indexOf('gitReadiness = checkScheduledGitReadiness')
-  const scheduledIndex = source.indexOf("run('scheduled-article-flow.mjs'")
-  assert.ok(readinessIndex > 0)
-  assert.ok(scheduledIndex > readinessIndex)
-})
-
-test('ops:mwf launchd setup uses the GUI domain APIs for only its own job', () => {
+test('launchd setup remains scoped to its own GUI job and uses normal reviewed mode', () => {
   const source = readFileSync('scripts/setup-launchd-mwf.mjs', 'utf8')
-
   assert.match(source, /return `gui\/\$\{process\.getuid\(\)\}`/)
   assert.match(source, /runLaunchctl\(\['print', `\$\{launchdDomain\(\)\}\/\$\{LABEL\}`\]\)/)
   assert.match(source, /runLaunchctl\(\['bootout', launchdDomain\(\), PLIST_PATH\]\)/)
   assert.match(source, /runLaunchctl\(\['bootstrap', launchdDomain\(\), PLIST_PATH\]\)/)
   assert.doesNotMatch(source, /runLaunchctl\(\['(?:list|load|unload)'/)
   assert.doesNotMatch(source, /com\.mitani\.aisoukai-media-(?:telegram-ops|media)/)
-})
-
-test('ops:mwf launchd uses the approved normal mode without bypassing review safeguards', () => {
-  const source = readFileSync('scripts/setup-launchd-mwf.mjs', 'utf8')
-
   assert.ok(source.includes('<string>--force</string>'))
   assert.doesNotMatch(source, /<string>--dry-run<\/string>/)
-  assert.match(source, /Git preflight と記事レビュー境界は ops-mwf 側で維持/)
   assert.match(source, /通常生成/)
 })
 
-test('ops:mwf guards duplicate Telegram review notifications by date, job, and text', () => {
+test('Telegram dedupe reserves only after credentials and commits only after successful send', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /reserveNotificationSend/)
-  assert.match(source, /ops-mwf-review-request/)
-  assert.match(source, /同一日・同一job・同一本文の重複/)
-  assert.match(source, /reservation\.commit\(\)/)
-  assert.match(source, /reservation\.release\(\)/)
-
-  const envCheckIndex = source.indexOf('if (!botToken || !chatId)')
-  const reserveIndex = source.indexOf('const reservation = reserveNotificationSend')
-  const sendIndex = source.indexOf('await sendTelegram')
-  assert.ok(envCheckIndex > 0)
-  assert.ok(reserveIndex > envCheckIndex)
+  const envIndex = source.indexOf('if (!botToken || !chatId)')
+  const reserveIndex = source.indexOf('const reservation = reserveNotificationSend', envIndex)
+  const sendIndex = source.indexOf('await sendTelegram', reserveIndex)
+  const commitIndex = source.indexOf('reservation.commit()', sendIndex)
+  const releaseIndex = source.indexOf('reservation.release()', commitIndex)
+  assert.ok(envIndex > 0)
+  assert.ok(reserveIndex > envIndex)
   assert.ok(sendIndex > reserveIndex)
+  assert.ok(commitIndex > sendIndex)
+  assert.ok(releaseIndex > commitIndex)
+  assert.match(source, /同一日・同一job・同一本文の重複/)
 })
 
-test('ops:mwf uses separate copy and dedupe identity for incident notifications', () => {
+test('ops:mwf fallback occurs after the legacy topic pool is exhausted and before durable stocking', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const notificationSource = readFileSync('scripts/lib/scheduled-draft-notification.mjs', 'utf8')
-
-  assert.match(source, /buildScheduledIncidentNotification/)
-  assert.match(source, /月水金の記事生成インシデント/)
-  assert.match(source, /Telegramレビュー依頼は送信していません/)
-  assert.match(notificationSource, /ops-mwf-incident/)
-  assert.match(notificationSource, /ops-mwf-review-request/)
-  assert.match(source, /shouldSendScheduledIncidentNotification/)
+  const generationIndex = source.indexOf("run('scheduled-article-flow.mjs'")
+  const fallbackIndex = source.indexOf('runThemeOpsFallback({')
+  const prepareCallIndex = source.indexOf('const prepared = prepareGeneratedDraftForHumanPush', fallbackIndex)
+  assert.ok(fallbackIndex > generationIndex)
+  assert.ok(prepareCallIndex > fallbackIndex)
+  assert.match(source, /isLegacyTopicPoolExhausted/)
+  assert.match(source, /未生成 approved topic はありません/)
 })
 
-test('ops:mwf preserves child exit ordering and never lets already-live reset an incident', () => {
+test('ops:mwf dry-run exits before queue, generation, Git, and notification effects', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  const childRunIndex = source.indexOf("run('scheduled-article-flow.mjs'")
-  const outcomeIndex = source.indexOf('scheduledOutcome = attachChildRunEvidence(classifyScheduledDraftOutcome')
-  const syncIndex = source.indexOf('draftSyncResult = prepareGeneratedDraftForHumanPush')
-  const alreadyLiveIndex = source.indexOf('const alreadyLiveNoop = alreadyLiveTodayNoop')
-
-  assert.ok(childRunIndex < outcomeIndex)
-  assert.ok(outcomeIndex < syncIndex)
-  assert.ok(syncIndex < alreadyLiveIndex)
-  assert.match(source, /normalizeSpawnSyncResult\(result\)/)
-  assert.match(source, /process\.exitCode = scheduledOutcome\.exitCode/)
-  assert.doesNotMatch(source, /if \(alreadyLiveTodayNoop[\s\S]{0,120}process\.exitCode = 0/)
-  assert.doesNotMatch(source, /process\.exitCode = 0/)
-
-  const incident = classifyScheduledDraftOutcome({
-    childStatus: 17,
-    scheduledResult: { ok: false, generated: false },
-  })
-  assert.equal(incident.exitCode, 17)
-  assert.equal(shouldSendDraftReviewNotification(incident), false)
-})
-
-test('ops:mwf preserves signal, nonzero, and malformed child results as distinct fail-closed incidents', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const normalizeSpawnSyncResult = loadPureFunction(source, 'normalizeSpawnSyncResult')
-  const attachChildRunEvidence = loadPureFunction(source, 'attachChildRunEvidence')
-
-  for (const [signal, expectedExit] of [['SIGINT', 130], ['SIGTERM', 143]]) {
-    const childRunResult = normalizeSpawnSyncResult({ status: null, signal, error: undefined })
-    const outcome = attachChildRunEvidence(classifyScheduledDraftOutcome({
-      childStatus: childRunResult.status,
-      scheduledResult: { ok: false, generated: false },
-    }), childRunResult)
-
-    assert.equal(childRunResult.status, expectedExit)
-    assert.equal(childRunResult.termination, `signal_${signal}`)
-    assert.equal(outcome.kind, 'incident')
-    assert.equal(outcome.exitCode, expectedExit)
-    assert.equal(outcome.childSignal, signal)
-    assert.match(outcome.reason, new RegExp(`${signal}.*exit ${expectedExit}`))
-    assert.equal(shouldSendDraftReviewNotification(outcome), false)
+  const dryRunIndex = source.indexOf("const dryRun = cliArgs.includes('--dry-run')")
+  const exitIndex = source.indexOf('process.exit(0)', dryRunIndex)
+  for (const sideEffect of [
+    'const runLock = acquireRunLock()',
+    'loadEnv()',
+    "run('convert-selected-topics.mjs'",
+    "run('scheduled-article-flow.mjs'",
+    'await sendOpsTelegram',
+  ]) {
+    assert.ok(source.indexOf(sideEffect) > exitIndex, sideEffect)
   }
-
-  const nonzero = normalizeSpawnSyncResult({ status: 17, signal: null, error: undefined })
-  const nonzeroOutcome = classifyScheduledDraftOutcome({
-    childStatus: nonzero.status,
-    scheduledResult: { ok: false, generated: false },
-  })
-  assert.deepEqual(nonzero, { status: 17, signal: null, termination: null })
-  assert.equal(nonzeroOutcome.kind, 'incident')
-  assert.equal(nonzeroOutcome.exitCode, 17)
-
-  const unknown = normalizeSpawnSyncResult({ status: null, signal: null, error: undefined })
-  const malformedOutcome = classifyScheduledDraftOutcome({ childStatus: 0, scheduledResult: {} })
-  assert.deepEqual(unknown, { status: 1, signal: null, termination: 'unknown_result' })
-  assert.equal(malformedOutcome.kind, 'incident')
-  assert.equal(malformedOutcome.exitCode, 1)
-  assert.match(malformedOutcome.reason, /結果JSONが不正/)
+  assert.ok(source.includes('"queue_mutated":false'))
+  assert.ok(source.includes('"notified":false'))
 })
 
-test('ops:mwf reports already-live today posts before no-topic notifications', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /loadContentStatus/)
-  assert.match(source, /findTodayLivePosts/)
-  assert.match(source, /alreadyLiveTodayNoop/)
-  assert.match(source, /本日公開対象の記事は既に公開中です/)
-  assert.match(source, /新規下書き生成: なし/)
-  assert.match(source, /本日分は公開済みのためTelegramレビュー依頼は送信しません/)
-  assert.doesNotMatch(source, /process\.exitCode = 0/)
-
-  const todayLiveIndex = source.indexOf('const todayLivePosts = findTodayLivePosts')
-  const alreadyLiveIndex = source.indexOf('本日公開対象の記事は既に公開中です')
-  const noTopicIndex = source.indexOf('本日配信予定の未承認記事はありません。')
-  assert.ok(todayLiveIndex > 0)
-  assert.ok(alreadyLiveIndex > todayLiveIndex)
-  assert.ok(noTopicIndex > alreadyLiveIndex)
+test('review request requires stocking and exact local reflection evidence', () => {
+  const missingSync = classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: { ok: true, generated: true },
+    stockResult: { ok: true, stocked: true },
+    draftSyncResult: { ok: true, committed: false },
+  })
+  assert.equal(missingSync.kind, 'stocked-pending-sync')
+  assert.equal(missingSync.exitCode, 0)
+  assert.equal(shouldSendDraftReviewNotification(missingSync), false)
+  assert.equal(shouldSendStockUpdateNotification(missingSync), true)
 })

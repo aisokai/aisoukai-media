@@ -5,141 +5,109 @@ import {
   scheduledDraftNotificationBoundary,
   shouldSendDraftReviewNotification,
   shouldSendScheduledIncidentNotification,
+  shouldSendStockUpdateNotification,
 } from '../scripts/lib/scheduled-draft-notification.mjs'
 
-test('only a zero-exit generated draft with successful sync is review-ready', () => {
-  const awaitingSync = classifyScheduledDraftOutcome({
+const generated = { ok: true, generated: true }
+const stocked = { ok: true, stocked: true }
+
+test('a generated draft is not classified for notification until durable stocking is recorded', () => {
+  const outcome = classifyScheduledDraftOutcome({ childStatus: 0, scheduledResult: generated })
+  assert.equal(outcome.kind, 'generated-awaiting-stock')
+  assert.equal(outcome.exitCode, 0)
+  assert.equal(scheduledDraftNotificationBoundary(outcome).shouldSend, false)
+})
+
+test('successful stocking and local reflection sends the review-ready update', () => {
+  const outcome = classifyScheduledDraftOutcome({
     childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-  })
-  const reviewReady = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
+    scheduledResult: generated,
+    stockResult: stocked,
     draftSyncResult: { ok: true, committed: true },
   })
-
-  assert.equal(awaitingSync.kind, 'generated-awaiting-sync')
-  assert.equal(shouldSendDraftReviewNotification(awaitingSync), false)
-  assert.equal(reviewReady.kind, 'review-ready')
-  assert.equal(reviewReady.exitCode, 0)
-  assert.equal(reviewReady.generated, true)
-  assert.equal(reviewReady.syncSucceeded, true)
-  assert.equal(reviewReady.syncCommitted, true)
-  assert.equal(shouldSendDraftReviewNotification(reviewReady), true)
-  assert.deepEqual(scheduledDraftNotificationBoundary(reviewReady), {
+  assert.equal(outcome.kind, 'review-ready')
+  assert.equal(outcome.exitCode, 0)
+  assert.equal(shouldSendDraftReviewNotification(outcome), true)
+  assert.equal(shouldSendStockUpdateNotification(outcome), false)
+  assert.deepEqual(scheduledDraftNotificationBoundary(outcome), {
     kind: 'review-request',
     shouldSend: true,
     job: 'ops-mwf-review-request',
   })
 })
 
-test('nonzero and normalized signal exits are incidents preserving their exact exit code', () => {
-  for (const childStatus of [1, 2, 17, 130, 143]) {
+test('Git-only sync inability is an exit-zero stocked update and never an incident', () => {
+  for (const draftSyncResult of [
+    { ok: false, reason: 'foreign tracked change' },
+    { ok: false, reason: 'foreign untracked change' },
+    { ok: false, reason: 'foreign staged change' },
+    { ok: false, reason: 'behind' },
+    { ok: false, reason: 'diverged' },
+    { ok: false, reason: 'fetch failure' },
+    { ok: false, reason: 'index lock' },
+    { ok: false, reason: 'unknown status' },
+  ]) {
     const outcome = classifyScheduledDraftOutcome({
-      childStatus,
-      scheduledResult: { ok: false, generated: false },
+      childStatus: 0,
+      scheduledResult: generated,
+      stockResult: stocked,
+      draftSyncResult,
     })
-    assert.equal(outcome.kind, 'incident')
-    assert.equal(outcome.exitCode, childStatus)
-    assert.equal(shouldSendDraftReviewNotification(outcome), false)
-    assert.equal(shouldSendScheduledIncidentNotification(outcome), true)
-    assert.equal(scheduledDraftNotificationBoundary(outcome).job, 'ops-mwf-incident')
+    assert.equal(outcome.kind, 'stocked-pending-sync')
+    assert.equal(outcome.exitCode, 0)
+    assert.equal(shouldSendScheduledIncidentNotification(outcome), false)
+    assert.equal(shouldSendStockUpdateNotification(outcome), true)
+    assert.deepEqual(scheduledDraftNotificationBoundary(outcome), {
+      kind: 'stock-update',
+      shouldSend: true,
+      job: 'ops-mwf-stock-update',
+    })
   }
 })
 
-test('null and malformed child results fail closed as incidents', () => {
-  const cases = [
-    { childStatus: null, scheduledResult: { ok: true, generated: true } },
+test('only inability to stock or generation failure is an incident', () => {
+  const stockFailure = classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: generated,
+    stockResult: { ok: false, stocked: false, reason: 'unsafe path' },
+  })
+  assert.equal(stockFailure.kind, 'incident')
+  assert.equal(stockFailure.exitCode, 1)
+  assert.equal(shouldSendScheduledIncidentNotification(stockFailure), true)
+
+  for (const childStatus of [1, 2, 17, 130, 143]) {
+    const failure = classifyScheduledDraftOutcome({
+      childStatus,
+      scheduledResult: { ok: false, generated: false },
+    })
+    assert.equal(failure.kind, 'incident')
+    assert.equal(failure.exitCode, childStatus)
+  }
+})
+
+test('malformed child results fail closed and no-draft remains a quiet success', () => {
+  for (const input of [
+    { childStatus: null, scheduledResult: generated },
     { childStatus: 0, scheduledResult: null },
     { childStatus: 0, scheduledResult: {} },
     { childStatus: 0, scheduledResult: { ok: true, generated: 'yes' } },
     { childStatus: 0, scheduledResult: { ok: false, generated: true } },
-  ]
-
-  for (const input of cases) {
+  ]) {
     const outcome = classifyScheduledDraftOutcome(input)
     assert.equal(outcome.kind, 'incident')
     assert.equal(outcome.exitCode, 1)
-    assert.equal(shouldSendDraftReviewNotification(outcome), false)
   }
-})
 
-test('no-draft and sync-failure outcomes have zero review-request sends', () => {
   const noDraft = classifyScheduledDraftOutcome({
     childStatus: 0,
     scheduledResult: { ok: true, generated: false },
   })
-  const syncFailure = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: false, reason: 'test failure' },
-  })
-  const skippedSync = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: true, committed: true, skipped: true },
-  })
-  const uncommittedSync = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: true, committed: false },
-  })
-  const incompleteSync = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: true },
-  })
-  const malformedSkippedSync = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: true, committed: true, skipped: 'no' },
-  })
-
   assert.equal(noDraft.kind, 'no-draft')
   assert.equal(noDraft.exitCode, 0)
   assert.equal(scheduledDraftNotificationBoundary(noDraft).shouldSend, false)
-  assert.equal(syncFailure.kind, 'sync-failure')
-  assert.equal(syncFailure.exitCode, 1)
-  assert.equal(shouldSendDraftReviewNotification(syncFailure), false)
-  assert.equal(shouldSendScheduledIncidentNotification(syncFailure), true)
-  assert.equal(skippedSync.kind, 'sync-failure')
-  assert.equal(uncommittedSync.kind, 'sync-failure')
-  assert.equal(incompleteSync.kind, 'sync-failure')
-  assert.equal(malformedSkippedSync.kind, 'sync-failure')
-  assert.equal(shouldSendDraftReviewNotification(uncommittedSync), false)
-  assert.equal(shouldSendDraftReviewNotification(incompleteSync), false)
 })
 
-test('review notification boundary rejects incomplete review-ready shapes', () => {
-  const incompleteReviewReady = {
-    kind: 'review-ready',
-    reviewReady: true,
-    exitCode: 0,
-  }
-
-  assert.equal(shouldSendDraftReviewNotification(incompleteReviewReady), false)
-  assert.deepEqual(scheduledDraftNotificationBoundary(incompleteReviewReady), {
-    kind: 'suppressed',
-    shouldSend: false,
-    job: null,
-  })
-})
-
-test('review requests and incidents use separate stable dedupe identities', () => {
-  const reviewReady = classifyScheduledDraftOutcome({
-    childStatus: 0,
-    scheduledResult: { ok: true, generated: true },
-    draftSyncResult: { ok: true, committed: true },
-  })
-  const incident = classifyScheduledDraftOutcome({
-    childStatus: 7,
-    scheduledResult: { ok: false, generated: false },
-  })
-
-  assert.equal(scheduledDraftNotificationBoundary(reviewReady).job, 'ops-mwf-review-request')
-  assert.equal(scheduledDraftNotificationBoundary(incident).job, 'ops-mwf-incident')
-  assert.notEqual(
-    scheduledDraftNotificationBoundary(reviewReady).job,
-    scheduledDraftNotificationBoundary(incident).job,
-  )
+test('notification boundaries reject incomplete forged outcome shapes', () => {
+  assert.equal(shouldSendDraftReviewNotification({ kind: 'review-ready', reviewReady: true, exitCode: 0 }), false)
+  assert.equal(shouldSendStockUpdateNotification({ kind: 'stocked-pending-sync', exitCode: 0 }), false)
 })

@@ -2,14 +2,14 @@
 // ops-mwf.mjs
 // 月水金 08:30 の定期記事生成 CLI。
 // やることは 1) selected ネタを承認済み topic に同期 2) 承認済み topic から1記事生成
-// 3) Git が clean / origin 同期済みの時だけ画像設定済みの下書きとして保存
-// 4) 生成下書きはローカル保存まで。Git commit / push は Human が明示操作する。
-// 5) Telegram で Human review / approval を依頼、のみ。
+// 3) Git 状態にかかわらず画像設定済みの下書きをローカルにストック
+// 4) ストック後に安全な場合だけ管理対象draftをlocal commit（pushは常にHuman操作）
+// 5) Telegram ではストック結果と管理画面への反映有無だけを通知。
 // approve / publish / Telegram request 取得は実行しない。
 import { spawnSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
@@ -18,14 +18,16 @@ import { runThemeOpsFallback } from './lib/theme-ops-fallback.mjs'
 import { assessScheduledGitReadiness } from './lib/scheduled-git-readiness.mjs'
 import {
   classifyOwnedDraftStatus,
-  readOwnedGeneratedDraftMarker,
   recoverOwnedGeneratedDraft,
   rememberGeneratedDraft,
 } from './lib/scheduled-draft-commit.mjs'
 import {
+  buildScheduledFailureNotification,
+  buildScheduledStockNotification,
   classifyScheduledDraftOutcome,
   scheduledDraftNotificationBoundary,
   shouldSendDraftReviewNotification,
+  shouldSendStockUpdateNotification,
   shouldSendScheduledIncidentNotification,
 } from './lib/scheduled-draft-notification.mjs'
 
@@ -181,18 +183,6 @@ function classifyTopicSyncFailure(childRunResult) {
   return incident
 }
 
-function classifyPreGenerationFailure(input) {
-  const stage = input?.stage
-  const reason = input?.reason
-  if (!['owned_draft_recovery', 'git_readiness'].includes(stage)) return null
-  return {
-    kind: 'incident',
-    reviewReady: false,
-    exitCode: 1,
-    reason: `${stage}_failed:${String(reason ?? 'unknown')}`,
-  }
-}
-
 function run(script, extraArgs = []) {
   const result = spawnSync(
     process.execPath,
@@ -228,16 +218,22 @@ function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
   }
 }
 
-function checkScheduledGitReadiness({ ownedDraftPath = null } = {}) {
+function checkScheduledGitReadiness({ ownedDraftPaths = [] } = {}) {
   const status = runCommand('git', ['status', '--porcelain'])
   const branch = runCommand('git', ['branch', '--show-current'])
   const head = runCommand('git', ['rev-parse', '--short', 'HEAD'])
+  const gitPath = runCommand('git', ['rev-parse', '--git-path', 'index.lock'])
+  const resolvedGitPath = gitPath.ok && gitPath.output
+    ? (isAbsolute(gitPath.output) ? gitPath.output : resolve(ROOT, gitPath.output))
+    : join(ROOT, '.git', 'index.lock')
   const statusLines = status.output.split('\n').filter((line) => line.trim().length > 0)
-  const ownedDraftOnly = ownedDraftPath && classifyOwnedDraftStatus(status.output, ownedDraftPath)
+  const ownedDraftOnly = ownedDraftPaths.length > 0
+    ? classifyOwnedDraftStatus(status.output, ownedDraftPaths)
+    : (statusLines.length === 0 ? {} : null)
   const base = {
     statusOk: status.ok,
     dirtyCount: ownedDraftOnly ? 0 : statusLines.length,
-    indexLockPresent: existsSync(join(ROOT, '.git', 'index.lock')),
+    indexLockPresent: existsSync(resolvedGitPath),
     branch: branch.ok && branch.output ? branch.output : '不明',
     head: head.ok && head.output ? head.output : '不明',
   }
@@ -271,26 +267,24 @@ function isLegacyTopicPoolExhausted(status, result) {
 
 function prepareGeneratedDraftForHumanPush(scheduledResult) {
   if (!scheduledResult?.generated) {
-    return { ok: true, skipped: true, reason: 'generated=false' }
-  }
-  const remembered = rememberGeneratedDraft({ root: ROOT, scheduledResult })
-  if (!remembered.ok) return remembered
-  return recoverOwnedGeneratedDraft({
-    root: ROOT,
-    runCommand,
-    assertGitReady: (marker) => checkScheduledGitReadiness({ ownedDraftPath: marker.path }),
-  })
-}
-
-function requireCommittedDraftSync(draftSyncResult) {
-  if (draftSyncResult?.ok === true && draftSyncResult.committed !== true) {
     return {
-      ...draftSyncResult,
-      ok: false,
-      reason: '生成下書きのlocal commitを確認できないためレビュー通知を停止しました',
+      stockResult: { ok: true, stocked: false, skipped: true, reason: 'generated=false' },
+      draftSyncResult: { ok: true, skipped: true, reason: 'generated=false' },
+      gitReadiness: { ok: true, reason: 'generated=false' },
     }
   }
-  return draftSyncResult
+  const stockResult = rememberGeneratedDraft({ root: ROOT, scheduledResult })
+  if (!stockResult.ok) {
+    return { stockResult, draftSyncResult: null, gitReadiness: null }
+  }
+  const ownedDraftPaths = stockResult.ledger.entries.map((entry) => entry.path)
+  const gitReadiness = checkScheduledGitReadiness({ ownedDraftPaths })
+  const draftSyncResult = recoverOwnedGeneratedDraft({
+    root: ROOT,
+    runCommand,
+    assertGitReady: () => gitReadiness,
+  })
+  return { stockResult, draftSyncResult, gitReadiness }
 }
 
 function readJsonIfExists(path) {
@@ -389,60 +383,22 @@ function alreadyLiveTodayNoop({ scheduledResult, contentStatus }) {
   return scheduledResult?.generated === false && findTodayLivePosts(contentStatus).length > 0
 }
 
-function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult, gitReadiness }) {
+function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, scheduledOutcome }) {
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
-  const lines = ['📝 月水金の記事生成']
 
   if (!generateDecision.ok) {
-    lines.push('記事生成は実行していません。')
-    lines.push(`理由: ${generateDecision.reason}`)
-    if (gitReadiness?.ok === false) {
-      const details = gitReadiness.details ?? {}
-      lines.push(`Git: branch ${details.branch ?? '不明'} / HEAD ${details.head ?? '不明'}`)
-      if (details.aheadSummary) lines.push(details.aheadSummary)
-      if (details.ahead > 0) lines.push('定期処理はGit pushを実行しません。Human push待ちです。')
-    }
-    return lines.join('\n')
+    return buildScheduledFailureNotification()
   }
 
   if (!scheduledResult) {
-    lines.push('⚠️ 記事生成結果を確認できませんでした。')
-    lines.push('ログを確認してください。')
-    return lines.join('\n')
+    return buildScheduledFailureNotification()
   }
 
   if (scheduledResult.generated) {
-    const imageOk = scheduledResult.image?.ok === true
-    lines.push(imageOk
-      ? '本日配信予定の記事を生成しました。本文確認・承認をお願いします。'
-      : '記事は生成しましたが、画像設定の確認が必要です。')
-    if (scheduledResult.title) lines.push(`記事: ${scheduledResult.title}`)
-    if (scheduledResult.publishAt) lines.push(`公開予定日: ${scheduledResult.publishAt}`)
-    if (scheduledResult.topicId) lines.push(`topic: ${scheduledResult.topicId}`)
-    if (scheduledResult.slug) lines.push(`slug: ${scheduledResult.slug}`)
-    lines.push(`画像: ${imageOk ? '設定済み' : '未設定または要確認'}`)
-    lines.push('')
-    lines.push('本文確認・承認:')
-    lines.push(dashboardUrl)
-    lines.push('')
-    if (draftSyncResult?.ok && !draftSyncResult.skipped) {
-      lines.push('Git同期: Human push待ち（定期処理はpushしません）')
-    } else if (draftSyncResult?.ok && draftSyncResult.skipped) {
-      lines.push(`Git同期: ${draftSyncResult.reason}`)
-    } else if (draftSyncResult) {
-      lines.push('Git同期準備: 失敗（ローカルのみの可能性があります）')
-      lines.push(`同期エラー: ${draftSyncResult.reason}`)
-    }
-
-    const reasons = scheduledResult.reasons ?? []
-    if (reasons.length > 0) {
-      lines.push('')
-      for (const reason of reasons.slice(0, 5)) lines.push(`確認事項: ${reason}`)
-    }
-
-    return lines.join('\n')
+    return buildScheduledStockNotification({ outcome: scheduledOutcome, dashboardUrl })
   }
 
+  const lines = ['📝 月水金の記事生成']
   const todayLivePosts = findTodayLivePosts(contentStatus)
   if (todayLivePosts.length > 0) {
     lines.push('本日公開対象の記事は既に公開中です。')
@@ -468,16 +424,9 @@ function buildReviewRequestNotification({ generateDecision, scheduledResult, con
 }
 
 function buildScheduledIncidentNotification({ scheduledOutcome, scheduledResult }) {
-  const lines = ['🚨 月水金の記事生成インシデント']
-  lines.push(`種別: ${scheduledOutcome.kind}`)
-  lines.push(`終了コード: ${scheduledOutcome.exitCode}`)
-  if (scheduledOutcome.childSignal) lines.push(`signal: ${scheduledOutcome.childSignal}`)
-  if (scheduledOutcome.childTermination) lines.push(`child終了状態: ${scheduledOutcome.childTermination}`)
-  lines.push(`理由: ${scheduledOutcome.reason}`)
-  if (scheduledResult?.topicId) lines.push(`topic: ${scheduledResult.topicId}`)
-  if (scheduledResult?.path) lines.push(`生成候補: ${scheduledResult.path}`)
-  lines.push('Telegramレビュー依頼は送信していません。ログを確認してください。')
-  return lines.join('\n')
+  void scheduledOutcome
+  void scheduledResult
+  return buildScheduledFailureNotification()
 }
 
 loadEnv()
@@ -506,70 +455,17 @@ if (force && !isSendDay) {
 
 let generateDecision = shouldGenerateScheduledArticle()
 let scheduledResult = null
+let stockResult = null
 let draftSyncResult = null
-let gitReadiness = { ok: true, reason: '記事生成なし' }
-let gitPreflightCompleted = false
-let draftRecoveryResult = null
+let gitReadiness = null
 let scheduledChildStatus = null
 let scheduledChildRunResult = null
 let scheduledOutcome = null
-
-if (generateDecision.ok) {
-  if (!existsSync(join(ROOT, '.git', 'index.lock'))) {
-    const ownedMarker = readOwnedGeneratedDraftMarker(ROOT)
-    gitReadiness = checkScheduledGitReadiness({ ownedDraftPath: ownedMarker?.path ?? null })
-    gitPreflightCompleted = true
-    if (!gitReadiness.ok) {
-      generateDecision = { ok: false, reason: `Git同期が安全でないため記事生成を停止: ${gitReadiness.reason}` }
-      scheduledOutcome = classifyPreGenerationFailure({
-        stage: 'git_readiness',
-        reason: gitReadiness.reason,
-      })
-      process.exitCode = scheduledOutcome.exitCode
-    }
-  }
-}
-
-if (generateDecision.ok) {
-  if (!existsSync(join(ROOT, '.git', 'index.lock'))) {
-    draftRecoveryResult = recoverOwnedGeneratedDraft({
-      root: ROOT,
-      runCommand,
-      assertGitReady: () => gitReadiness,
-    })
-    if (!draftRecoveryResult.ok) {
-      draftSyncResult = draftRecoveryResult
-      generateDecision = { ok: false, reason: `管理対象draftの回復を停止: ${draftRecoveryResult.reason}` }
-      scheduledOutcome = classifyPreGenerationFailure({
-        stage: 'owned_draft_recovery',
-        reason: draftRecoveryResult.reason,
-      })
-      process.exitCode = scheduledOutcome.exitCode
-    } else if (draftRecoveryResult.recovered) {
-      console.log(`  ✅ ${draftRecoveryResult.reason}`)
-    }
-  }
-}
-
-if (generateDecision.ok && !gitPreflightCompleted) {
-  gitReadiness = checkScheduledGitReadiness()
-  gitPreflightCompleted = true
-  if (!gitReadiness.ok) {
-    generateDecision = { ok: false, reason: `Git同期が安全でないため記事生成を停止: ${gitReadiness.reason}` }
-    scheduledOutcome = classifyPreGenerationFailure({
-      stage: 'git_readiness',
-      reason: gitReadiness.reason,
-    })
-    process.exitCode = scheduledOutcome.exitCode
-  }
-}
 
 header('1/3  ネタリスト selected 同期')
 let syncIncident = null
 if (!generateDecision.ok) {
   console.log(`  ⏭ ${generateDecision.reason}`)
-} else if (!gitReadiness.ok) {
-  console.log(`  ⏭ ${gitReadiness.reason}`)
 } else {
   for (const month of topicSyncMonths()) {
     const childRunResult = run('convert-selected-topics.mjs', ['--month', month, '--yes', '--if-exists', '--allow-empty'])
@@ -619,19 +515,25 @@ if (!generateDecision.ok) {
     process.exitCode = scheduledOutcome.exitCode
   }
 
-  if (scheduledOutcome.kind === 'generated-awaiting-sync') {
-    header('2.5/3  生成下書きのHuman Git同期待ち')
-    draftSyncResult = prepareGeneratedDraftForHumanPush(scheduledResult)
-    draftSyncResult = requireCommittedDraftSync(draftSyncResult)
+  if (scheduledOutcome.kind === 'generated-awaiting-stock') {
+    header('2.5/3  生成下書きのストック記録・ローカル反映')
+    const prepared = prepareGeneratedDraftForHumanPush(scheduledResult)
+    stockResult = prepared.stockResult
+    draftSyncResult = prepared.draftSyncResult
+    gitReadiness = prepared.gitReadiness
     scheduledOutcome = classifyScheduledDraftOutcome({
       childStatus: scheduledChildStatus,
       scheduledResult,
+      stockResult,
       draftSyncResult,
     })
-    if (draftSyncResult.ok) {
+    if (scheduledOutcome.kind === 'review-ready') {
       console.log(`  ✅ ${draftSyncResult.reason}`)
+    } else if (scheduledOutcome.kind === 'stocked-pending-sync') {
+      console.log('  ✅ 新しい記事を安全にストックしました')
+      console.log(`  ⏳ ${draftSyncResult?.reason ?? gitReadiness?.reason ?? '管理画面への反映待ちです'}`)
     } else {
-      console.log(`  ⚠️ ${draftSyncResult.reason}`)
+      console.log(`  ⚠️ ${stockResult?.reason ?? scheduledOutcome.reason}`)
       process.exitCode = scheduledOutcome.exitCode
     }
   }
@@ -642,10 +544,10 @@ const contentStatus = loadContentStatus(join(ROOT, 'content', 'posts'))
 const notificationBoundary = scheduledDraftNotificationBoundary(scheduledOutcome)
 const notificationText = shouldSendScheduledIncidentNotification(scheduledOutcome)
   ? buildScheduledIncidentNotification({ scheduledOutcome, scheduledResult })
-  : buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, draftSyncResult, gitReadiness })
+  : buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, scheduledOutcome })
 const alreadyLiveNoop = alreadyLiveTodayNoop({ scheduledResult, contentStatus })
 console.log(notificationText.split('\n').map((line) => `  ${line}`).join('\n'))
-if (shouldSendDraftReviewNotification(scheduledOutcome)) {
+if (shouldSendDraftReviewNotification(scheduledOutcome) || shouldSendStockUpdateNotification(scheduledOutcome)) {
   try {
     await sendOpsTelegram(notificationText, { job: notificationBoundary.job })
   } catch (error) {

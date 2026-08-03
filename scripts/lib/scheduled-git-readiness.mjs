@@ -21,25 +21,25 @@ export function assessScheduledGitReadiness({
   head = '不明',
 }) {
   const details = { branch, head, ahead: 0, behind: 0, aheadSummary: null }
-  if (indexLockPresent) return { ok: false, reason: 'Git index lock が存在するため記事生成を停止します。', details }
-  if (!statusOk) return { ok: false, reason: 'git status を確認できません', details }
-  if (dirtyCount > 0) return { ok: false, reason: `未commit変更があります（${dirtyCount}件）。先に整理してください。`, details }
-  if (!fetchOk) return { ok: false, reason: 'origin/main の取得に失敗しました。安全のため記事生成を停止します。', details }
-  if (!divergenceOk) return { ok: false, reason: 'GitHubとの差分確認に失敗しました。安全のため記事生成を停止します。', details }
+  if (indexLockPresent) return { ok: false, reason: 'index lock が存在するためローカル反映を保留します。', details }
+  if (!statusOk) return { ok: false, reason: 'ローカル状態を確認できないため反映を保留します。', details }
+  if (dirtyCount > 0) return { ok: false, reason: `管理対象外の変更があります（${dirtyCount}件）。ローカル反映を保留します。`, details }
+  if (!fetchOk) return { ok: false, reason: 'origin/main の取得に失敗したためローカル反映を保留します。', details }
+  if (!divergenceOk) return { ok: false, reason: 'origin/main との差分確認に失敗したためローカル反映を保留します。', details }
 
   const divergence = parseGitDivergence(divergenceOutput)
-  if (!divergence) return { ok: false, reason: 'GitHubとの差分確認結果を読めません。安全のため記事生成を停止します。', details }
+  if (!divergence) return { ok: false, reason: 'origin/main との差分確認結果を読めないためローカル反映を保留します。', details }
   details.ahead = divergence.ahead
   details.behind = divergence.behind
   if (divergence.behind > 0 && divergence.ahead > 0) {
-    return { ok: false, reason: `GitHub側とローカルの履歴が分岐しています（ahead ${divergence.ahead}, behind ${divergence.behind}）。先に整理してください。`, details }
+    return { ok: false, reason: `origin/main と履歴が分岐しています（ahead ${divergence.ahead}, behind ${divergence.behind}）。ローカル反映を保留します。`, details }
   }
   if (divergence.behind > 0) {
-    return { ok: false, reason: `GitHub側に未取得commitがあります（behind ${divergence.behind}）。先に同期状態を整理してください。`, details }
+    return { ok: false, reason: `origin/main に未取得commitがあります（behind ${divergence.behind}）。ローカル反映を保留します。`, details }
   }
   if (divergence.ahead > 0) {
     details.aheadSummary = `先行commit: ${head} を含む ${divergence.ahead}件`
-    return { ok: true, reason: `Git状態はcleanでorigin/mainと整合しています（ahead ${divergence.ahead}、Human push待ち）`, details }
+    return { ok: false, reason: `未反映のlocal commitがあります（ahead ${divergence.ahead}）。新しいdraftのローカル反映を保留します。`, details }
   }
-  return { ok: true, reason: 'Git状態はcleanでorigin/mainと同期済みです', details }
+  return { ok: true, reason: 'ローカル反映可能です', details }
 }

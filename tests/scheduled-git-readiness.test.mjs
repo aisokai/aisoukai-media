@@ -20,19 +20,27 @@ test('scheduled Git readiness parses only non-negative integer divergence', () =
   assert.equal(parseGitDivergence('unknown'), null)
 })
 
-test('scheduled Git readiness fails closed for dirty, fetch failure, and unreadable divergence', () => {
-  assert.equal(assessScheduledGitReadiness({ ...base, dirtyCount: 1 }).ok, false)
-  assert.equal(assessScheduledGitReadiness({ ...base, fetchOk: false }).ok, false)
-  assert.equal(assessScheduledGitReadiness({ ...base, divergenceOutput: 'invalid' }).ok, false)
-  assert.match(assessScheduledGitReadiness({ ...base, indexLockPresent: true }).reason, /index lock/)
+test('scheduled Git readiness defers only local reflection for every unsafe state', () => {
+  for (const input of [
+    { ...base, dirtyCount: 1 },
+    { ...base, fetchOk: false },
+    { ...base, divergenceOk: false },
+    { ...base, divergenceOutput: 'invalid' },
+    { ...base, indexLockPresent: true },
+    { ...base, statusOk: false },
+  ]) {
+    const result = assessScheduledGitReadiness(input)
+    assert.equal(result.ok, false)
+    assert.match(result.reason, /保留/)
+    assert.doesNotMatch(result.reason, /記事生成を停止/)
+  }
 })
 
-test('scheduled Git readiness allows clean ahead-only commits while retaining Human push context', () => {
+test('scheduled Git readiness defers ahead-only state while retaining exact recovery context', () => {
   const result = assessScheduledGitReadiness({ ...base, divergenceOutput: '1 0' })
-  assert.equal(result.ok, true)
-  assert.match(result.reason, /origin\/mainと整合/)
+  assert.equal(result.ok, false)
+  assert.match(result.reason, /ローカル反映を保留/)
   assert.match(result.reason, /ahead 1/)
-  assert.match(result.reason, /Human push待ち/)
   assert.deepEqual(result.details, {
     branch: 'main',
     head: 'abc1234',
