@@ -400,3 +400,11 @@ reviewed_by: 三谷
 reason: 承認後にtitle/excerptが編集されたため、Human review をやり直してください
 date: 2026-07-22
 publish_at: 2026-07-22
+## 2026-08-04T09:32:34.429+09:00
+datetime: 2026-08-04T09:32:34.429+09:00
+action: approve
+slug: 2026-08-03-topic-174477bdcb152ae9
+reviewed_by: 三谷
+date: 2026-08-03
+publish_at: 2026-08-03
+
