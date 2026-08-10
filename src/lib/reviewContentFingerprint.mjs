@@ -32,9 +32,7 @@ export function getReviewedContentFingerprint(data, content) {
 
 export function hasStaleReviewedContent(data, content) {
   const stored = String(data.reviewed_content_hash ?? '').trim()
-  // Existing approved posts without an historical snapshot remain valid. New
-  // approvals always receive one, so later material edits can be detected.
-  return data.reviewed === true && stored !== '' && stored !== getReviewedContentFingerprint(data, content)
+  return data.reviewed === true && stored !== getReviewedContentFingerprint(data, content)
 }
 
 const SERVER_OWNED_REVIEW_FIELDS = [

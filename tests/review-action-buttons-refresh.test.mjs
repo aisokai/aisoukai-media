@@ -25,6 +25,7 @@ test('approve action is idempotent for already reviewed posts', () => {
   assert.match(source, /reviewed_by/)
   assert.match(source, /この記事は既に承認済みです/)
   assert.match(source, /return\s*\{\s*ok:\s*true/s)
-  assert.match(reviewActions, /stock_status = 'adopted'/)
+  assert.match(reviewActions, /applyTeacherApproval/)
+  assert.match(reviewActions, /expectedContentVersion/)
   assert.match(reviewActions, /stock_status = 'rejected'/)
 })

@@ -14,10 +14,17 @@ import {
   normalizeGitStatus,
   summarizeWorkflowCounts,
 } from './dmp-core-state.mjs'
+import { getReviewedContentFingerprint } from '../../src/lib/reviewContentFingerprint.mjs'
 
 const TODAY = '2026-06-22'
 const FUTURE = '2026-12-31'
 const PAST = '2026-01-01'
+
+function approvedPost({ date = PAST, content = 'approved body' } = {}) {
+  const data = { reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date }
+  data.reviewed_content_hash = getReviewedContentFingerprint(data, content)
+  return { data, content }
+}
 
 // ── workflow_status ──────────────────────────────────────────────────────────
 
@@ -44,15 +51,17 @@ test('未承認は review_waiting', () => {
 })
 
 test('本文確認済み かつ日付到来は published', () => {
+  const post = approvedPost()
   assert.equal(
-    classifyWorkflowStatus({ reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: PAST }, { today: TODAY }),
+    classifyWorkflowStatus(post.data, { today: TODAY, content: post.content }),
     WORKFLOW_STATUS.PUBLISHED,
   )
 })
 
 test('本文確認済み だが未来日付は publish_waiting', () => {
+  const post = approvedPost({ date: FUTURE })
   assert.equal(
-    classifyWorkflowStatus({ reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: FUTURE }, { today: TODAY }),
+    classifyWorkflowStatus(post.data, { today: TODAY, content: post.content }),
     WORKFLOW_STATUS.PUBLISH_WAITING,
   )
 })
@@ -64,17 +73,21 @@ test('不正入力は unknown', () => {
 
 // ── review_status ────────────────────────────────────────────────────────────
 
-test('review_status: 差し戻し / 承認 / 待ち', () => {
+test('review_status: 差し戻し / exact approval / stale content の再レビュー', () => {
+  const post = approvedPost()
   assert.equal(classifyReviewStatus({ rejection_reason: 'x' }), REVIEW_STATUS.RETURNED)
-  assert.equal(classifyReviewStatus({ reviewed: true }), REVIEW_STATUS.APPROVED)
+  assert.equal(classifyReviewStatus(post.data, { content: post.content }), REVIEW_STATUS.APPROVED)
+  assert.equal(classifyReviewStatus(post.data, { content: 'changed body' }), REVIEW_STATUS.REVIEW_WAITING)
   assert.equal(classifyReviewStatus({}), REVIEW_STATUS.REVIEW_WAITING)
 })
 
 // ── isReviewQueueItem（/admin pending-review と一致）──────────────────────────
 
-test('isReviewQueueItem: archived 除外 / reviewed 除外 / 差し戻しは残す', () => {
+test('isReviewQueueItem: archived 除外 / exact approval 除外 / stale content は再レビュー', () => {
+  const post = approvedPost()
   assert.equal(isReviewQueueItem({ archived: true }), false)
-  assert.equal(isReviewQueueItem({ reviewed: true }), false)
+  assert.equal(isReviewQueueItem(post.data, { content: post.content }), false)
+  assert.equal(isReviewQueueItem(post.data, { content: 'changed body' }), true)
   assert.equal(isReviewQueueItem({ rejection_reason: 'x' }), true)
   assert.equal(isReviewQueueItem({}), true)
 })

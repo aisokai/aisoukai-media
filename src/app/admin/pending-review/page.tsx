@@ -124,7 +124,7 @@ function renderReviewPostCard({
           </div>
         )}
 
-        <ReviewActionButtons slug={post.slug} title={post.title} />
+        <ReviewActionButtons slug={post.slug} title={post.title} expectedContentVersion={post.contentVersion} />
         {isRejected && <RejectedPostDeleteButton slug={post.slug} />}
 
         <details className="mt-3 text-xs" open={isRejected}>

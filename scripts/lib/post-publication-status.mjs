@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import matter from 'gray-matter'
-import { hasStaleReviewedContent } from '../../src/lib/reviewContentFingerprint.mjs'
+import { getDmpArticleState } from '../../src/lib/dmpArticleState.mjs'
 
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000
 
@@ -23,10 +23,8 @@ function addBlocker(blockers, code, message) {
 export function getPostPublicationStatus(data, { today = getTodayJst(), content = '' } = {}) {
   const blockers = []
   const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
-  const humanApproved =
-    data.reviewed === true &&
-    Boolean(toDateStr(data.reviewed_at)) &&
-    Boolean(String(data.reviewed_by ?? '').trim())
+  const state = getDmpArticleState({ data, content, today })
+  const humanApproved = state.approvedExactVersion
   const autoApproved = false
   const approved = humanApproved
 
@@ -50,7 +48,7 @@ export function getPostPublicationStatus(data, { today = getTodayJst(), content 
     )
   }
 
-  if (hasStaleReviewedContent(data, content)) {
+  if (data.reviewed === true && !state.approvedExactVersion) {
     addBlocker(blockers, 'review_content_stale', '承認後に内容が変更されています。Human review をやり直してください')
   }
 
@@ -67,7 +65,7 @@ export function getPostPublicationStatus(data, { today = getTodayJst(), content 
   }
 
   return {
-    publishable: blockers.length === 0,
+    publishable: state.publishable && blockers.length === 0,
     approved,
     humanApproved,
     autoApproved,

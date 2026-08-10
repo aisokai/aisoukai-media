@@ -24,6 +24,7 @@ import { existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { getPostPublicationStatus, getTodayJst } from './post-publication-status.mjs'
+import { getDmpArticleState } from '../../src/lib/dmpArticleState.mjs'
 
 // ── 語彙（YAML phase1_state_contract と一致）─────────────────────────────────
 
@@ -80,22 +81,22 @@ function isPlainData(data) {
  * archived / 差し戻し(rejection_reason) は blocked、draft は draft、未承認は review_waiting、
  * 承認済みで公開可能なら published、承認済みだが未到来/未来なら publish_waiting。
  */
-export function classifyWorkflowStatus(data, { today = getTodayJst() } = {}) {
+export function classifyWorkflowStatus(data, { today = getTodayJst(), content = '' } = {}) {
   if (!isPlainData(data)) return WORKFLOW_STATUS.UNKNOWN
   if (data.archived === true) return WORKFLOW_STATUS.BLOCKED
   if (data.rejection_reason) return WORKFLOW_STATUS.BLOCKED // 差し戻し
   if (data.draft === true) return WORKFLOW_STATUS.DRAFT
-  const pub = getPostPublicationStatus(data, { today })
+  const pub = getPostPublicationStatus(data, { today, content })
   if (!pub.approved) return WORKFLOW_STATUS.REVIEW_WAITING
   if (pub.publishable) return WORKFLOW_STATUS.PUBLISHED
   return WORKFLOW_STATUS.PUBLISH_WAITING
 }
 
 /** Human レビュー観点の状態。差し戻し / 承認済み / 待ち を分離する。 */
-export function classifyReviewStatus(data) {
+export function classifyReviewStatus(data, { content = '' } = {}) {
   if (!isPlainData(data)) return REVIEW_STATUS.UNKNOWN
   if (data.rejection_reason) return REVIEW_STATUS.RETURNED
-  if (data.reviewed === true) return REVIEW_STATUS.APPROVED
+  if (getDmpArticleState({ data, content }).approvedExactVersion) return REVIEW_STATUS.APPROVED
   return REVIEW_STATUS.REVIEW_WAITING
 }
 
@@ -104,11 +105,10 @@ export function classifyReviewStatus(data) {
  * /admin（getPendingReviewPostsForAdmin / buildPendingReviewPost）と同じ条件:
  *   archived:true は除外、reviewed:true は除外、それ以外（差し戻し含む）は pending。
  */
-export function isReviewQueueItem(data) {
+export function isReviewQueueItem(data, { content = '' } = {}) {
   if (!isPlainData(data)) return false
   if (data.archived === true) return false
-  if (data.reviewed === true) return false
-  return true
+  return !getDmpArticleState({ data, content }).approvedExactVersion
 }
 
 // ── 画像状態 ─────────────────────────────────────────────────────────────────
@@ -244,7 +244,8 @@ export function summarizeWorkflowCounts(posts, { today = getTodayJst(), repoRoot
   }
   for (const post of posts ?? []) {
     const data = post && post.data !== undefined ? post.data : post
-    const ws = classifyWorkflowStatus(data, { today })
+    const content = post && post.data !== undefined ? post.content ?? '' : ''
+    const ws = classifyWorkflowStatus(data, { today, content })
     switch (ws) {
       case WORKFLOW_STATUS.DRAFT:
         counts.draft_count++

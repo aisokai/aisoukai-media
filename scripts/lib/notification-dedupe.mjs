@@ -18,14 +18,19 @@ export function notificationDedupeKey({ date, job, text }) {
   return `${safeJob}-${hash}`
 }
 
-export function reserveNotificationSend({ root, date, job, text }) {
+export function reserveNotificationSend({ root, date, job, text, contentVersion }) {
   if (!root) throw new Error('root is required')
   if (!date) throw new Error('date is required')
   if (!job) throw new Error('job is required')
   if (!text) throw new Error('text is required')
 
-  const key = notificationDedupeKey({ date, job, text })
-  const dir = join(root, 'logs', 'notification-dedupe', safePathPart(date))
+  const versioned = typeof contentVersion === 'string' && /^[a-f0-9]{64}$/.test(contentVersion)
+  const key = versioned
+    ? `${safePathPart(job)}-${contentVersion}`
+    : notificationDedupeKey({ date, job, text })
+  const dir = versioned
+    ? join(root, 'logs', 'notification-dedupe', 'content-versions')
+    : join(root, 'logs', 'notification-dedupe', safePathPart(date))
   const path = join(dir, `${key}.json`)
   mkdirSync(dir, { recursive: true })
 
@@ -34,6 +39,7 @@ export function reserveNotificationSend({ root, date, job, text }) {
     date,
     job,
     key,
+    ...(versioned ? { contentVersion } : {}),
     createdAt: new Date().toISOString(),
   }
 

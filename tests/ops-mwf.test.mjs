@@ -99,7 +99,7 @@ test('dirty, ahead, behind, diverged, fetch failure, index lock, and unknown Git
     })
     assert.equal(outcome.kind, 'stocked-pending-sync')
     assert.equal(outcome.exitCode, 0)
-    assert.equal(shouldSendStockUpdateNotification(outcome), true)
+    assert.equal(shouldSendStockUpdateNotification(outcome), false)
     assert.equal(shouldSendScheduledIncidentNotification(outcome), false)
   }
 })
@@ -127,16 +127,45 @@ test('Telegram copy exposes only the three plain-language stock outcomes', () =>
   }
 })
 
-test('Git-only pending sends a normal deduplicated stock update, never an incident notification', () => {
+test('Git-only pending remains non-notified until the admin source confirms the exact version', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
   const notificationSource = readFileSync('scripts/lib/scheduled-draft-notification.mjs', 'utf8')
   assert.match(source, /shouldSendStockUpdateNotification\(scheduledOutcome\)/)
-  assert.match(notificationSource, /ops-mwf-stock-update/)
+  assert.doesNotMatch(notificationSource, /ops-mwf-stock-update/)
   assert.match(notificationSource, /ops-mwf-review-request/)
   assert.match(notificationSource, /ops-mwf-incident/)
   assert.match(source, /reserveNotificationSend/)
   assert.match(source, /reservation\.commit\(\)/)
   assert.match(source, /reservation\.release\(\)/)
+})
+
+test('saved pending-review receipts perform the bounded freshness check on a later invocation', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const helper = functionDeclaration(source, 'pendingReviewRecheckReadiness')
+  const receiptCheck = helper.indexOf('readPendingReviewReceipts(REVIEW_PENDING_PATH).length === 0')
+  const readinessCheck = helper.indexOf('return checkScheduledGitReadiness()')
+  const recheckCall = source.indexOf('const pendingReviewReadiness = pendingReviewRecheckReadiness(gitReadiness)')
+
+  assert.ok(receiptCheck >= 0)
+  assert.ok(readinessCheck > receiptCheck)
+  assert.ok(recheckCall > 0)
+  assert.match(source, /adminSourceFresh: pendingReviewReadiness\?\.adminSourceFresh/)
+
+  const existingReadiness = { adminSourceFresh: true }
+  const freshReadiness = { adminSourceFresh: true, reason: 'fresh' }
+  const noReceipt = loadPureFunction(source, 'pendingReviewRecheckReadiness', {
+    readPendingReviewReceipts: () => [],
+    REVIEW_PENDING_PATH: 'ignored',
+    checkScheduledGitReadiness: () => { throw new Error('must not check without a receipt') },
+  })
+  assert.equal(noReceipt(existingReadiness), existingReadiness)
+  assert.equal(noReceipt(null), null)
+  const withReceipt = loadPureFunction(source, 'pendingReviewRecheckReadiness', {
+    readPendingReviewReceipts: () => [{ path: 'content/posts/2026-08-01-pending.md' }],
+    REVIEW_PENDING_PATH: 'ignored',
+    checkScheduledGitReadiness: () => freshReadiness,
+  })
+  assert.equal(withReceipt(null), freshReadiness)
 })
 
 test('true generation or stocking failures use the failure update and retain nonzero exit', () => {
@@ -244,7 +273,7 @@ test('Telegram dedupe reserves only after credentials and commits only after suc
   assert.ok(sendIndex > reserveIndex)
   assert.ok(commitIndex > sendIndex)
   assert.ok(releaseIndex > commitIndex)
-  assert.match(source, /同一日・同一job・同一本文の重複/)
+  assert.match(source, /同一コンテンツ版の重複/)
 })
 
 test('ops:mwf fallback occurs after the legacy topic pool is exhausted and before durable stocking', () => {
@@ -285,5 +314,5 @@ test('review request requires stocking and exact local reflection evidence', () 
   assert.equal(missingSync.kind, 'stocked-pending-sync')
   assert.equal(missingSync.exitCode, 0)
   assert.equal(shouldSendDraftReviewNotification(missingSync), false)
-  assert.equal(shouldSendStockUpdateNotification(missingSync), true)
+  assert.equal(shouldSendStockUpdateNotification(missingSync), false)
 })

@@ -4,7 +4,7 @@ import matter from 'gray-matter';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
 import { readGitHubDirectory, readGitHubFile } from './githubContents';
-import { hasStaleReviewedContent } from './reviewContentFingerprint.mjs';
+import { getDmpArticleState } from './dmpArticleState.mjs';
 
 const POSTS_DIR = path.join(process.cwd(), 'content/posts');
 
@@ -17,32 +17,7 @@ function getTodayJst(): string {
 // AI生成記事は生成時 reviewed/auto_approved とも false で作られ、
 // Human approval 後に reviewed: true / reviewed_at / reviewed_by へ変更する。
 function isPublishReady(data: Record<string, unknown>, content = ''): boolean {
-  if (data['draft'] === true) return false
-  if (data['archived'] === true) return false
-
-  const hasReviewedAt = String(data['reviewed_at'] ?? '').trim().length > 0
-  const hasReviewedBy = String(data['reviewed_by'] ?? '').trim().length > 0
-  const humanApproved = data['reviewed'] === true && hasReviewedAt && hasReviewedBy
-
-  if (!humanApproved) return false
-  if (hasStaleReviewedContent(data, content)) return false
-
-  const today = getTodayJst()
-
-  const toStr = (v: unknown): string =>
-    v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '')
-
-  // publish_at が設定されていれば優先して未来判定する
-  const publishAt = data['publish_at']
-  if (publishAt && toStr(publishAt) > today) return false
-
-  // publish_at がない場合は date を未来判定に使う
-  if (!publishAt) {
-    const dateVal = data['date']
-    if (dateVal && toStr(dateVal) > today) return false
-  }
-
-  return true
+  return getDmpArticleState({ data, content, adminDiscoverability: null, today: getTodayJst() }).publishable
 }
 
 export type PostMeta = {
@@ -124,6 +99,8 @@ export type PendingReviewPost = {
   rejectionReason?: string;
   reviewInvalidationReason?: string;
   image?: string;
+  // Exact canonical content hash rendered to the reviewer and required by CAS.
+  contentVersion: string;
 };
 
 function toDateString(val: unknown): string {
@@ -135,7 +112,8 @@ async function buildPendingReviewPost(fileName: string, raw: string): Promise<Pe
   const { data, content } = matter(raw);
 
   if (data['archived'] === true) return null;
-  if (data['reviewed'] === true && !hasStaleReviewedContent(data as Record<string, unknown>, content)) return null;
+  const state = getDmpArticleState({ data, content });
+  if (state.approvedExactVersion) return null;
 
   const processed = await remark()
     .use(remarkHtml, { sanitize: true })
@@ -154,6 +132,7 @@ async function buildPendingReviewPost(fileName: string, raw: string): Promise<Pe
     rejectionReason: data['rejection_reason'] ? String(data['rejection_reason']) : undefined,
     reviewInvalidationReason: data['review_invalidation_reason'] ? String(data['review_invalidation_reason']) : undefined,
     image:           data['image'] ? String(data['image']) : undefined,
+    contentVersion: state.contentVersion,
   };
 }
 

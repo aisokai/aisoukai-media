@@ -14,9 +14,10 @@ function getStoredReviewerName() {
 type Props = {
   slug: string
   title: string
+  expectedContentVersion: string
 }
 
-export default function ReviewActionButtons({ slug, title }: Props) {
+export default function ReviewActionButtons({ slug, title, expectedContentVersion }: Props) {
   const router = useRouter()
   const [reviewerName, setReviewerName] = useState(getStoredReviewerName)
   const [reason, setReason] = useState('')
@@ -39,7 +40,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
     if (!window.confirm(`この記事を承認しますか？\n\n${title}`)) return
 
     startTransition(async () => {
-      const next = await approvePostAction({ slug, reviewedBy: reviewerName })
+      const next = await approvePostAction({ slug, reviewedBy: reviewerName, expectedContentVersion })
       setResult(next)
       if (next.ok) {
         setCompleted(true)
@@ -61,7 +62,7 @@ export default function ReviewActionButtons({ slug, title }: Props) {
     if (!window.confirm(`この記事を却下しますか？\n\n${title}`)) return
 
     startTransition(async () => {
-      const next = await rejectPostAction({ slug, reviewedBy: reviewerName, reason })
+      const next = await rejectPostAction({ slug, reviewedBy: reviewerName, reason, expectedContentVersion })
       setResult(next)
       if (next.ok) router.refresh()
     })
