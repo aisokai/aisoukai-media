@@ -3,9 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import matter from 'gray-matter'
 import { requireAdmin } from '@/lib/adminAuth'
-import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
+import { commitGitHubFiles, readGitHubBranchHead, readGitHubFile } from '@/lib/githubContents'
 import { approvePostMarkdown, rejectPostMarkdown } from '@/lib/reviewActions'
-import { hasStaleReviewedContent } from '@/lib/reviewContentFingerprint.mjs'
+import { assertExpectedContentVersion, getDmpArticleState } from '@/lib/dmpArticleState.mjs'
 import { notifyPostApprovedTelegram } from '@/lib/reviewApprovalNotification.mjs'
 
 export type ReviewActionResult = {
@@ -48,24 +48,18 @@ function isReviewedPost(raw: string) {
     data.reviewed === true &&
     Boolean(String(data.reviewed_at ?? '').trim()) &&
     Boolean(String(data.reviewed_by ?? '').trim()) &&
-    !hasStaleReviewedContent(data, content)
+    getDmpArticleState({ data, content, adminDiscoverability: { status: 'confirmed', source: 'admin-review-source', contentVersion: '' } }).approvedExactVersion
   )
-}
-
-async function loadReviewLog() {
-  try {
-    return (await readGitHubFile('logs/review-history.md')).content
-  } catch {
-    return ''
-  }
 }
 
 export async function approvePostAction({
   slug,
   reviewedBy,
+  expectedContentVersion,
 }: {
   slug: string
   reviewedBy: string
+  expectedContentVersion: string
 }): Promise<ReviewActionResult> {
   try {
     await requireAdmin()
@@ -74,10 +68,18 @@ export async function approvePostAction({
     if (!by) throw new Error('承認者名を入力してください')
 
     const postPath = `content/posts/${slug}.md`
+    const expectedHeadSha = await readGitHubBranchHead()
     const [postFile, reviewLog] = await Promise.all([
-      readGitHubFile(postPath),
-      loadReviewLog(),
+      readGitHubFile(postPath, { ref: expectedHeadSha }),
+      readGitHubFile('logs/review-history.md', { ref: expectedHeadSha }).then((file) => file.content).catch(() => ''),
     ])
+
+    const current = matter(postFile.content)
+    assertExpectedContentVersion({
+      data: current.data,
+      content: current.content,
+      expectedContentVersion,
+    })
 
     if (isReviewedPost(postFile.content)) {
       revalidatePath('/admin/pending-review')
@@ -89,11 +91,11 @@ export async function approvePostAction({
       }
     }
 
-    const update = approvePostMarkdown(postFile.content, slug, by)
+    const update = approvePostMarkdown(postFile.content, slug, by, expectedContentVersion)
     const commit = await commitGitHubFiles(`approve post: ${slug}`, [
       { path: postPath, content: update.nextPostMarkdown },
       { path: 'logs/review-history.md', content: `${reviewLog}${update.logEntry}` },
-    ])
+    ], { expectedHeadSha })
 
     revalidatePath('/admin/pending-review')
     revalidatePath('/blog')
@@ -126,10 +128,12 @@ export async function rejectPostAction({
   slug,
   reviewedBy,
   reason,
+  expectedContentVersion,
 }: {
   slug: string
   reviewedBy: string
   reason: string
+  expectedContentVersion: string
 }): Promise<ReviewActionResult> {
   try {
     await requireAdmin()
@@ -140,16 +144,17 @@ export async function rejectPostAction({
     if (!rejectReason) throw new Error('却下理由を入力してください')
 
     const postPath = `content/posts/${slug}.md`
+    const expectedHeadSha = await readGitHubBranchHead()
     const [postFile, reviewLog] = await Promise.all([
-      readGitHubFile(postPath),
-      loadReviewLog(),
+      readGitHubFile(postPath, { ref: expectedHeadSha }),
+      readGitHubFile('logs/review-history.md', { ref: expectedHeadSha }).then((file) => file.content).catch(() => ''),
     ])
 
-    const update = rejectPostMarkdown(postFile.content, slug, by, rejectReason)
+    const update = rejectPostMarkdown(postFile.content, slug, by, rejectReason, expectedContentVersion)
     const commit = await commitGitHubFiles(`reject post: ${slug}`, [
       { path: postPath, content: update.nextPostMarkdown },
       { path: 'logs/review-history.md', content: `${reviewLog}${update.logEntry}` },
-    ])
+    ], { expectedHeadSha })
 
     revalidatePath('/admin/pending-review')
 

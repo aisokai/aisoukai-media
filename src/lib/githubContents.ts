@@ -49,10 +49,10 @@ async function readJson<T>(url: string, init: RequestInit, label: string): Promi
   return res.json() as Promise<T>
 }
 
-export async function readGitHubFile(path: string): Promise<GitHubFile> {
+export async function readGitHubFile(path: string, { ref }: { ref?: string } = {}): Promise<GitHubFile> {
   const { token, repo, branch } = getGitHubConfig()
   const json = await readJson<{ content: string; sha: string }>(
-    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(branch)}`,
+    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(ref ?? branch)}`,
     { headers: githubHeaders(token) },
     `GitHub read ${path}`,
   )
@@ -61,6 +61,16 @@ export async function readGitHubFile(path: string): Promise<GitHubFile> {
     content: Buffer.from(json.content, 'base64').toString('utf8'),
     sha: json.sha,
   }
+}
+
+export async function readGitHubBranchHead(): Promise<string> {
+  const { token, repo, branch } = getGitHubConfig()
+  const ref = await readJson<{ object: { sha: string } }>(
+    `https://api.github.com/repos/${repo}/git/ref/heads/${encodeURIComponent(branch)}`,
+    { headers: githubHeaders(token) },
+    'GitHub read branch ref',
+  )
+  return ref.object.sha
 }
 
 export async function readGitHubDirectory(path: string): Promise<GitHubDirectoryEntry[]> {
@@ -74,7 +84,7 @@ export async function readGitHubDirectory(path: string): Promise<GitHubDirectory
   return json
 }
 
-export async function commitGitHubFiles(message: string, files: GitHubCommitFile[]) {
+export async function commitGitHubFiles(message: string, files: GitHubCommitFile[], { expectedHeadSha }: { expectedHeadSha?: string } = {}) {
   const { token, repo, branch } = getGitHubConfig()
   const headers = githubHeaders(token)
   const baseUrl = `https://api.github.com/repos/${repo}`
@@ -84,6 +94,9 @@ export async function commitGitHubFiles(message: string, files: GitHubCommitFile
     { headers },
     'GitHub read branch ref',
   )
+  if (expectedHeadSha && ref.object.sha !== expectedHeadSha) {
+    throw new Error('GitHub branch changed while this review was open. Reload and review the current content again.')
+  }
 
   const baseCommit = await readJson<{ tree: { sha: string } }>(
     `${baseUrl}/git/commits/${ref.object.sha}`,
@@ -156,7 +169,7 @@ export async function commitGitHubFiles(message: string, files: GitHubCommitFile
     {
       method: 'PATCH',
       headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sha: commit.sha }),
+      body: JSON.stringify({ sha: commit.sha, force: false }),
     },
     'GitHub update branch ref',
   )

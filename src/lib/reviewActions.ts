@@ -1,5 +1,5 @@
 import matter from 'gray-matter'
-import { getReviewedContentFingerprint } from './reviewContentFingerprint.mjs'
+import { applyTeacherApproval, assertExpectedContentVersion } from './dmpArticleState.mjs'
 
 export type ReviewAction = 'approve' | 'reject'
 
@@ -57,20 +57,16 @@ function buildReviewLogEntry({
   return lines.join('\n') + '\n'
 }
 
-export function approvePostMarkdown(raw: string, slug: string, reviewedBy: string): ReviewUpdate {
+export function approvePostMarkdown(raw: string, slug: string, reviewedBy: string, expectedContentVersion: string): ReviewUpdate {
   const parsed = matter(raw)
   const data = normalizeDates(parsed.data)
   const today = getTodayIso()
 
-  data.reviewed = true
-  data.draft = false
-  data.reviewed_at = today
-  data.reviewed_by = reviewedBy
+  assertExpectedContentVersion({ data, content: parsed.content, expectedContentVersion })
+  Object.assign(data, applyTeacherApproval({ data, content: parsed.content, reviewedBy, reviewedAt: today }))
+  delete data.rejection_reason
   delete data.review_invalidated_at
   delete data.review_invalidation_reason
-  data.stock_status = 'adopted'
-  delete data.rejection_reason
-  data.reviewed_content_hash = getReviewedContentFingerprint(data, parsed.content)
 
   return {
     nextPostMarkdown: matter.stringify(parsed.content, data),
@@ -89,13 +85,16 @@ export function rejectPostMarkdown(
   slug: string,
   reviewedBy: string,
   reason: string,
+  expectedContentVersion: string,
 ): ReviewUpdate {
   const parsed = matter(raw)
   const data = normalizeDates(parsed.data)
+  assertExpectedContentVersion({ data, content: parsed.content, expectedContentVersion })
 
   data.reviewed = false
   data.rejection_reason = reason
   data.stock_status = 'rejected'
+  delete data.reviewed_content_hash
 
   return {
     nextPostMarkdown: matter.stringify(parsed.content, data),

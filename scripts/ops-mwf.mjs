@@ -11,6 +11,10 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, w
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import matter from 'gray-matter'
+import { getContentVersion, isAdminDiscoverableVersion } from '../src/lib/dmpArticleState.mjs'
+import { confirmAdminReviewSourceVersion } from './lib/admin-review-source-visibility.mjs'
+import { readPendingReviewReceipts, recheckPendingReviewReceipt, writePendingReviewReceipt } from './lib/pending-review-recheck.mjs'
 import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { loadContentStatus } from './lib/content-status.mjs'
@@ -35,6 +39,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const LOG_DIR = join(ROOT, 'logs')
 const LOCK_PATH = join(LOG_DIR, 'ops-mwf.lock')
+const REVIEW_PENDING_PATH = join(LOG_DIR, 'ops-mwf-review-pending.json')
 const LOCK_STALE_MS = 2 * 60 * 60 * 1000
 const SEND_DAYS = new Set([1, 3, 5]) // 月=1, 水=3, 金=5 (JST UTC+9)
 const DAY_NAMES_JA = ['日', '月', '火', '水', '木', '金', '土']
@@ -219,6 +224,12 @@ function runCommand(command, args, { stdio = 'pipe', cwd = ROOT } = {}) {
 }
 
 function checkScheduledGitReadiness({ ownedDraftPaths = [] } = {}) {
+  const withAdminSourceFreshness = (readiness, adminSourceFresh = false) => ({
+    ...readiness,
+    // Only this preflight performs the existing origin/main fetch and
+    // divergence check. Consumers must not infer freshness from a ref alone.
+    adminSourceFresh,
+  })
   const status = runCommand('git', ['status', '--porcelain'])
   const branch = runCommand('git', ['branch', '--show-current'])
   const head = runCommand('git', ['rev-parse', '--short', 'HEAD'])
@@ -238,22 +249,22 @@ function checkScheduledGitReadiness({ ownedDraftPaths = [] } = {}) {
     head: head.ok && head.output ? head.output : '不明',
   }
   if (!base.statusOk || base.dirtyCount > 0) {
-    return assessScheduledGitReadiness(base)
+    return withAdminSourceFreshness(assessScheduledGitReadiness(base))
   }
 
   const fetch = runCommand('git', ['fetch', 'origin', 'main'])
   if (!fetch.ok) {
-    return assessScheduledGitReadiness({ ...base, fetchOk: false })
+    return withAdminSourceFreshness(assessScheduledGitReadiness({ ...base, fetchOk: false }))
   }
   const divergence = runCommand('git', ['rev-list', '--left-right', '--count', 'HEAD...origin/main'])
-  return assessScheduledGitReadiness({
+  return withAdminSourceFreshness(assessScheduledGitReadiness({
     ...base,
     fetchOk: fetch.ok,
     divergenceOk: divergence.ok,
     divergenceOutput: divergence.output,
     branch: branch.ok && branch.output ? branch.output : '不明',
     head: head.ok && head.output ? head.output : '不明',
-  })
+  }), fetch.ok === true && divergence.ok === true && /^\d+\s+\d+$/.test(divergence.output))
 }
 
 function isLegacyTopicPoolExhausted(status, result) {
@@ -287,6 +298,62 @@ function prepareGeneratedDraftForHumanPush(scheduledResult) {
   return { stockResult, draftSyncResult, gitReadiness }
 }
 
+function generatedDraftReviewInput(scheduledResult) {
+  const relativePath = String(scheduledResult?.path ?? '')
+  if (!/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(relativePath)) {
+    return { adminDiscoverability: null, draftData: {}, draftContent: '' }
+  }
+  try {
+    const parsed = matter(readFileSync(join(ROOT, relativePath), 'utf8'))
+    const contentVersion = getContentVersion(parsed.data, parsed.content)
+    // `checkScheduledGitReadiness` has already fetched origin/main. Reading that
+    // ref is the existing admin source-of-truth visibility boundary; no sync is
+    // initiated here. Local-only and pending-sync drafts cannot pass this check.
+    const source = runCommand('git', ['show', `origin/main:${relativePath}`])
+    let adminDiscoverability = null
+    if (source.ok) {
+      const remote = matter(source.output)
+      const candidate = confirmAdminReviewSourceVersion({
+        localData: parsed.data, localContent: parsed.content,
+        sourceData: remote.data, sourceContent: remote.content,
+      })
+      if (isAdminDiscoverableVersion(candidate, contentVersion)) adminDiscoverability = candidate
+    }
+    return { adminDiscoverability, draftData: parsed.data, draftContent: parsed.content }
+  } catch {
+    return { adminDiscoverability: null, draftData: {}, draftContent: '' }
+  }
+}
+
+function rememberOwnedPendingReviewDraft({ path, contentVersion }) {
+  writePendingReviewReceipt(REVIEW_PENDING_PATH, { path, contentVersion })
+}
+
+function recheckOwnedPendingReviewDraft({ adminSourceFresh = false } = {}) {
+  const rechecked = recheckPendingReviewReceipt({
+    filePath: REVIEW_PENDING_PATH,
+    adminSourceFresh,
+    inspect: (path) => ({ reviewInput: generatedDraftReviewInput({ path }) }),
+  })
+  if (rechecked) {
+    return {
+      scheduledResult: { ok: true, generated: true, path: rechecked.receipt.path }, stockResult: { ok: true, stocked: true },
+      draftSyncResult: { ok: true, committed: true, rechecked: true },
+      reviewInput: rechecked.reviewInput,
+    }
+  }
+  return null
+}
+
+function pendingReviewRecheckReadiness(existingReadiness) {
+  if (existingReadiness) return existingReadiness
+  // A receipt can outlive the generation invocation that created it. In that
+  // later invocation, perform the same bounded origin/main freshness check
+  // before inspecting the exact source version.
+  if (readPendingReviewReceipts(REVIEW_PENDING_PATH).length === 0) return null
+  return checkScheduledGitReadiness()
+}
+
 function readJsonIfExists(path) {
   if (!path || !existsSync(path)) return null
   try {
@@ -314,7 +381,7 @@ async function sendTelegram(botToken, chatId, text) {
   return json
 }
 
-async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-review-request' } = {}) {
+async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-review-request', contentVersion } = {}) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
 
@@ -323,9 +390,9 @@ async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-review-reque
     return false
   }
 
-  const reservation = reserveNotificationSend({ root: ROOT, date, job, text })
+  const reservation = reserveNotificationSend({ root: ROOT, date, job, text, contentVersion })
   if (!reservation.shouldSend) {
-    console.log(`  ⏭ Telegram 通知をスキップしました（同一日・同一job・同一本文の重複: ${reservation.key}）`)
+    console.log(`  ⏭ Telegram 通知をスキップしました（同一コンテンツ版の重複: ${reservation.key}）`)
     return false
   }
 
@@ -385,6 +452,10 @@ function alreadyLiveTodayNoop({ scheduledResult, contentStatus }) {
 
 function buildReviewRequestNotification({ generateDecision, scheduledResult, contentStatus, scheduledOutcome }) {
   const dashboardUrl = `${resolveNotificationSiteUrl()}/admin/pending-review`
+
+  if (scheduledOutcome?.kind === 'review-ready') {
+    return buildScheduledStockNotification({ outcome: scheduledOutcome, dashboardUrl })
+  }
 
   if (!generateDecision.ok) {
     return buildScheduledFailureNotification()
@@ -521,21 +592,43 @@ if (!generateDecision.ok) {
     stockResult = prepared.stockResult
     draftSyncResult = prepared.draftSyncResult
     gitReadiness = prepared.gitReadiness
+    const reviewInput = generatedDraftReviewInput(scheduledResult)
     scheduledOutcome = classifyScheduledDraftOutcome({
       childStatus: scheduledChildStatus,
       scheduledResult,
       stockResult,
       draftSyncResult,
+      ...reviewInput,
     })
     if (scheduledOutcome.kind === 'review-ready') {
       console.log(`  ✅ ${draftSyncResult.reason}`)
     } else if (scheduledOutcome.kind === 'stocked-pending-sync') {
       console.log('  ✅ 新しい記事を安全にストックしました')
       console.log(`  ⏳ ${draftSyncResult?.reason ?? gitReadiness?.reason ?? '管理画面への反映待ちです'}`)
+      if (draftSyncResult?.committed === true) {
+        rememberOwnedPendingReviewDraft({ path: scheduledResult.path, contentVersion: scheduledOutcome.contentVersion })
+      }
     } else {
       console.log(`  ⚠️ ${stockResult?.reason ?? scheduledOutcome.reason}`)
       process.exitCode = scheduledOutcome.exitCode
     }
+  }
+}
+
+// A later normal weekly/manual invocation rechecks only owned pending receipts
+// after the same bounded origin/main freshness check used for a new draft.
+if (!scheduledOutcome || scheduledOutcome.kind === 'no-draft' || scheduledOutcome.kind === 'stocked-pending-sync') {
+  const pendingReviewReadiness = pendingReviewRecheckReadiness(gitReadiness)
+  const rechecked = recheckOwnedPendingReviewDraft({ adminSourceFresh: pendingReviewReadiness?.adminSourceFresh })
+  if (rechecked) {
+    scheduledResult = rechecked.scheduledResult
+    scheduledOutcome = classifyScheduledDraftOutcome({
+      childStatus: 0,
+      scheduledResult,
+      stockResult: rechecked.stockResult,
+      draftSyncResult: rechecked.draftSyncResult,
+      ...rechecked.reviewInput,
+    })
   }
 }
 
@@ -549,14 +642,14 @@ const alreadyLiveNoop = alreadyLiveTodayNoop({ scheduledResult, contentStatus })
 console.log(notificationText.split('\n').map((line) => `  ${line}`).join('\n'))
 if (shouldSendDraftReviewNotification(scheduledOutcome) || shouldSendStockUpdateNotification(scheduledOutcome)) {
   try {
-    await sendOpsTelegram(notificationText, { job: notificationBoundary.job })
+    await sendOpsTelegram(notificationText, notificationBoundary)
   } catch (error) {
     console.error(`  ❌ Telegram 送信失敗: ${error.message}`)
     process.exitCode = 1
   }
 } else if (shouldSendScheduledIncidentNotification(scheduledOutcome)) {
   try {
-    await sendOpsTelegram(notificationText, { job: notificationBoundary.job })
+    await sendOpsTelegram(notificationText, notificationBoundary)
   } catch (error) {
     console.error(`  ❌ Telegram インシデント通知失敗: ${error.message}`)
     if (!process.exitCode) process.exitCode = 1

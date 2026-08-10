@@ -7,6 +7,8 @@ import {
   shouldSendScheduledIncidentNotification,
   shouldSendStockUpdateNotification,
 } from '../scripts/lib/scheduled-draft-notification.mjs'
+import { getContentVersion } from '../src/lib/dmpArticleState.mjs'
+import { confirmAdminReviewSourceVersion } from '../scripts/lib/admin-review-source-visibility.mjs'
 
 const generated = { ok: true, generated: true }
 const stocked = { ok: true, stocked: true }
@@ -18,22 +20,30 @@ test('a generated draft is not classified for notification until durable stockin
   assert.equal(scheduledDraftNotificationBoundary(outcome).shouldSend, false)
 })
 
-test('successful stocking and local reflection sends the review-ready update', () => {
+test('pending sync cannot notify; only a confirmed exact admin-source version can notify', () => {
+  const pending = classifyScheduledDraftOutcome({
+    childStatus: 0, scheduledResult: generated, stockResult: stocked,
+    draftSyncResult: { ok: true, committed: true }, draftData: { title: '下書き' }, draftContent: '本文',
+  })
+  assert.equal(pending.kind, 'stocked-pending-sync')
+  assert.equal(shouldSendDraftReviewNotification(pending), false)
+  const contentVersion = getContentVersion({ title: '下書き' }, '本文')
   const outcome = classifyScheduledDraftOutcome({
     childStatus: 0,
     scheduledResult: generated,
     stockResult: stocked,
-    draftSyncResult: { ok: true, committed: true },
+    draftSyncResult: { ok: true, committed: true }, draftData: { title: '下書き' }, draftContent: '本文',
+    adminDiscoverability: confirmAdminReviewSourceVersion({
+      localData: { title: '下書き' }, localContent: '本文',
+      sourceData: { title: '下書き' }, sourceContent: '本文',
+    }),
   })
   assert.equal(outcome.kind, 'review-ready')
   assert.equal(outcome.exitCode, 0)
   assert.equal(shouldSendDraftReviewNotification(outcome), true)
   assert.equal(shouldSendStockUpdateNotification(outcome), false)
-  assert.deepEqual(scheduledDraftNotificationBoundary(outcome), {
-    kind: 'review-request',
-    shouldSend: true,
-    job: 'ops-mwf-review-request',
-  })
+  assert.equal(scheduledDraftNotificationBoundary(outcome).kind, 'review-request')
+  assert.equal(scheduledDraftNotificationBoundary(outcome).contentVersion, contentVersion)
 })
 
 test('Git-only sync inability is an exit-zero stocked update and never an incident', () => {
@@ -56,12 +66,8 @@ test('Git-only sync inability is an exit-zero stocked update and never an incide
     assert.equal(outcome.kind, 'stocked-pending-sync')
     assert.equal(outcome.exitCode, 0)
     assert.equal(shouldSendScheduledIncidentNotification(outcome), false)
-    assert.equal(shouldSendStockUpdateNotification(outcome), true)
-    assert.deepEqual(scheduledDraftNotificationBoundary(outcome), {
-      kind: 'stock-update',
-      shouldSend: true,
-      job: 'ops-mwf-stock-update',
-    })
+    assert.equal(shouldSendStockUpdateNotification(outcome), false)
+    assert.deepEqual(scheduledDraftNotificationBoundary(outcome), { kind: 'suppressed', shouldSend: false, job: null })
   }
 })
 

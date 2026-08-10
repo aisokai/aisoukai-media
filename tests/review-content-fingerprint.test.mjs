@@ -28,7 +28,7 @@ test('approved content fingerprint ignores approval metadata but detects materia
   assert.equal(hasStaleReviewedContent({ ...stored, reviewed: false, excerpt: '編集済みの要約' }, content), false)
 })
 
-test('a stale reviewed fingerprint is not publishable while legacy human approval remains supported', () => {
+test('a stale or hashless reviewed fingerprint is not publishable', () => {
   const fingerprint = getReviewedContentFingerprint(approved, content)
   const stale = getPostPublicationStatus(
     { ...approved, reviewed_content_hash: fingerprint, title: '承認後に変更された記事' },
@@ -38,7 +38,8 @@ test('a stale reviewed fingerprint is not publishable while legacy human approva
 
   assert.equal(stale.publishable, false)
   assert.ok(stale.blockers.some((blocker) => blocker.code === 'review_content_stale'))
-  assert.equal(legacy.publishable, true)
+  assert.equal(legacy.publishable, false)
+  assert.ok(legacy.blockers.some((blocker) => blocker.code === 'review_content_stale'))
 })
 
 test('low-risk auto approval, rejected posts, and future posts retain their closed publication policy', () => {

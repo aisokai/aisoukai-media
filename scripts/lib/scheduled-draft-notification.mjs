@@ -26,6 +26,9 @@ export function classifyScheduledDraftOutcome({
   scheduledResult,
   stockResult,
   draftSyncResult,
+  adminDiscoverability,
+  draftData = {},
+  draftContent = '',
 } = {}) {
   if (!Number.isInteger(childStatus) || childStatus < 0) {
     return incident('scheduled child の終了状態を確認できませんでした')
@@ -60,17 +63,17 @@ export function classifyScheduledDraftOutcome({
   if (stockResult?.ok !== true || stockResult?.stocked !== true) {
     return incident(stockResult?.reason ?? '生成下書きを安全にストックできませんでした')
   }
-  if (draftSyncResult?.ok === true
-    && draftSyncResult.committed === true
-    && (draftSyncResult.skipped === undefined || draftSyncResult.skipped === false)) {
+  const article = getDmpArticleState({ data: draftData, content: draftContent, adminDiscoverability })
+  if (article.reviewReady) {
     return {
       kind: 'review-ready',
       reviewReady: true,
       exitCode: 0,
       generated: true,
-      syncSucceeded: true,
-      syncCommitted: true,
-      reason: '生成下書きのGit同期準備が完了しました',
+      syncSucceeded: draftSyncResult?.ok === true,
+      syncCommitted: draftSyncResult?.committed === true,
+      contentVersion: article.contentVersion,
+      reason: '生成下書きが管理画面で確認できます',
     }
   }
   return {
@@ -80,6 +83,7 @@ export function classifyScheduledDraftOutcome({
     generated: true,
     stocked: true,
     syncSucceeded: false,
+    contentVersion: article.contentVersion,
     reason: draftSyncResult?.reason ?? '生成下書きは安全にストックされ、管理画面への反映待ちです',
   }
 }
@@ -89,15 +93,9 @@ export function scheduledDraftNotificationBoundary(outcome) {
     && outcome.reviewReady === true
     && outcome.exitCode === 0
     && outcome.generated === true
-    && outcome.syncSucceeded === true
-    && outcome.syncCommitted === true) {
-    return { kind: 'review-request', shouldSend: true, job: 'ops-mwf-review-request' }
-  }
-  if (outcome?.kind === 'stocked-pending-sync'
-    && outcome.exitCode === 0
-    && outcome.generated === true
-    && outcome.stocked === true) {
-    return { kind: 'stock-update', shouldSend: true, job: 'ops-mwf-stock-update' }
+    && typeof outcome.contentVersion === 'string'
+    && /^[a-f0-9]{64}$/.test(outcome.contentVersion)) {
+    return { kind: 'review-request', shouldSend: true, job: 'ops-mwf-review-request', contentVersion: outcome.contentVersion }
   }
   if (outcome?.kind === 'incident') {
     return { kind: 'incident', shouldSend: true, job: 'ops-mwf-incident' }
@@ -114,5 +112,7 @@ export function shouldSendScheduledIncidentNotification(outcome) {
 }
 
 export function shouldSendStockUpdateNotification(outcome) {
-  return scheduledDraftNotificationBoundary(outcome).kind === 'stock-update'
+  void outcome
+  return false
 }
+import { getDmpArticleState } from '../../src/lib/dmpArticleState.mjs'
