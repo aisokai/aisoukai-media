@@ -15,6 +15,7 @@ ai_generated: false
 reviewed_at: '2026-05-12'
 reviewed_by: 三谷
 image_alt: 歯科衛生士がX線モニターを指しながら患者に説明するイメージ
+reviewed_content_hash: 1b6ec34f33982fde4addb40460a31a3f51f68344ace5595a2ebf91fe6b19ee12
 ---
 
 ## はじめに

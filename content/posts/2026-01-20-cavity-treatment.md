@@ -14,6 +14,7 @@ draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
 image_alt: 頬を押さえて歯の痛みに顔をしかめる女性
+reviewed_content_hash: b3000d11eae35bec7b82a6d7b8a45b69dd2476d1d52b199b290edd6fe7e9dae6
 ---
 
 ## 虫歯治療の基本的な流れ

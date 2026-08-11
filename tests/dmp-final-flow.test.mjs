@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { applyTeacherApproval, assertExpectedContentVersion, getDmpArticleState, getContentVersion } from '../src/lib/dmpArticleState.mjs'
+import { getPostPublicationStatus } from '../scripts/lib/post-publication-status.mjs'
+import matter from 'gray-matter'
 import { confirmAdminReviewSourceVersion } from '../scripts/lib/admin-review-source-visibility.mjs'
 import { classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary } from '../scripts/lib/scheduled-draft-notification.mjs'
 import { reserveNotificationSend } from '../scripts/lib/notification-dedupe.mjs'
@@ -12,6 +14,14 @@ import { join } from 'node:path'
 
 const data = { title: 'テスト', date: '2026-08-01', draft: false, reviewed: false }
 const content = '本文\n'
+
+function currentHumanApprovedPosts() {
+  return readdirSync('content/posts')
+    .filter((file) => file.endsWith('.md'))
+    .sort()
+    .map((file) => ({ file, parsed: matter(readFileSync(`content/posts/${file}`, 'utf8')) }))
+    .filter(({ parsed }) => parsed.data.reviewed === true && !parsed.data.draft && !parsed.data.archived && !parsed.data.rejection_reason)
+}
 
 test('five-stage DMP sequence requires exact discoverability, CAS review, then exact-version publication', () => {
   const version = getContentVersion(data, content)
@@ -46,6 +56,29 @@ test('a generated ready draft becomes publishable immediately after exact approv
   assert.equal(approved.stock_status, 'adopted')
   assert.equal(getDmpArticleState({ data: approved, content, today: '2026-08-02' }).approvedExactVersion, true)
   assert.equal(getDmpArticleState({ data: approved, content, today: '2026-08-02' }).publishable, true)
+})
+
+test('all 33 current Human-approved posts retain one locked, publishable version after migration', () => {
+  const approvedPosts = currentHumanApprovedPosts()
+  assert.equal(approvedPosts.length, 33)
+  for (const { file, parsed } of approvedPosts) {
+    const status = getPostPublicationStatus(parsed.data, { today: '2026-08-11', content: parsed.content })
+    assert.equal(status.publishable, true, file)
+    assert.equal(parsed.data.reviewed_content_hash, getContentVersion(parsed.data, parsed.content), file)
+  }
+})
+
+test('a later title or body edit loses publication until a fresh exact Human approval', () => {
+  const [{ parsed }] = currentHumanApprovedPosts()
+  const exact = getPostPublicationStatus(parsed.data, { today: '2026-08-11', content: parsed.content })
+  const changedTitle = getPostPublicationStatus(
+    { ...parsed.data, title: `${parsed.data.title}（改訂）` },
+    { today: '2026-08-11', content: parsed.content },
+  )
+  const changedBody = getPostPublicationStatus(parsed.data, { today: '2026-08-11', content: `${parsed.content}\n改訂` })
+  assert.equal(exact.publishable, true)
+  assert.equal(changedTitle.publishable, false)
+  assert.equal(changedBody.publishable, false)
 })
 
 test('monthly topic collection and three-per-week draft entry points remain intact', () => {

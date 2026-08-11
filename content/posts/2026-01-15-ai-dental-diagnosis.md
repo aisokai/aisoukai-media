@@ -14,6 +14,7 @@ image_alt: セラミッククラウンと歯科技工ケースのイメージ
 draft: false
 reviewed_at: '2026-06-10'
 reviewed_by: 三谷
+reviewed_content_hash: 6e03258ead4f1030e2c212785f9d3fdb08edacc34ca075e62204b0ed2e8bd7fa
 ---
 
 ## はじめに

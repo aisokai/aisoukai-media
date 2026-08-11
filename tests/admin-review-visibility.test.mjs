@@ -3,21 +3,13 @@ import matter from 'gray-matter'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-test('current corrective change contributes exactly one re-review item with append-only history', () => {
-  const post = readFileSync('content/posts/2026-07-22-topic-090fbe37c5607d3d.md', 'utf8')
-  const reviewLog = readFileSync('logs/review-history.md', 'utf8')
-  const adminLog = readFileSync('logs/admin-post-history.md', 'utf8')
+test('the migrated approved snapshot has no spurious re-review item', () => {
   const invalidated = readdirSync('content/posts')
     .filter((file) => file.endsWith('.md'))
     .map((file) => ({ file, data: matter(readFileSync(`content/posts/${file}`, 'utf8')).data }))
     .filter(({ data }) => data.reviewed === false && data.review_invalidation_reason)
 
-  assert.match(post, /^reviewed: false$/m)
-  assert.match(post, /^review_invalidation_reason: /m)
-  assert.deepEqual(invalidated.map(({ file }) => file), ['2026-07-22-topic-090fbe37c5607d3d.md'])
-  assert.match(reviewLog, /action: approve\nslug: 2026-07-22-topic-090fbe37c5607d3d/)
-  assert.match(reviewLog, /action: rereview_required\nslug: 2026-07-22-topic-090fbe37c5607d3d/)
-  assert.match(adminLog, /action: edit-rereview-required\nslug: 2026-07-22-topic-090fbe37c5607d3d/)
+  assert.deepEqual(invalidated, [])
 })
 
 test('admin dashboard differentiates selected progress from candidate and pending totals for both monthly files', () => {
@@ -33,13 +25,14 @@ test('admin dashboard differentiates selected progress from candidate and pendin
   }
 })
 
-test('admin and public sources route stale approved content into pending review rather than publication', () => {
+test('admin and public sources route a non-exact approved version into pending review rather than publication', () => {
   const posts = readFileSync('src/lib/posts.ts', 'utf8')
   const pendingPage = readFileSync('src/app/admin/pending-review/page.tsx', 'utf8')
   const actions = readFileSync('src/app/admin/pending-review/actions.ts', 'utf8')
 
-  assert.match(posts, /hasStaleReviewedContent/)
-  assert.match(posts, /reviewed'] === true && !hasStaleReviewedContent/)
+  assert.match(posts, /getDmpArticleState/)
+  assert.match(posts, /\.publishable/)
+  assert.match(posts, /state\.approvedExactVersion/)
   assert.match(pendingPage, /再レビューが必要です/)
-  assert.match(actions, /!hasStaleReviewedContent\(data, content\)/)
+  assert.match(actions, /assertExpectedContentVersion/)
 })

@@ -14,6 +14,7 @@ draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
 image_alt: 虫眼鏡で歯型を覗き込む「歯科検診」の文字入り画像
+reviewed_content_hash: 5d6ea1153ad8481ffe9e26489062bfee71254ee3823c0ddf8bfc6af35ace4db0
 ---
 
 ## 予防歯科とは
