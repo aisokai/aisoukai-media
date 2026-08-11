@@ -20,8 +20,8 @@ const TODAY = '2026-06-22'
 const FUTURE = '2026-12-31'
 const PAST = '2026-01-01'
 
-function approvedPost({ date = PAST, content = 'approved body' } = {}) {
-  const data = { reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date }
+function approvedPost({ date = PAST, content = 'approved body', ...fields } = {}) {
+  const data = { ...fields, reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date }
   data.reviewed_content_hash = getReviewedContentFingerprint(data, content)
   return { data, content }
 }
@@ -161,8 +161,8 @@ test('summarizeWorkflowCounts: 状態別件数と画像未設定件数', () => {
     { data: { draft: true, date: PAST } }, // draft
     { data: { date: PAST } }, // review_waiting, 画像未設定
     { data: { date: PAST, image: '/i.jpg', image_alt: 'a' } }, // review_waiting, 画像ok
-    { data: { reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: PAST, image: '/i.jpg', image_alt: 'a' } }, // published
-    { data: { reviewed: true, reviewed_at: PAST, reviewed_by: '三谷', date: FUTURE, image: '/i.jpg', image_alt: 'a' } }, // publish_waiting
+    approvedPost({ image: '/i.jpg', image_alt: 'a' }), // published
+    approvedPost({ date: FUTURE, image: '/i.jpg', image_alt: 'a' }), // publish_waiting
     { data: { archived: true } }, // blocked
   ]
   const counts = summarizeWorkflowCounts(posts, { today: TODAY })
