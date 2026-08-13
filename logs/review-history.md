@@ -422,3 +422,11 @@ slug: 2026-07-22-topic-090fbe37c5607d3d
 reviewed_by: 三谷
 date: 2026-07-22
 publish_at: 2026-07-22
+## 2026-08-14T08:46:06.979+09:00
+datetime: 2026-08-14T08:46:06.979+09:00
+action: approve
+slug: 2026-08-05-topic-493f778fa6130676
+reviewed_by: 三谷
+date: 2026-08-05
+publish_at: 2026-08-05
+
