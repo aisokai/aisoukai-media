@@ -14,6 +14,7 @@ draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
 image_alt: 指で押すとグラグラする歯を表現した粘土模型のイメージ
+reviewed_content_hash: 371ef750b2b16c719b1094c998d023ccb403fa30334f0e9de7ef476b98f56495
 ---
 
 ## 歯周病とはどのような病気か

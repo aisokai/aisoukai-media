@@ -4,8 +4,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { applyTeacherApproval, getDmpArticleState } from '../src/lib/dmpArticleState.mjs'
 
-test('current corrective change contributes exactly one re-review item with append-only history', () => {
-  const post = readFileSync('content/posts/2026-07-22-topic-090fbe37c5607d3d.md', 'utf8')
+test('current corrective change is exactly Human-approved and preserves append-only history', () => {
+  const post = matter(readFileSync('content/posts/2026-07-22-topic-090fbe37c5607d3d.md', 'utf8'))
   const reviewLog = readFileSync('logs/review-history.md', 'utf8')
   const adminLog = readFileSync('logs/admin-post-history.md', 'utf8')
   const invalidated = readdirSync('content/posts')
@@ -13,9 +13,9 @@ test('current corrective change contributes exactly one re-review item with appe
     .map((file) => ({ file, data: matter(readFileSync(`content/posts/${file}`, 'utf8')).data }))
     .filter(({ data }) => data.reviewed === false && data.review_invalidation_reason)
 
-  assert.match(post, /^reviewed: false$/m)
-  assert.match(post, /^review_invalidation_reason: /m)
-  assert.deepEqual(invalidated.map(({ file }) => file), ['2026-07-22-topic-090fbe37c5607d3d.md'])
+  assert.equal(post.data.reviewed, true)
+  assert.match(post.data.reviewed_content_hash, /^[a-f0-9]{64}$/)
+  assert.deepEqual(invalidated, [])
   assert.match(reviewLog, /action: approve\nslug: 2026-07-22-topic-090fbe37c5607d3d/)
   assert.match(reviewLog, /action: rereview_required\nslug: 2026-07-22-topic-090fbe37c5607d3d/)
   assert.match(adminLog, /action: edit-rereview-required\nslug: 2026-07-22-topic-090fbe37c5607d3d/)

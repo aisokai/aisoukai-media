@@ -14,6 +14,7 @@ draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
 image_alt: 親知らずが横向きに埋伏している歯列断面3DCGイラスト
+reviewed_content_hash: e55e2d6a81881d0e526f5877c3c6b8d6a8e4f63dd4d08f912799d4937eda25d5
 ---
 
 ## 親知らずとは

@@ -14,6 +14,7 @@ draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
 image_alt: 重度の虫歯が神経に達した歯の断面カラーイラスト（根管治療適応例）
+reviewed_content_hash: 883e466eec64b7a752951a81ae57ac9fbba9e1c0b31f853a6b1da7842360bb40
 ---
 
 ## 根管治療とはどんな処置か

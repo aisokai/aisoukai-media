@@ -14,6 +14,7 @@ draft: false
 reviewed_at: '2026-05-13'
 reviewed_by: 氏名
 image_alt: 歯科スタッフが母と子に絵本を使って説明しているイメージ
+reviewed_content_hash: 370e1580877470fc70b9cf1aa4ae643ac190ffb3d63c529082f5e13c77c58bca
 ---
 
 ## 乳歯の役割
