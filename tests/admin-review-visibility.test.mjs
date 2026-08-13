@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import matter from 'gray-matter'
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { applyTeacherApproval, getDmpArticleState } from '../src/lib/dmpArticleState.mjs'
 
 test('current corrective change contributes exactly one re-review item with append-only history', () => {
   const post = readFileSync('content/posts/2026-07-22-topic-090fbe37c5607d3d.md', 'utf8')
@@ -33,13 +34,21 @@ test('admin dashboard differentiates selected progress from candidate and pendin
   }
 })
 
-test('admin and public sources route stale approved content into pending review rather than publication', () => {
+test('unapproved articles remain visible to admin review but cannot publish, while exact Human approval can publish', () => {
   const posts = readFileSync('src/lib/posts.ts', 'utf8')
   const pendingPage = readFileSync('src/app/admin/pending-review/page.tsx', 'utf8')
-  const actions = readFileSync('src/app/admin/pending-review/actions.ts', 'utf8')
+  const content = '本文\n'
+  const unapproved = { title: '管理レビュー待ち記事', date: '2026-08-01', draft: false, reviewed: false }
+  const pending = getDmpArticleState({ data: unapproved, content, today: '2026-08-02' })
+  const approved = applyTeacherApproval({ data: unapproved, content, reviewedBy: '先生', reviewedAt: '2026-08-01' })
+  const publishable = getDmpArticleState({ data: approved, content, today: '2026-08-02' })
 
-  assert.match(posts, /hasStaleReviewedContent/)
-  assert.match(posts, /reviewed'] === true && !hasStaleReviewedContent/)
+  assert.equal(pending.state, 'pending-review')
+  assert.equal(pending.approvedExactVersion, false)
+  assert.equal(pending.publishable, false)
+  assert.equal(publishable.approvedExactVersion, true)
+  assert.equal(publishable.publishable, true)
+  assert.match(posts, /if \(state\.approvedExactVersion\) return null/)
+  assert.match(posts, /\)\.publishable/)
   assert.match(pendingPage, /再レビューが必要です/)
-  assert.match(actions, /!hasStaleReviewedContent\(data, content\)/)
 })
