@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, FileSpreadsheet } from 'lucide-react'
 import { isAdminAuthenticated } from '@/lib/adminAuth'
-import { type ArticleTopicRow, buildArticleTopicSummary, getArticleTopics } from '@/lib/articleTopics'
+import { type ArticleTopicRow, loadAdminArticleTopics } from '@/lib/articleTopics'
+import { readGitHubArticleTopicsCsv } from '@/lib/articleTopicsGithub'
 import { NOINDEX_METADATA } from '@/lib/seo'
 import ArticleTopicEditControls from './ArticleTopicEditControls'
 
@@ -61,8 +62,9 @@ export default async function ArticleTopicsPage({ searchParams }: PageProps) {
   const categoryFilter = params?.category ?? 'all'
   const monthlyOnly = params?.monthly === 'yes'
   const sort = params?.sort ?? 'newest'
-  const rows = getArticleTopics()
-  const summary = buildArticleTopicSummary(rows)
+  const loaded = await loadAdminArticleTopics(readGitHubArticleTopicsCsv)
+  const rows = loaded.ok ? loaded.data.topics : []
+  const summary = loaded.ok ? loaded.data.summary : null
   const categories = [...new Set(rows.map((row) => row.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
   const visibleRows = sortArticleTopicsForAdmin(
     rows.filter((row) => {
@@ -97,12 +99,23 @@ export default async function ArticleTopicsPage({ searchParams }: PageProps) {
       </div>
 
       <section className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryTile label="全ネタ" value={summary.total} />
-        <SummaryTile label="採用済み" value={summary.approved} tone="blue" />
-        <SummaryTile label="アイデア" value={summary.idea} />
-        <SummaryTile label="高リスク" value={summary.highRisk} tone="red" />
-        <SummaryTile label="月次追加" value={summary.monthly} tone="green" />
+        <SummaryTile label="全ネタ" value={summary?.total ?? '読込不可'} />
+        <SummaryTile label="採用済み" value={summary?.approved ?? '読込不可'} tone="blue" />
+        <SummaryTile label="アイデア" value={summary?.idea ?? '読込不可'} />
+        <SummaryTile label="高リスク" value={summary?.highRisk ?? '読込不可'} tone="red" />
+        <SummaryTile label="月次追加" value={summary?.monthly ?? '読込不可'} tone="green" />
       </section>
+
+      {loaded.ok ? (
+        <p className={`mt-4 rounded-lg border px-4 py-3 text-sm ${loaded.source === 'local_fallback' ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
+          読込元: {loaded.source === 'github_main' ? 'GitHub main' : loaded.source === 'local_fallback' ? 'ローカル（GitHub読込失敗時のフォールバック）' : 'ローカル'}
+          {loaded.errorCode && '。GitHubの読込に失敗したため、ローカルCSVを表示しています。'}
+        </p>
+      ) : (
+        <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">
+          記事ネタCSVを読み込めません ({loaded.errorCode})。件数0件として表示していません。
+        </p>
+      )}
 
       <form method="get" className="mt-6 grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-6">
         <FilterSelect label="状態" name="status" value={statusFilter}>
@@ -144,7 +157,7 @@ export default async function ArticleTopicsPage({ searchParams }: PageProps) {
         </div>
       </form>
 
-      <section className="mt-8 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+      {loaded.ok ? <section className="mt-8 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-4 py-3">
           <h2 className="text-sm font-bold text-gray-900">ネタ一覧</h2>
           <p className="mt-1 text-xs text-gray-500">条件に合うものを最大80件表示します。</p>
@@ -208,7 +221,7 @@ export default async function ArticleTopicsPage({ searchParams }: PageProps) {
             </tbody>
           </table>
         </div>
-      </section>
+      </section> : null}
     </main>
   )
 }
@@ -234,7 +247,7 @@ function FilterSelect({
   )
 }
 
-function SummaryTile({ label, value, tone = 'gray' }: { label: string; value: number; tone?: 'gray' | 'blue' | 'red' | 'green' }) {
+function SummaryTile({ label, value, tone = 'gray' }: { label: string; value: number | string; tone?: 'gray' | 'blue' | 'red' | 'green' }) {
   const styles = {
     gray: 'border-gray-200 bg-white text-gray-900',
     blue: 'border-blue-100 bg-blue-50 text-blue-900',

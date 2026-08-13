@@ -70,6 +70,14 @@ idea → research（npm run research:trends）
 - `data/article-topics.sample.csv` — 記事ネタDB
 - `data/article-requests.json` — Telegram リクエスト
 
+### 管理画面のCSV読込方針
+
+`/admin/article-topics` の表示と編集は同じCSVローダー、RFC 4180対応パーサー、列スキーマ、件数集計を使う。`GITHUB_REVIEW_TOKEN` が設定されている環境では GitHub `main` の `data/article-topics.sample.csv` を正本として先に読む。読込だけが失敗した場合はローカルCSVへフォールバックし、画面にその旨を表示する。両方を読めない場合は件数0件として扱わず、明示的な読込エラーにする。
+
+GitHub読込を行った結果は、同じ読込元へ編集を保存する。フォールバック中の編集はローカルCSVへ保存され、GitHubへの外部更新は行わない。
+
+目視確認は実際の管理者ログインで `/admin/article-topics` を開き、GitHub main・フォールバック警告・読込エラーの表示を、検証専用のローカルCSV fixtureで確認する。認証を迂回したり、実CSVや外部サービスを変更したりしない。
+
 ### SNS — Instagram / X / LINE（Phase 2 以降）
 
 ```

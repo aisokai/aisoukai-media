@@ -28,6 +28,19 @@ export type ArticleTopicSummary = {
   monthly: number
 }
 
+export type ArticleTopicSource = 'github_main' | 'local' | 'local_fallback'
+export type ArticleTopicLoadErrorCode = 'github_read_failed' | 'article_topics_unavailable' | 'article_topics_csv_invalid'
+
+export type ParsedArticleTopicCsv = {
+  rows: string[][]
+  topics: ArticleTopicRow[]
+  summary: ArticleTopicSummary
+}
+
+export type ArticleTopicLoadResult =
+  | { ok: true; source: ArticleTopicSource; errorCode?: 'github_read_failed'; data: ParsedArticleTopicCsv }
+  | { ok: false; errorCode: ArticleTopicLoadErrorCode }
+
 export const ARTICLE_TOPICS_RELATIVE_PATH = 'data/article-topics.sample.csv'
 export const ARTICLE_TOPIC_COLUMNS = [
   'id',
@@ -47,6 +60,12 @@ export const ARTICLE_TOPIC_COLUMNS = [
 ] as const
 
 const TOPICS_PATH = path.join(process.cwd(), ARTICLE_TOPICS_RELATIVE_PATH)
+
+function asLoadError(error: unknown): ArticleTopicLoadErrorCode {
+  return error instanceof ArticleTopicCsvError ? 'article_topics_csv_invalid' : 'article_topics_unavailable'
+}
+
+export class ArticleTopicCsvError extends Error {}
 
 export function parseArticleTopicCsvRows(text: string) {
   const rows: string[][] = []
@@ -83,21 +102,22 @@ export function parseArticleTopicCsvRows(text: string) {
     }
   }
 
+  if (inQuotes) throw new ArticleTopicCsvError('CSV quotation is incomplete')
   row.push(cell.trim())
   if (row.some(Boolean)) rows.push(row)
   return rows
 }
 
-export function getArticleTopics(): ArticleTopicRow[] {
-  if (!fs.existsSync(TOPICS_PATH)) return []
-
-  const rows = parseArticleTopicCsvRows(fs.readFileSync(TOPICS_PATH, 'utf8'))
+function rowsToTopics(rows: string[][]): ArticleTopicRow[] {
   const [headers, ...body] = rows
-  if (!headers) return []
+  if (!headers) throw new ArticleTopicCsvError('CSV header is missing')
+  if (headers.length !== ARTICLE_TOPIC_COLUMNS.length || headers.some((header, index) => header !== ARTICLE_TOPIC_COLUMNS[index])) {
+    throw new ArticleTopicCsvError('CSV schema does not match article topic columns')
+  }
+  if (body.some((cells) => cells.length !== headers.length)) throw new ArticleTopicCsvError('CSV row schema does not match header')
 
   const index = new Map(headers.map((header, i) => [header, i]))
   const read = (cells: string[], key: string) => cells[index.get(key) ?? -1] ?? ''
-
   return body.map((cells) => ({
     id: read(cells, 'id'),
     discoveredAt: read(cells, 'discovered_at'),
@@ -114,6 +134,55 @@ export function getArticleTopics(): ArticleTopicRow[] {
     publishDate: read(cells, 'publish_date'),
     notes: read(cells, 'notes'),
   }))
+}
+
+export function parseArticleTopicCsv(text: string): ParsedArticleTopicCsv {
+  const rows = parseArticleTopicCsvRows(text)
+  const topics = rowsToTopics(rows)
+  return { rows, topics, summary: buildArticleTopicSummary(topics) }
+}
+
+type LoadArticleTopicsOptions = {
+  hasGitHubSource?: boolean
+  readGitHub?: () => Promise<string>
+  readLocal?: () => string
+}
+
+export function loadAdminArticleTopics(readGitHub: () => Promise<string>, options: Omit<LoadArticleTopicsOptions, 'readGitHub'> = {}) {
+  return loadArticleTopics({ ...options, readGitHub })
+}
+
+export async function loadArticleTopics(options: LoadArticleTopicsOptions = {}): Promise<ArticleTopicLoadResult> {
+  const hasGitHubSource = options.hasGitHubSource ?? Boolean(process.env.GITHUB_REVIEW_TOKEN)
+  const readLocal = options.readLocal ?? (() => fs.readFileSync(TOPICS_PATH, 'utf8'))
+  const readGitHub = options.readGitHub ?? (async () => { throw new Error('GitHub article topic reader is unavailable') })
+
+  if (hasGitHubSource) {
+    try {
+      return { ok: true, source: 'github_main', data: parseArticleTopicCsv(await readGitHub()) }
+    } catch {
+      try {
+        return { ok: true, source: 'local_fallback', errorCode: 'github_read_failed', data: parseArticleTopicCsv(readLocal()) }
+      } catch (error) {
+        return { ok: false, errorCode: asLoadError(error) }
+      }
+    }
+  }
+
+  try {
+    return { ok: true, source: 'local', data: parseArticleTopicCsv(readLocal()) }
+  } catch (error) {
+    return { ok: false, errorCode: asLoadError(error) }
+  }
+}
+
+/** Legacy local-only callers. Admin article-topics uses loadArticleTopics instead. */
+export function getArticleTopics(): ArticleTopicRow[] {
+  try {
+    return parseArticleTopicCsv(fs.readFileSync(TOPICS_PATH, 'utf8')).topics
+  } catch {
+    return []
+  }
 }
 
 export function csvEscapeArticleTopic(value: unknown) {

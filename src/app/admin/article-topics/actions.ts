@@ -7,9 +7,10 @@ import { requireAdmin } from '@/lib/adminAuth'
 import {
   ARTICLE_TOPICS_RELATIVE_PATH,
   articleTopicRowsToCsv,
-  parseArticleTopicCsvRows,
+  loadAdminArticleTopics,
+  type ArticleTopicSource,
 } from '@/lib/articleTopics'
-import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
+import { commitGitHubArticleTopicsCsv, readGitHubArticleTopicsCsv } from '@/lib/articleTopicsGithub'
 
 export type ArticleTopicActionResult = {
   ok: boolean
@@ -31,23 +32,16 @@ function validateTopicId(id: string) {
   if (!/^(TOPIC|MONTHLY)-[A-Z0-9-]+$/.test(id)) throw new Error('topic ID の形式が不正です')
 }
 
-async function loadCsv() {
-  if (process.env.GITHUB_REVIEW_TOKEN) return (await readGitHubFile(ARTICLE_TOPICS_RELATIVE_PATH)).content
-  const localPath = path.join(process.cwd(), ARTICLE_TOPICS_RELATIVE_PATH)
-  if (!fs.existsSync(localPath)) throw new Error('article-topics CSV が見つかりません')
-  return fs.readFileSync(localPath, 'utf8')
-}
-
-async function saveCsv(content: string, id: string) {
-  if (process.env.GITHUB_REVIEW_TOKEN) {
-    const commit = await commitGitHubFiles(`update article topic: ${id}`, [
-      { path: ARTICLE_TOPICS_RELATIVE_PATH, content },
-    ])
+async function saveCsv(content: string, id: string, source: ArticleTopicSource) {
+  if (source === 'github_main') {
+    const commit = await commitGitHubArticleTopicsCsv(content, id)
     return `GitHub commit: ${commit.sha.slice(0, 7)}`
   }
 
   fs.writeFileSync(path.join(process.cwd(), ARTICLE_TOPICS_RELATIVE_PATH), content, 'utf8')
-  return 'ローカルCSVを更新しました'
+  return source === 'local_fallback'
+    ? 'GitHub読込失敗時のローカルCSVを更新しました'
+    : 'ローカルCSVを更新しました'
 }
 
 export async function updateArticleTopicAction({
@@ -87,7 +81,9 @@ export async function updateArticleTopicAction({
       throw new Error('publish_date は YYYY-MM-DD で入力してください')
     }
 
-    const rows = parseArticleTopicCsvRows(await loadCsv())
+    const loaded = await loadAdminArticleTopics(readGitHubArticleTopicsCsv)
+    if (!loaded.ok) throw new Error(`記事ネタCSVの読込に失敗しました (${loaded.errorCode})`)
+    const rows = loaded.data.rows.map((row) => [...row])
     const headers = rows[0]
     if (!headers) throw new Error('CSV header がありません')
 
@@ -122,7 +118,7 @@ export async function updateArticleTopicAction({
     target[publishDateCol] = publishDate
     target[notesCol] = notes
 
-    const result = await saveCsv(articleTopicRowsToCsv(rows), id)
+    const result = await saveCsv(articleTopicRowsToCsv(rows), id, loaded.source)
     revalidatePath('/admin/article-topics')
     revalidatePath('/admin')
     return { ok: true, message: `保存しました。${result}` }

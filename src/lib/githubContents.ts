@@ -20,10 +20,10 @@ export type GitHubCommitFile = {
   content: string | null
 }
 
-function getGitHubConfig(): GitHubConfig {
+function getGitHubConfig({ branch: branchOverride }: { branch?: string } = {}): GitHubConfig {
   const token = process.env.GITHUB_REVIEW_TOKEN
   const repo = process.env.GITHUB_REVIEW_REPO ?? 'aisokai/aisoukai-media'
-  const branch = process.env.GITHUB_REVIEW_BRANCH ?? 'main'
+  const branch = branchOverride ?? process.env.GITHUB_REVIEW_BRANCH ?? 'main'
   if (!token) throw new Error('GITHUB_REVIEW_TOKEN is not set')
   return { token, repo, branch }
 }
@@ -84,8 +84,8 @@ export async function readGitHubDirectory(path: string): Promise<GitHubDirectory
   return json
 }
 
-export async function commitGitHubFiles(message: string, files: GitHubCommitFile[], { expectedHeadSha }: { expectedHeadSha?: string } = {}) {
-  const { token, repo, branch } = getGitHubConfig()
+export async function commitGitHubFiles(message: string, files: GitHubCommitFile[], { expectedHeadSha, branch: branchOverride }: { expectedHeadSha?: string; branch?: string } = {}) {
+  const { token, repo, branch } = getGitHubConfig({ branch: branchOverride })
   const headers = githubHeaders(token)
   const baseUrl = `https://api.github.com/repos/${repo}`
 

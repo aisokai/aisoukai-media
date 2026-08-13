@@ -1,6 +1,17 @@
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { loadAdminArticleTopics } from '../src/lib/articleTopics.ts'
+
+const ARTICLE_TOPICS_CSV_HEADER = 'id,discovered_at,source_type,source_url,topic,title_candidate,category,target_keyword,patient_intent,priority,medical_risk,status,publish_date,notes'
+
+function articleTopicsCsv(rows) {
+  return `${ARTICLE_TOPICS_CSV_HEADER}\n${rows.join('\n')}\n`
+}
+
+function articleTopicCsvRow(id, title = id) {
+  return `${id},2026-08-01,clinic,,${title},${title},その他,keyword,intent,medium,low,approved,2026-08-01,`
+}
 
 function loadFunctionBody(source, functionName) {
   const functionStart = source.indexOf(`function ${functionName}`)
@@ -210,6 +221,55 @@ test('article topic management exposes editable csv fields', () => {
   assert.match(actions, /updateArticleTopicAction/)
   assert.match(actions, /title_candidate/)
   assert.match(actions, /medical_risk/)
+})
+
+test('article topic display and edit policy prefer shared GitHub data and distinguish fallback, errors, and valid empty CSV', async () => {
+  const newGitHubCsv = articleTopicsCsv([articleTopicCsvRow('TOPIC-GITHUB', 'new GitHub')])
+  const staleLocalCsv = articleTopicsCsv([articleTopicCsvRow('TOPIC-LOCAL', 'stale local')])
+  const githubReader = async () => newGitHubCsv
+  const display = await loadAdminArticleTopics(githubReader, { hasGitHubSource: true, readLocal: () => staleLocalCsv })
+  const edit = await loadAdminArticleTopics(githubReader, { hasGitHubSource: true, readLocal: () => staleLocalCsv })
+  for (const loaded of [display, edit]) {
+    assert.equal(loaded.ok, true)
+    assert.equal(loaded.source, 'github_main')
+    assert.equal(loaded.data.topics[0].id, 'TOPIC-GITHUB')
+  }
+
+  const fallback = await loadAdminArticleTopics(async () => { throw new Error('fixture GitHub failure') }, {
+    hasGitHubSource: true,
+    readLocal: () => staleLocalCsv,
+  })
+  assert.equal(fallback.ok, true)
+  assert.equal(fallback.source, 'local_fallback')
+  assert.equal(fallback.errorCode, 'github_read_failed')
+
+  const unavailable = await loadAdminArticleTopics(async () => { throw new Error('fixture GitHub failure') }, {
+    hasGitHubSource: true,
+    readLocal: () => { throw new Error('fixture local failure') },
+  })
+  assert.deepEqual(unavailable, { ok: false, errorCode: 'article_topics_unavailable' })
+
+  const empty = await loadAdminArticleTopics(async () => articleTopicsCsv([]), {
+    hasGitHubSource: true,
+    readLocal: () => staleLocalCsv,
+  })
+  assert.equal(empty.ok, true)
+  assert.equal(empty.source, 'github_main')
+  assert.equal(empty.data.summary.total, 0)
+  assert.deepEqual(empty.data.topics, [])
+
+  const page = readFileSync('src/app/admin/article-topics/page.tsx', 'utf8')
+  const actions = readFileSync('src/app/admin/article-topics/actions.ts', 'utf8')
+  assert.match(page, /await loadAdminArticleTopics\(readGitHubArticleTopicsCsv\)/)
+  assert.match(actions, /await loadAdminArticleTopics\(readGitHubArticleTopicsCsv\)/)
+  assert.match(page, /local_fallback/)
+  assert.match(page, /記事ネタCSVを読み込めません/)
+  assert.match(page, /\.slice\(0, 80\)/)
+  for (const filter of ['statusFilter', 'riskFilter', 'categoryFilter', 'monthlyOnly']) assert.match(page, new RegExp(filter))
+  assert.match(actions, /source === 'github_main'/)
+  const githubAdapter = readFileSync('src/lib/articleTopicsGithub.ts', 'utf8')
+  assert.match(githubAdapter, /ref: ARTICLE_TOPICS_GITHUB_REF/)
+  assert.match(githubAdapter, /branch: ARTICLE_TOPICS_GITHUB_REF/)
 })
 
 test('topic candidates and pending review expose status filters and rejected body previews', () => {
