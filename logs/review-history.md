@@ -430,3 +430,11 @@ reviewed_by: 三谷
 date: 2026-08-05
 publish_at: 2026-08-05
 
+## 2026-08-14T08:46:10.041+09:00
+datetime: 2026-08-14T08:46:10.041+09:00
+action: approve
+slug: 2026-08-07-topic-4edbfef8a639392d
+reviewed_by: 三谷
+date: 2026-08-07
+publish_at: 2026-08-07
+
