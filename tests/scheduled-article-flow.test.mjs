@@ -2,14 +2,15 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-test('scheduled article flow only picks due approved topics unless allow-future is explicit', () => {
+test('scheduled article flow picks one unused CSV topic without topic status or risk gates', () => {
   const source = readFileSync('scripts/scheduled-article-flow.mjs', 'utf8')
 
   assert.match(source, /getTodayJst/)
-  assert.match(source, /findMissingApprovedTopics/)
+  assert.match(source, /findUnusedTopics/)
   assert.match(source, /allowFuture/)
   assert.match(source, /publishDate > today/)
-  assert.match(source, /公開日が今日以前の未生成 approved topic はありません/)
+  assert.match(source, /未使用ネタはありません/)
+  assert.doesNotMatch(source, /\(r\.status \?\? ''\)\.trim\(\) === 'approved'/)
   assert.match(source, /source_topic_id/)
   assert.match(source, /--no-notify/)
   assert.match(source, /result_json/)
@@ -25,7 +26,7 @@ test('scheduled article flow only picks due approved topics unless allow-future 
   assert.match(source, /品質NG/)
 })
 
-test('scheduled article flow can prepare the next approved topic for today without auto publishing', () => {
+test('scheduled article flow can prepare the next unused topic for today without auto publishing', () => {
   const source = readFileSync('scripts/scheduled-article-flow.mjs', 'utf8')
   const generateSource = readFileSync('scripts/generate-draft.mjs', 'utf8')
 
@@ -49,12 +50,21 @@ test('draft generation has save-before quality gates for broken prompt fragments
   assert.match(source, /writeFileSync\(filePath, content/)
 })
 
-test('ops review notification reports no due approved topic as no generated article', () => {
+test('a persisted article keeps image diagnostics for Human review and continues to stock/notification', () => {
+  const source = readFileSync('scripts/scheduled-article-flow.mjs', 'utf8')
+  const catchIndex = source.indexOf('画像を設定できませんでした')
+  const exitAfterCatch = source.indexOf('process.exit(1)', catchIndex)
+  const publicationIndex = source.indexOf('const publication = evaluatePostFile', catchIndex)
+  assert.ok(catchIndex > 0)
+  assert.ok(publicationIndex > catchIndex)
+  assert.ok(exitAfterCatch === -1 || exitAfterCatch > publicationIndex)
+  assert.match(source, /result\.reasons\.push\(`画像を設定できませんでした/)
+})
+
+test('ops review notification reports CSV exhaustion as no generated article', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
-  assert.match(source, /本日配信予定の未承認記事はありません/)
-  assert.match(source, /生成記事: なし/)
-  assert.match(source, /scheduledResult\?\.generated/)
+  assert.match(source, /未使用ネタがないため生成しません/)
 })
 
 test('post validation rejects generated body corruption markers', () => {

@@ -192,7 +192,7 @@ tags:
 | `npm run request:archive -- <update_id>` | リクエストを archived にする（最終状態。一覧から省略表示） |
 | `npm run request:archive -- --all-done` | drafted / ignored の全件を一括 archived にする |
 | `npm run notify:requests` | 記事リクエストの状態サマリーを console 出力し Telegram に送信する（Human がトリガー） |
-| `npm run ops:mwf` | 月水金 定期運用を実行（selected ネタ同期→承認済み topic から1記事生成→画像確認→Telegram レビュー依頼）。月水金以外は警告。`--force` で強制実行 |
+| `npm run ops:mwf` | 月水金 定期運用を実行（未使用CSVネタから1記事生成→永続ストック→Telegramレビュー依頼）。月水金以外は警告。`--force` で強制実行 |
 | `npm run image:import-inbox` | `public/images/library/inbox/` を再帰走査して画像を自動分類・コピー・JSON 登録する（デフォルト dry-run / `--apply` で実行 / `--apply --move` で移動） |
 | `npm run image:list` | 画像ライブラリのサマリーを表示する（カテゴリ別件数 / alt未カスタマイズ / license未更新 / 未使用画像。`--all` で全件表示） |
 | `npm run image:check` | `data/image-library.json` と記事画像の整合性を検証する（path実在 / id重複 / category妥当性 / alt・license確認 / 記事の image・image_alt 必須） |
@@ -206,7 +206,7 @@ tags:
 | `npm run image:usage` | 記事 ↔ 画像の対応一覧を表示する（未割当記事・共用画像も表示。読み取り専用） |
 | `npm run telegram:notify:live-check -- --send` | Telegram Bot への疎通確認（外部送信あり。Human の明示実行のみ） |
 | `npm run article:manual -- --title "..." --category "..." --date YYYY-MM-DD` | 手動依頼フロー: topic 登録 → AI 下書き生成 → Telegram 通知を一括実行（Human がトリガー） |
-| `npm run article:scheduled` | 定期提案フロー: 公開日到来済み・未生成の承認済み topic を 1 件選択 → AI 下書き生成 → 画像確認 → Telegram 通知 |
+| `npm run article:scheduled` | 定期提案フロー: CSVの未使用ネタを1件選択 → AI下書き生成 → 画像確認 → Telegram通知（掲載はHuman承認後のみ） |
 | `npm run article:scheduled -- --auto-publish` | 使用禁止。本文確認なしの自動公開を防ぐためエラー終了する |
 | `npm run article:auto-scheduled` | 定期運用向けの短縮コマンド。次の approved topic を本日配信予定のレビュー待ち記事として生成する |
 | `npm run article:batch-scheduled -- --month YYYY-MM --limit N` | 指定月の approved かつ未生成 topic をまとめて下書き生成する（Human が明示実行 / approve・publish はしない） |
@@ -284,7 +284,7 @@ Telegram から直接承認しない。publish API は作らない。
 
 ### 月水金 定期運用（`ops:mwf`）
 
-**月・水・金に、承認済みネタから1記事を生成してレビュー依頼を送る:**
+**月・水・金に、未使用ネタから1記事を生成してストックし、レビュー依頼を送る:**
 
 ```bash
 npm run ops:mwf               # 月・水・金のみ実行
@@ -292,22 +292,22 @@ npm run ops:mwf -- --force    # 曜日に関わらず実行
 ```
 
 `ops:mwf` が順に実行すること（approve / publish / push / request:draft 自動実行なし）:
-1. `topic-candidates:convert` 相当 — 当月・翌月の selected ネタを approved topic として CSV に同期
-2. `article:scheduled` — 公開日到来済み・未生成の approved topic を1件選び、AI下書きを生成
-3. 生成記事の `image` / `image_alt` を検査し、空なら画像ライブラリから補完
-4. Telegram に `/admin/pending-review` のレビュー・承認依頼を送信
+1. 月次ネタCSVから未使用ネタを1件選び、AI下書きを生成
+2. 生成記事を永続ストックする
+3. Telegram に必ずレビュー・承認依頼を送信する（失敗時は未送信として次回再試行する）
+4. 先生が承認した記事だけが既存の掲載経路へ進む
 
 記事生成ステップの制御:
 
 ```bash
-npm run ops:mwf -- --no-generate    # selected ネタ同期と Telegram 通知のみ。記事は生成しない
+npm run ops:mwf -- --no-generate    # 生成せず、未送信Telegram通知だけを再試行
 ```
 
 記事生成は次の場合にスキップされる:
 
 - `--no-generate` 指定
 - `ANTHROPIC_API_KEY` 未設定
-- 公開日到来済み・未生成の approved topic がない
+- 未使用ネタがない
 - 記事生成または画像設定に失敗した
 
 **ops:mwf 後に Human が実行するアクション:**

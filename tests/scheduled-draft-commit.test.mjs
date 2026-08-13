@@ -167,7 +167,7 @@ test('initial durable ledger write or rename failure never throws and classifies
     })
     assert.equal(outcome.kind, 'incident')
     assert.equal(outcome.exitCode, 1)
-    assert.equal(buildScheduledFailureNotification(), '記事ストックを更新できませんでした。次回再試行します。')
+    assert.equal(buildScheduledFailureNotification(), '記事ストックまたはTelegram通知に失敗しました。未送信として記録し、次回再試行します。')
   }
 })
 
@@ -182,7 +182,7 @@ test('non-directory logs root returns structured initial stock failure without t
   assert.match(result.reason, /ledgerの書き込みに失敗/)
 })
 
-test('post-stock cleanup I/O failure stays pending, retains ledger, and uses plain pending copy', () => {
+test('post-stock cleanup I/O failure stays pending but does not suppress notification handling', () => {
   const root = makeRoot()
   writePost(root, path1, safeDraft('one'))
   const stockResult = rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
@@ -203,11 +203,11 @@ test('post-stock cleanup I/O failure stays pending, retains ledger, and uses pla
     stockResult,
     draftSyncResult,
   })
-  assert.equal(outcome.kind, 'stocked-pending-sync')
+  assert.equal(outcome.kind, 'stocked')
   assert.equal(outcome.exitCode, 0)
   assert.equal(
-    buildScheduledStockNotification({ outcome }),
-    '新しい記事を1件ストックしました。管理画面への反映待ちです。',
+    buildScheduledStockNotification({ dashboardUrl: 'https://example.test/admin/pending-review' }),
+    '新しい記事を1件ストックしました。内容とリスク情報を確認して承認してください。\nhttps://example.test/admin/pending-review',
   )
 })
 

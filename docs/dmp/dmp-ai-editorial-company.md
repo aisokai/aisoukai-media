@@ -80,7 +80,7 @@ DMP は藍想会の **外向けコンテンツ全体** を管理する。
 - **既存実装**: `npm run generate:draft`, `npm run article:manual`, `npm run article:scheduled`
 - **出力**: `content/posts/YYYY-MM-DD-slug.md`（`reviewed: false`）
 - **制約**: `reviewed: true` への書き換えは禁止。AI生成記事は必ず `ai_generated: true` フラグ付き
-- **定期接続**: `npm run ops:mwf` の 4 ステップ目で、review 待ちがなく `ANTHROPIC_API_KEY` がある場合に `article:scheduled` を呼び出す。`--no-generate` で停止できる
+- **定期接続**: `npm run ops:mwf` は月水金にCSVの未使用ネタから1記事を生成し、永続ストック後に必ずTelegram通知処理へ進む。既存ストック数・Git同期・管理画面反映・医療リスクは停止条件にしない。`--no-generate` は生成を省略し、未送信通知の再試行だけを行う
 
 ### SNS部（SNS）
 
@@ -129,7 +129,7 @@ DMP は藍想会の **外向けコンテンツ全体** を管理する。
 - **既存実装**: `npm run status:content`, `npm run validate:publish-ready`, `logs/review-history.md`
 - **出力**: 承認待ちリスト、公開ステータスレポート
 - **制約**: 自動公開禁止。Human が `npm run approve:post` → `npm run build` → `git push` を明示的に実行
-- **定期運用**: `npm run ops:mwf` で status / Telegram request / 定期下書き生成 / 通知をまとめて実行する。公開管理部は approve / publish は行わず、Human Gate に渡す
+- **定期運用**: `npm run ops:mwf` は「生成 → ストック → Telegram通知」だけを担い、approve / publish は行わない。Human承認だけが既存の掲載経路へ進める唯一のgateである
 
 ---
 

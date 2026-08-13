@@ -194,11 +194,11 @@ function hasGeneratedPostForTopic(row, blocked = loadBlockedScheduledTopics()) {
   return false
 }
 
-// status='approved' で、公開日到来済み、かつ対応する下書きファイルがまだ存在しない topic 行を探す
-function findMissingApprovedTopics(rows, { allowFuture = false, today = TODAY } = {}) {
+// CSV の未使用ネタを1件選ぶ。topicの採否、リスク、公開予定日は記事生成を止める条件にしない。
+// 掲載可否は生成後の Human approval だけが決める。
+function findUnusedTopics(rows, { allowFuture = false, today = TODAY } = {}) {
   const blocked = loadBlockedScheduledTopics()
   return rows
-    .filter((r) => (r.status ?? '').trim() === 'approved')
     .filter((r) => {
       const id          = (r.id ?? '').trim()
       const publishDate = (r.publish_date ?? '').trim()
@@ -383,24 +383,24 @@ async function main() {
   let pickedTopic = null
   let rows    = readCsvRows()
 
-  // 1-a: approved で公開日到来済み、かつ下書き未生成の topic を探す
-  const pending = findMissingApprovedTopics(rows, { allowFuture })
+  // 1-a: CSVの未使用ネタを1件選ぶ。
+  const pending = findUnusedTopics(rows, { allowFuture })
   if (pending.length > 0) {
     const picked = pending[0]
     pickedTopic = picked
     topicId = (picked.id ?? '').trim()
-    console.log(`  既存の承認済み topic を使用します`)
+    console.log(`  既存の未使用 topic を使用します`)
     console.log(`  topic_id  : ${topicId}`)
     console.log(`  タイトル  : ${picked.title_candidate}`)
     console.log(`  優先度    : ${picked.priority}`)
     console.log(`  公開予定日: ${picked.publish_date}`)
   } else {
-    const futurePending = findMissingApprovedTopics(rows, { allowFuture: true })
-      .filter((row) => String(row.publish_date ?? '').trim() > TODAY)
     if (!fillFromResearch) {
+      const futurePending = findUnusedTopics(rows, { allowFuture: true })
+        .filter((row) => String(row.publish_date ?? '').trim() > TODAY)
       const reason = futurePending.length > 0
-        ? `公開日が今日以前の未生成 approved topic はありません（次回候補: ${futurePending[0].publish_date} / ${futurePending[0].id}）`
-        : '公開日が今日以前の未生成 approved topic はありません'
+        ? `未使用ネタはありません（次回候補: ${futurePending[0].publish_date} / ${futurePending[0].id}）`
+        : '未使用ネタはありません'
       console.log(`  ⏭ ${reason}`)
       result.reasons = [reason]
       writeResult(resultPath, result)
@@ -408,7 +408,7 @@ async function main() {
     }
 
     // 1-b: 明示指定時のみ research:trends から候補を補充する
-    console.log(`  承認済みの未処理 topic がありません。research:trends で補充します ...`)
+    console.log(`  未使用 topic がありません。research:trends で補充します ...`)
     console.log()
 
     const research = runResearchTrends()
@@ -490,9 +490,11 @@ async function main() {
     console.log()
     console.log(`  image: ok${result.image.assigned ? ` (${result.image.imageId} を補完)` : ''}`)
   } catch (error) {
-    result.reasons = [`画像を設定できませんでした: ${error.message}`]
-    writeResult(resultPath, result)
-    process.exit(1)
+    // The article already exists at this point. Keep the image failure as
+    // review information so stock and the per-article Telegram path continue.
+    result.image = { ok: false, assigned: false, image: '', imageAlt: '', imageId: '' }
+    result.reasons.push(`画像を設定できませんでした: ${error.message}`)
+    console.log(`  ⚠️ ${result.reasons.at(-1)}`)
   }
 
   const publication = evaluatePostFile(generatedFilePath)
@@ -500,7 +502,7 @@ async function main() {
   result.published = publication.publishable
   result.title = publication.title
   result.publishAt = publication.publishAt
-  result.reasons = publication.publishable ? [] : publication.reasons
+  result.reasons = [...result.reasons, ...(publication.publishable ? [] : publication.reasons)]
   writeResult(resultPath, result)
 
   // ── STEP 4: pending-review 通知 ──

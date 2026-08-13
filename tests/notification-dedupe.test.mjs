@@ -1,10 +1,10 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { reserveNotificationSend } from '../scripts/lib/notification-dedupe.mjs'
+import { readRetryableNotification, reserveNotificationSend } from '../scripts/lib/notification-dedupe.mjs'
 
 test('same date, job, and text can only reserve one notification send', () => {
   const root = mkdtempSync(join(tmpdir(), 'aisoukai-notify-dedupe-'))
@@ -13,7 +13,7 @@ test('same date, job, and text can only reserve one notification send', () => {
 
   assert.equal(first.shouldSend, true)
   assert.equal(second.shouldSend, false)
-  assert.equal(second.reason, 'duplicate')
+  assert.equal(second.reason, 'in-flight')
 })
 
 test('changed notification text is not suppressed for the same job and date', () => {
@@ -32,6 +32,37 @@ test('failed sends can release the reservation so a retry can notify later', () 
 
   const second = reserveNotificationSend({ root, date: '2026-06-29', job: 'ops-mwf', text: 'retry me' })
   assert.equal(second.shouldSend, true)
+})
+
+test('failed versioned sends remain retryable and are not treated as successful dedupe', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aisoukai-notify-dedupe-'))
+  const version = 'c'.repeat(64)
+  const first = reserveNotificationSend({ root, date: '2026-08-12', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
+  first.fail({ text: 'retry me' })
+  assert.deepEqual(readRetryableNotification({ root, job: 'ops-mwf-review-request' })?.contentVersion, version)
+  const retry = reserveNotificationSend({ root, date: '2026-08-13', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
+  assert.equal(retry.shouldSend, true)
+})
+
+test('an interrupted stale reservation is retryable while a fresh reservation remains in flight', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aisoukai-notify-dedupe-'))
+  const version = 'd'.repeat(64)
+  const first = reserveNotificationSend({ root, date: '2026-08-12', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
+  const concurrent = reserveNotificationSend({ root, date: '2026-08-12', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
+  assert.equal(concurrent.shouldSend, false)
+  assert.equal(concurrent.reason, 'in-flight')
+  const record = JSON.parse(readFileSync(first.path, 'utf8'))
+  writeFileSync(first.path, `${JSON.stringify({ ...record, createdAt: '2000-01-01T00:00:00.000Z' })}\n`)
+  assert.equal(readRetryableNotification({ root, job: 'ops-mwf-review-request' })?.contentVersion, version)
+  const recovered = reserveNotificationSend({ root, date: '2026-08-12', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
+  assert.equal(recovered.shouldSend, true)
+})
+
+test('a fresh interrupted reservation is not selected for retry', () => {
+  const root = mkdtempSync(join(tmpdir(), 'aisoukai-notify-dedupe-'))
+  const version = 'e'.repeat(64)
+  reserveNotificationSend({ root, date: '2026-08-12', job: 'ops-mwf-review-request', text: 'in flight', contentVersion: version })
+  assert.equal(readRetryableNotification({ root, job: 'ops-mwf-review-request' }), null)
 })
 
 test('review notifications dedupe by durable content version across dates, retry failures, and allow changed versions', () => {
