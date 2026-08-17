@@ -9,12 +9,13 @@ tags:
   - 医療テクノロジー
 author: 藍想会メディア編集部
 reviewed: true
-image: /images/library/cavity/cavity-34431025.jpg
-image_alt: セラミッククラウンと歯科技工ケースのイメージ
+image: /images/library/general/ai-topic-20260511-001-dental-ai-diagnosis-a.png
+image_alt: 歯科医師がタブレットの歯の画像を患者に説明する様子
 draft: false
-reviewed_at: '2026-06-10'
+reviewed_at: '2026-08-17'
 reviewed_by: 三谷
-reviewed_content_hash: 6e03258ead4f1030e2c212785f9d3fdb08edacc34ca075e62204b0ed2e8bd7fa
+reviewed_content_hash: e80821b8f0da2156d40807c5926578acdbbc18876bea07b7c730466d131f374f
+stock_status: adopted
 ---
 
 ## はじめに
