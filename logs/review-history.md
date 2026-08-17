@@ -531,3 +531,11 @@ reviewed_by: 三谷
 date: 2026-08-14
 publish_at: 2026-08-14
 
+## 2026-08-17T14:27:00.758+09:00
+datetime: 2026-08-17T14:27:00.758+09:00
+action: approve
+slug: 2026-08-17-topic-20260511-008
+reviewed_by: 三谷
+date: 2026-08-17
+publish_at: 2026-08-17
+
