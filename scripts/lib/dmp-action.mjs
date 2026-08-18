@@ -8,6 +8,10 @@
 //
 // 将来 Phase3 で data/dmp/actions/ への書き込みを追加する。
 
+// The route layer obtains its canonical-core adapter through this facade.  The
+// adapter itself remains stateless and never becomes a persistence authority.
+export { createActionTransport } from './dmp-action-transport.mjs'
+
 // ── 定数 ────────────────────────────────────────────────────────────────────
 
 export const ACTION_TYPES = Object.freeze([

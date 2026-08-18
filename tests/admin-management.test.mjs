@@ -272,6 +272,34 @@ test('article topic display and edit policy prefer shared GitHub data and distin
   assert.match(githubAdapter, /branch: ARTICLE_TOPICS_GITHUB_REF/)
 })
 
+test('DMP action routes delegate to the stateless canonical transport with mandatory CAS hashes', () => {
+  const store = readFileSync('src/lib/dmpActionStore.ts', 'utf8')
+  const collection = readFileSync('src/app/api/dmp-core/v1/actions/route.ts', 'utf8')
+  const summary = readFileSync('src/app/api/dmp-core/v1/actions/summary/route.ts', 'utf8')
+  const detail = readFileSync('src/app/api/dmp-core/v1/actions/[id]/route.ts', 'utf8')
+  const validate = readFileSync('src/app/api/dmp-core/v1/actions/[id]/validate/route.ts', 'utf8')
+  const transition = readFileSync('src/app/api/dmp-core/v1/actions/[id]/transition/route.ts', 'utf8')
+
+  for (const route of [collection, summary, detail, validate, transition]) {
+    assert.match(route, /createActionTransport/)
+    assert.match(route, /dmpActionCore/)
+    assert.match(route, /mode: 'dry-run'/)
+  }
+  assert.match(collection, /transport\.listActions/)
+  assert.match(collection, /transport\.createAction/)
+  assert.match(summary, /transport\.getActionSummary/)
+  assert.match(detail, /transport\.getAction/)
+  assert.match(validate, /transport\.validateAction\(\{ id, expected_snapshot_hash \}\)/)
+  assert.match(transition, /transport\.transitionAction\(\{ id, to_status, expected_snapshot_hash \}\)/)
+  assert.match(validate, /expected_snapshot_hash/)
+  assert.match(transition, /expected_snapshot_hash/)
+  assert.doesNotMatch(store, /\bMap\b|\.set\(|createAction\(input\)/)
+  assert.match(store, /core_unavailable/)
+  assert.match(store, /listActions\(\): CoreResult \{\s+return unavailable\(\)/)
+  assert.match(store, /createAction\(\): CoreResult \{\s+return unavailable\(\)/)
+  assert.match(store, /getActionSummary\(\): CoreResult \{\s+return unavailable\(\)/)
+})
+
 test('topic candidates and pending review expose status filters and rejected body previews', () => {
   const topicCandidates = readFileSync('src/app/admin/topic-candidates/page.tsx', 'utf8')
   const pendingReview = readFileSync('src/app/admin/pending-review/page.tsx', 'utf8')

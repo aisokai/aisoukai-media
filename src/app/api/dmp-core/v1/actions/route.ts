@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
-  validateActionInput,
-  createAction,
+  createActionTransport,
 } from '@/../scripts/lib/dmp-action.mjs'
-import { getAll, set } from '@/lib/dmpActionStore'
+import { dmpActionCore } from '@/lib/dmpActionStore'
+
+const transport = createActionTransport({ core: dmpActionCore })
 
 function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status })
@@ -15,10 +16,17 @@ export async function GET(request: NextRequest) {
   const channelFilter = searchParams.get('channel')
   const originFilter = searchParams.get('origin_surface')
 
-  let actions = getAll()
-  if (statusFilter) actions = actions.filter((a) => a.status === statusFilter)
-  if (channelFilter) actions = actions.filter((a) => a.channel === channelFilter)
-  if (originFilter) actions = actions.filter((a) => a.origin_surface === originFilter)
+  const result = await transport.listActions({
+    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(channelFilter ? { channel: channelFilter } : {}),
+    ...(originFilter ? { origin_surface: originFilter } : {}),
+  })
+
+  if (!result.ok) {
+    return jsonResponse({ ok: false, mode: 'dry-run', errors: result.errors ?? ['Action の取得に失敗しました'] }, 400)
+  }
+
+  const actions = Array.isArray(result.data) ? result.data : []
 
   return jsonResponse({
     ok: true,
@@ -46,18 +54,12 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const validation = validateActionInput(body)
-  if (!validation.valid) {
-    return jsonResponse({ ok: false, mode: 'dry-run', errors: validation.errors }, 400)
-  }
-
-  const result = createAction(body)
+  const result = await transport.createAction({ input: body })
   if (!result.ok) {
-    return jsonResponse({ ok: false, mode: 'dry-run', errors: result.errors }, 400)
+    return jsonResponse({ ok: false, mode: 'dry-run', errors: result.errors ?? ['Action の作成に失敗しました'] }, 400)
   }
 
   const action = result.data as { id: string; status: string; [key: string]: unknown }
-  set(action.id, { ...action, type: String(action.type), channel: String(action.channel), origin_surface: String(action.origin_surface) })
 
   return jsonResponse({
     ok: true,
