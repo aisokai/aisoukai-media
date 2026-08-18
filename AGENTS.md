@@ -1,3 +1,30 @@
+<!-- BEGIN:repository-policy -->
+# Canonical repository policy
+
+## Policy record
+
+- Policy version: `aisoukai-media-standard-non-stop-2026-08-18`
+- Gate profile: `STANDARD_NON_STOP`
+- Answer date: `2026-08-18`
+- Evidence reference: `teacher_message_2026_08_18_yes_gui_and_aisoukai_standard_non_stop_policy`
+- Teacher data handling declaration: `NO_SENSITIVE_DATA`
+- Declaration scope: DMP code, configuration, documentation, and tests only; no real data, secrets, credentials, patient data, or private-message bodies.
+
+## Declared boundary and operations
+
+- Affected paths and data flow are limited to non-sensitive DMP code, configuration, documentation, and test artifacts in this repository, processed locally without real-data access.
+- Metadata-only sources are repository policy, paths, and runtime configuration; the only sink is the local repository workspace.
+- Allowed reversible work in this declared scope: local edits, validation, tests, lint, builds, browser verification when UI changes require it, bounded repairs, targeted local commits after the seven completion gates, and—when separately declared by a v3 task contract—reviewed non-force push, repository sync, CI, preview or production application-code deploy, and machine-to-machine artifact transfer.
+- Prohibited in this declared scope: reading or writing secrets, credentials, tokens, production environment values, patient data, or private-message text; `THIRD_PARTY_HUMAN_DATA_TRANSFER`; payment or contractual actions; destructive or irreversible operations; cron, auto-dispatch, send-keys, and live execution.
+- A Human Gate remains required for destructive or irreversible work, payment or contractual action, `THIRD_PARTY_HUMAN_DATA_TRANSFER`, and any teacher-declared `SENSITIVE_STRICT` real-data boundary. Re-question only when the objective crosses this declaration, target, risk class, or sensitive boundary.
+
+## v3 execution
+
+- The active development protocol is `manager_worker_reviewer_v3` with `execution_container: "visible_task"`; the teacher-facing secretary is not a development manager.
+- Every development intake records one Teacher-first data declaration, bounded non-overlapping worker ownership, operation risk, standing authorization, and the seven completion gates. Independent review must clear correctness and safety before completion.
+- Runtime model and effort remain `unverified` unless official evidence is available. Legacy v1/v2, proposal-bound, compatibility, report transport, and reconciliation workflows are retired and must not be recreated.
+<!-- END:repository-policy -->
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
