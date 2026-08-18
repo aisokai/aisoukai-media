@@ -97,6 +97,21 @@ test('rejects mixed snapshots, unknown schema, and formula injection', () => {
   assert.throws(() => parseThemeTopicCsv(csvFor([themeRow({ topic: '=HYPERLINK("https://bad")' })])), /数式注入/)
 })
 
+test('requires the exact ordered 20-column contract without lossy header compatibility', () => {
+  const row = themeRow()
+  const reorderedHeader = [...THEME_TOPIC_CSV_COLUMNS]
+  ;[reorderedHeader[0], reorderedHeader[1]] = [reorderedHeader[1], reorderedHeader[0]]
+  const values = THEME_TOPIC_CSV_COLUMNS.map((column) => {
+    const value = typeof row[column] === 'object' ? JSON.stringify(row[column]) : row[column]
+    return csvCell(value)
+  })
+
+  assert.equal(THEME_TOPIC_CSV_COLUMNS.length, 20)
+  assert.throws(() => parseThemeTopicCsv(`${reorderedHeader.join(',')}\n${values.join(',')}\n`), /固定のtheme-topic-csv\.v1列/)
+  assert.throws(() => parseThemeTopicCsv(`${HEADER},unexpected\n${values.join(',')},${csvCell('extra')}\n`), /固定のtheme-topic-csv\.v1列/)
+  assert.throws(() => parseThemeTopicCsv(`${HEADER}\n${values.slice(0, -1).join(',')}\n`), /列数が固定列と一致/)
+})
+
 test('rejects duplicate theme topic IDs', () => {
   assert.throws(() => parseThemeTopicCsv(csvFor([
     themeRow(),
@@ -108,6 +123,8 @@ test('rejects non-active rows, malformed JSON, and unsafe/private markers', () =
   assert.throws(() => parseThemeTopicCsv(csvFor([themeRow({ state: 'draft' })])), /state は active/)
   assert.throws(() => parseThemeTopicCsv(`${HEADER}\n${csvCell('theme-topic-csv.v1')},${csvCell('snap')},${csvCell('hash')},${csvCell('theme-001')},${csvCell('1')},${csvCell('topic')},${csvCell('value')},${csvCell('fit')},${csvCell('safe')},${csvCell('{bad-json')},${csvCell('trend')},${csvCell('sum')},${csvCell('["blog"]')},${csvCell('[]')},${csvCell('[]')},${csvCell('active')},${csvCell('2026-07-14')},${csvCell('2026-07-14')},${csvCell('2026-07-14')},${csvCell('v1')}\n`), /JSONが不正/)
   assert.throws(() => parseThemeTopicCsv(csvFor([themeRow({ safe_angle: 'private patient notes' })])), /安全でない/)
+  assert.throws(() => parseThemeTopicCsv(csvFor([themeRow({ avoid_claims: ['credential is required'] })])), /安全でない/)
+  assert.throws(() => parseThemeTopicCsv(csvFor([themeRow({ channel_fit_reasons: { blog: 'secret source' } })])), /安全でない/)
 })
 
 test('uses conservative risk and deterministic category fallback', () => {
@@ -128,6 +145,35 @@ test('requires an explicit valid publish date', () => {
   assert.throws(() => buildBlogTopicRow(row), /publishDate/)
   assert.throws(() => buildBlogTopicRow(row, { publishDate: '2026-02-30' }), /publishDate/)
   assert.throws(() => buildBlogTopicRow(row, { publishDate: '=2026-08-01' }), /publishDate/)
+})
+
+test('preserves immutable lineage while using only intended topic fields for the blog intake', () => {
+  const [row] = parseThemeTopicCsv(csvFor([themeRow({
+    topic: '定期検診の流れ',
+    snapshot_id: 'notebook_event_ffffffff-ffff-4fff-8fff-ffffffffffff',
+    snapshot_hash: 'c'.repeat(64),
+    source_summary_hash: 'd'.repeat(64),
+    row_version: '17',
+  })]))
+  const intake = buildBlogTopicRow(row, { publishDate: '2026-08-18' })
+
+  assert.deepEqual(Object.fromEntries([
+    ['source_topic_id', intake.source_topic_id],
+    ['source_theme_topic_id', intake.source_theme_topic_id],
+    ['source_theme_snapshot_id', intake.source_theme_snapshot_id],
+    ['source_theme_snapshot_hash', intake.source_theme_snapshot_hash],
+    ['source_theme_row_version', intake.source_theme_row_version],
+  ]), {
+    source_topic_id: row.topic_id,
+    source_theme_topic_id: row.topic_id,
+    source_theme_snapshot_id: row.snapshot_id,
+    source_theme_snapshot_hash: row.snapshot_hash,
+    source_theme_row_version: row.row_version,
+  })
+  assert.equal(intake.status, 'theme_ready')
+  assert.equal(intake.publish_date, '2026-08-18')
+  assert.match(intake.notes, /source_summary_hash/)
+  assert.doesNotMatch(intake.notes, /recommended_channels|channel_fit_reasons/)
 })
 
 test('scans only temp post fixtures for existing source topic IDs', () => {

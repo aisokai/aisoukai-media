@@ -55,7 +55,8 @@ const REQUIRED_TEXT_COLUMNS = [
 const DATE_TIME_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?$/
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/
 const FORMULA_RE = /^[=+\-@]/
-const UNSAFE_MARKER_RE = /(private|secret|confidential|credential|password|api[\s_-]*(?:key|token)|access[\s_-]*(?:key|token)|authorization|bearer|\.env|個人情報|患者(?:データ|情報)|診療(?:情報|録)|カルテ|認証情報|パスワード|秘密)/iu
+const UNSAFE_MARKER_RE = /(private|secret|confidential|credential|password|api[\s_-]*(?:key|token)|access[\s_-]*(?:key|token)|authorization|bearer|\.env|dangerous|unsafe|do[\s_-]*not[\s_-]*use|個人情報|患者(?:データ|情報)|診療(?:情報|録)|カルテ|認証情報|パスワード|秘密|危険|使用禁止)/iu
+const LINEAGE_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/
 const MAX_NOTE_LENGTH = 1800
 
 const CATEGORY_RULES = [
@@ -257,8 +258,23 @@ function normalizeThemeRow(row, lineNumber = '?', { requireSchema = true } = {})
     assertSafeValue(value, `行 ${lineNumber}: channel_fit_reasons.${key}`)
   }
   if (!TOPIC_ID_RE.test(normalized.topic_id)) fail(`行 ${lineNumber}: topic_id の形式が不正です`)
+  for (const column of ['snapshot_id', 'row_version', 'source_kind', 'audit_policy_version']) {
+    if (!LINEAGE_TOKEN_RE.test(normalized[column])) {
+      fail(`行 ${lineNumber}: ${column} のlineageトークン形式が不正です`)
+    }
+  }
   if (!HASH_RE.test(normalized.snapshot_hash)) fail(`行 ${lineNumber}: snapshot_hash の形式が不正です`)
   if (!HASH_RE.test(normalized.source_summary_hash)) fail(`行 ${lineNumber}: source_summary_hash の形式が不正です`)
+  for (const column of JSON_ARRAY_COLUMNS) {
+    if (new Set(normalized[column]).size !== normalized[column].length) {
+      fail(`行 ${lineNumber}: ${column} に重複値があります`)
+    }
+  }
+  const channels = new Set(normalized.recommended_channels)
+  const reasonChannels = Object.keys(normalized.channel_fit_reasons)
+  if (reasonChannels.length !== channels.size || reasonChannels.some((channel) => !channels.has(channel))) {
+    fail(`行 ${lineNumber}: channel_fit_reasons がrecommended_channelsと一致しません`)
+  }
   for (const column of ['created_at', 'updated_at', 'last_audited_at']) {
     assertDateTime(normalized[column], `行 ${lineNumber}: ${column}`)
   }
