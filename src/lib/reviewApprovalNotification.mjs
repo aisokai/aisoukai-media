@@ -61,41 +61,8 @@ export function buildPostApprovalNotification({
   return lines.join('\n')
 }
 
-export async function notifyPostApprovedTelegram({
-  title,
-  slug,
-  reviewedBy,
-  commitSha,
-  publishDate,
-  date,
-  today,
-  env = process.env,
-  fetchImpl = fetch,
-}) {
-  const botToken = env.TELEGRAM_BOT_TOKEN
-  const chatId = env.TELEGRAM_CHAT_ID
-  if (!botToken || !chatId) return false
-
-  const text = buildPostApprovalNotification({
-    title,
-    slug,
-    reviewedBy,
-    commitSha,
-    publishDate,
-    date,
-    today,
-    env,
-  })
-
-  try {
-    const res = await fetchImpl(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    })
-    const json = await res.json()
-    return json.ok === true
-  } catch {
-    return false
-  }
+export async function notifyPostApprovedTelegram() {
+  // Third-party transfer stays hard-disabled until a separate, non-forgeable
+  // transport boundary is introduced under an explicit Human Gate.
+  return false
 }

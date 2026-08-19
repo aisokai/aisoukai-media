@@ -26,8 +26,8 @@ test('approval notification text includes article details and production links',
   assert.doesNotMatch(text, /localhost/)
 })
 
-test('approval notification sender posts to Telegram when credentials exist', async () => {
-  const calls = []
+test('approval notification sender is hard-disabled even with a synthetic human gate', async () => {
+  let fetchCalled = false
   const sent = await notifyPostApprovedTelegram({
     title: 'テスト記事',
     slug: '2026-06-29-test-post',
@@ -40,19 +40,72 @@ test('approval notification sender posts to Telegram when credentials exist', as
       TELEGRAM_CHAT_ID: '12345',
       NEXT_PUBLIC_SITE_URL: 'https://clinic.example.jp',
     },
-    fetchImpl: async (url, init) => {
-      calls.push({ url, init })
+    humanGate: {
+      status: 'approved',
+      scope: 'telegram_post_approval_notification',
+      thirdPartyHumanDataTransfer: 'authorized',
+      authorizationId: 'synthetic-test-gate',
+    },
+    fetchImpl: async () => {
+      fetchCalled = true
       return { ok: true, json: async () => ({ ok: true }) }
     },
   })
 
-  assert.equal(sent, true)
-  assert.equal(calls.length, 1)
-  assert.equal(calls[0].url, 'https://api.telegram.org/botdummy-token/sendMessage')
-  const body = JSON.parse(calls[0].init.body)
-  assert.equal(body.chat_id, '12345')
-  assert.match(body.text, /✅ 記事を承認しました/)
-  assert.match(body.text, /https:\/\/clinic\.example\.jp\/blog\/2026-06-29-test-post/)
+  assert.equal(sent, false)
+  assert.equal(fetchCalled, false)
+})
+
+test('approval notification sender is a no-op with credentials but without a valid human gate', async () => {
+  let fetchCalled = false
+  const sent = await notifyPostApprovedTelegram({
+    title: 'テスト記事',
+    slug: '2026-06-29-test-post',
+    reviewedBy: 'Reviewer',
+    commitSha: '1234567890abcdef',
+    publishDate: '2026-06-29',
+    today: '2026-06-29',
+    env: {
+      TELEGRAM_BOT_TOKEN: 'dummy-token',
+      TELEGRAM_CHAT_ID: '12345',
+    },
+    humanGate: {
+      status: 'approved',
+      scope: 'telegram_post_approval_notification',
+      thirdPartyHumanDataTransfer: 'unauthorized',
+      authorizationId: 'synthetic-test-gate',
+    },
+    fetchImpl: async () => {
+      fetchCalled = true
+      throw new Error('fetch must not be called')
+    },
+  })
+
+  assert.equal(sent, false)
+  assert.equal(fetchCalled, false)
+})
+
+test('approval notification sender is a no-op without an injected transport', async () => {
+  const sent = await notifyPostApprovedTelegram({
+    title: 'テスト記事',
+    slug: '2026-06-29-test-post',
+    reviewedBy: 'Reviewer',
+    commitSha: '1234567890abcdef',
+    publishDate: '2026-06-29',
+    today: '2026-06-29',
+    env: {
+      TELEGRAM_BOT_TOKEN: 'dummy-token',
+      TELEGRAM_CHAT_ID: '12345',
+    },
+    humanGate: {
+      status: 'approved',
+      scope: 'telegram_post_approval_notification',
+      thirdPartyHumanDataTransfer: 'authorized',
+      authorizationId: 'synthetic-test-gate',
+    },
+  })
+
+  assert.equal(sent, false)
 })
 
 test('approval notification sender is a no-op without Telegram credentials', async () => {
