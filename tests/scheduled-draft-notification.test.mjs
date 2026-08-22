@@ -1,9 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
+import { buildScheduledStockNotification, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
 
 const generated = { ok: true, generated: true, path: 'content/posts/2026-08-12-topic.md' }
 const stocked = { ok: true, stocked: true, contentVersion: 'a'.repeat(64) }
+
+test('stock notification states local storage and production-admin visibility without changing the review request', () => {
+  const dashboardUrl = 'https://example.test/admin/pending-review'
+  const notification = buildScheduledStockNotification({ dashboardUrl })
+
+  assert.match(notification, /ローカルに1件保存しました/)
+  assert.match(notification, /ローカル保存のため、本番の管理画面にはまだ表示されない場合があります/)
+  assert.match(notification, /内容とリスク情報を確認して承認してください/)
+  assert.match(notification, new RegExp(`${dashboardUrl.replaceAll('/', '\\/')}$`))
+})
 
 test('a generated article reaches notification only after durable stock', () => {
   const waiting = classifyScheduledDraftOutcome({ childStatus: 0, scheduledResult: generated })

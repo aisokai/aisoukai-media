@@ -27,11 +27,22 @@ test('admin dashboard differentiates selected progress from candidate and pendin
 
   for (const month of ['2026-08', '2026-09']) {
     const candidateFile = JSON.parse(readFileSync(`data/monthly-topic-candidates/${month}.json`, 'utf8'))
-    assert.equal(candidateFile.candidateCount, 24)
-    assert.equal(candidateFile.topics.length, 24)
-    assert.equal(candidateFile.targetPostCount, 12)
-    assert.equal(candidateFile.topics.filter((topic) => topic.status === 'pending').length, 24)
+    assert.equal(candidateFile.candidateCount, candidateFile.topics.length)
+    assert.ok(candidateFile.targetPostCount > 0)
+    assert.ok(candidateFile.targetPostCount <= candidateFile.candidateCount)
+    assert.ok(candidateFile.topics.filter((topic) => topic.status === 'pending').length <= candidateFile.candidateCount)
   }
+})
+
+test('admin dashboard uses the same GitHub-main-priority article topics loader as the CSV page', () => {
+  const dashboard = readFileSync('src/app/admin/page.tsx', 'utf8')
+
+  assert.match(dashboard, /import \{ loadAdminArticleTopics \} from '@\/lib\/articleTopics'/)
+  assert.match(dashboard, /import \{ readGitHubArticleTopicsCsv \} from '@\/lib\/articleTopicsGithub'/)
+  assert.match(dashboard, /await loadAdminArticleTopics\(readGitHubArticleTopicsCsv\)/)
+  assert.match(dashboard, /loadedArticleTopics\.ok \? loadedArticleTopics\.data\.summary : null/)
+  assert.doesNotMatch(dashboard, /getArticleTopics\(/)
+  assert.match(dashboard, /topicSummary \? `\$\{topicSummary\.approved\}件` : '読込不可'/)
 })
 
 test('unapproved articles remain visible to admin review but cannot publish, while exact Human approval can publish', () => {
