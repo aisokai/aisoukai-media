@@ -13,7 +13,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { isAdminAuthenticated } from '@/lib/adminAuth'
-import { buildArticleTopicSummary, getArticleTopics } from '@/lib/articleTopics'
+import { loadAdminArticleTopics } from '@/lib/articleTopics'
+import { readGitHubArticleTopicsCsv } from '@/lib/articleTopicsGithub'
 import { getAdminPosts } from '@/lib/adminPosts'
 import { getDefaultTopicCandidateMonth, getMonthlyTopicCandidatesForAdmin, buildTopicCandidateSummary } from '@/lib/monthlyTopicCandidates'
 import { getPendingReviewPostsForAdmin } from '@/lib/posts'
@@ -70,8 +71,8 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
   const pendingCount = pendingPosts.filter((post) => !post.rejectionReason).length
   const rejectedCount = pendingPosts.filter((post) => post.rejectionReason).length
   const archivedPosts = allPosts.filter((post) => post.archived).length
-  const topicRows = getArticleTopics()
-  const topicSummary = buildArticleTopicSummary(topicRows)
+  const loadedArticleTopics = await loadAdminArticleTopics(readGitHubArticleTopicsCsv)
+  const topicSummary = loadedArticleTopics.ok ? loadedArticleTopics.data.summary : null
   const month = requestedMonth ?? currentJstMonth()
   const requestedTopicFile = await getMonthlyTopicCandidatesForAdmin(month)
   const topicFile = requestedTopicFile
@@ -126,7 +127,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
           tone="blue"
           href={`/admin/topic-candidates?month=${displayMonth}&status=selected`}
         />
-        <Metric label="採用CSV" value={`${topicSummary.approved}件`} tone="green" href="/admin/article-topics?status=approved" />
+        <Metric label="採用CSV" value={topicSummary ? `${topicSummary.approved}件` : '読込不可'} tone="green" href="/admin/article-topics?status=approved" />
       </section>
 
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -151,7 +152,7 @@ export default async function AdminDashboardPage({ searchParams }: PageProps) {
           title="採用CSVの確認"
           description="確定済みの記事ネタCSVを確認し、状態・公開予定日・メモを編集します。"
           href="/admin/article-topics"
-          badge={`${topicSummary.total}件`}
+          badge={topicSummary ? `${topicSummary.total}件` : '読込不可'}
           tone="green"
         />
         <ToolCard

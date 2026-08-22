@@ -207,7 +207,7 @@ test('post-stock cleanup I/O failure stays pending but does not suppress notific
   assert.equal(outcome.exitCode, 0)
   assert.equal(
     buildScheduledStockNotification({ dashboardUrl: 'https://example.test/admin/pending-review' }),
-    '新しい記事を1件ストックしました。内容とリスク情報を確認して承認してください。\nhttps://example.test/admin/pending-review',
+    '新しい記事をローカルに1件保存しました。内容とリスク情報を確認して承認してください。この下書きはローカル保存のため、本番の管理画面にはまだ表示されない場合があります。\nhttps://example.test/admin/pending-review',
   )
 })
 
