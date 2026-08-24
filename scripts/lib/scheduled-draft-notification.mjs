@@ -4,15 +4,16 @@ function incident(reason, exitCode = 1) {
   return { kind: 'incident', exitCode, reason }
 }
 
-// A generated article is a review request as soon as its durable stock record
-// exists. Git/admin visibility and medical-risk labels are diagnostic details,
-// never notification gates. Human approval remains the only publication gate.
-export function buildScheduledStockNotification({ dashboardUrl }) {
-  return `新しい記事をローカルに1件保存しました。内容とリスク情報を確認して承認してください。この下書きはローカル保存のため、本番の管理画面にはまだ表示されない場合があります。\n${dashboardUrl}`
+// A durable local stock record is not evidence that the production admin can
+// review it. This notice deliberately has no approval CTA or production URL.
+// Human approval remains the only publication gate once the article is visible
+// in the authenticated production review queue.
+export function buildScheduledStockNotification() {
+  return '新しい記事をローカルのストックに1件保存しました。本番の管理画面にはまだ反映されていません。'
 }
 
 export function buildScheduledFailureNotification() {
-  return '記事ストックまたはTelegram通知に失敗しました。未送信として記録し、次回再試行します。'
+  return '記事ストックまたはTelegram通知に失敗しました。未送信として記録しました。必要に応じて運用確認してください。'
 }
 
 export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, stockResult, draftData = {}, draftContent = '' } = {}) {
@@ -42,7 +43,7 @@ export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, st
 
 export function scheduledDraftNotificationBoundary(outcome) {
   if (outcome?.kind === 'stocked' && outcome.exitCode === 0 && outcome.generated === true && outcome.stocked === true) {
-    return { kind: 'review-request', shouldSend: true, job: 'ops-mwf-review-request', contentVersion: outcome.contentVersion }
+    return { kind: 'stock-notice', shouldSend: true, job: 'ops-mwf-stock-notice', contentVersion: outcome.contentVersion }
   }
   if (outcome?.kind === 'incident') return { kind: 'incident', shouldSend: true, job: 'ops-mwf-incident' }
   return { kind: 'none', shouldSend: false, job: null }
@@ -50,6 +51,10 @@ export function scheduledDraftNotificationBoundary(outcome) {
 
 export function shouldSendDraftReviewNotification(outcome) {
   return scheduledDraftNotificationBoundary(outcome).kind === 'review-request'
+}
+
+export function shouldSendStockNoticeNotification(outcome) {
+  return scheduledDraftNotificationBoundary(outcome).kind === 'stock-notice'
 }
 
 export function shouldSendScheduledIncidentNotification(outcome) {

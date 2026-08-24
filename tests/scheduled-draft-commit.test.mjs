@@ -167,7 +167,7 @@ test('initial durable ledger write or rename failure never throws and classifies
     })
     assert.equal(outcome.kind, 'incident')
     assert.equal(outcome.exitCode, 1)
-    assert.equal(buildScheduledFailureNotification(), '記事ストックまたはTelegram通知に失敗しました。未送信として記録し、次回再試行します。')
+    assert.equal(buildScheduledFailureNotification(), '記事ストックまたはTelegram通知に失敗しました。未送信として記録しました。必要に応じて運用確認してください。')
   }
 })
 
@@ -206,8 +206,8 @@ test('post-stock cleanup I/O failure stays pending but does not suppress notific
   assert.equal(outcome.kind, 'stocked')
   assert.equal(outcome.exitCode, 0)
   assert.equal(
-    buildScheduledStockNotification({ dashboardUrl: 'https://example.test/admin/pending-review' }),
-    '新しい記事をローカルに1件保存しました。内容とリスク情報を確認して承認してください。この下書きはローカル保存のため、本番の管理画面にはまだ表示されない場合があります。\nhttps://example.test/admin/pending-review',
+    buildScheduledStockNotification(),
+    '新しい記事をローカルのストックに1件保存しました。本番の管理画面にはまだ反映されていません。',
   )
 })
 

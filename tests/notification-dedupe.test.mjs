@@ -34,14 +34,15 @@ test('failed sends can release the reservation so a retry can notify later', () 
   assert.equal(second.shouldSend, true)
 })
 
-test('failed versioned sends remain retryable and are not treated as successful dedupe', () => {
+test('legacy review-request failures remain stored but are not selected by the stock-notice retry job', () => {
   const root = mkdtempSync(join(tmpdir(), 'aisoukai-notify-dedupe-'))
   const version = 'c'.repeat(64)
   const first = reserveNotificationSend({ root, date: '2026-08-12', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
   first.fail({ text: 'retry me' })
   assert.deepEqual(readRetryableNotification({ root, job: 'ops-mwf-review-request' })?.contentVersion, version)
-  const retry = reserveNotificationSend({ root, date: '2026-08-13', job: 'ops-mwf-review-request', text: 'retry me', contentVersion: version })
-  assert.equal(retry.shouldSend, true)
+  assert.equal(readRetryableNotification({ root, job: 'ops-mwf-stock-notice' }), null)
+  const stockNotice = reserveNotificationSend({ root, date: '2026-08-13', job: 'ops-mwf-stock-notice', text: 'stock notice', contentVersion: version })
+  assert.equal(stockNotice.shouldSend, true)
 })
 
 test('an interrupted stale reservation is retryable while a fresh reservation remains in flight', () => {
@@ -65,16 +66,16 @@ test('a fresh interrupted reservation is not selected for retry', () => {
   assert.equal(readRetryableNotification({ root, job: 'ops-mwf-review-request' }), null)
 })
 
-test('review notifications dedupe by durable content version across dates, retry failures, and allow changed versions', () => {
+test('stock notices dedupe by durable content version across dates and allow changed versions', () => {
   const root = mkdtempSync(join(tmpdir(), 'aisoukai-notify-dedupe-'))
   const one = 'a'.repeat(64)
   const two = 'b'.repeat(64)
-  const first = reserveNotificationSend({ root, date: '2026-06-29', job: 'ops-mwf-review-request', text: 'one', contentVersion: one })
+  const first = reserveNotificationSend({ root, date: '2026-06-29', job: 'ops-mwf-stock-notice', text: 'one', contentVersion: one })
   first.commit()
-  const otherDate = reserveNotificationSend({ root, date: '2026-07-01', job: 'ops-mwf-review-request', text: 'one revised', contentVersion: one })
-  const changed = reserveNotificationSend({ root, date: '2026-07-01', job: 'ops-mwf-review-request', text: 'two', contentVersion: two })
+  const otherDate = reserveNotificationSend({ root, date: '2026-07-01', job: 'ops-mwf-stock-notice', text: 'one revised', contentVersion: one })
+  const changed = reserveNotificationSend({ root, date: '2026-07-01', job: 'ops-mwf-stock-notice', text: 'two', contentVersion: two })
   changed.release()
-  const retry = reserveNotificationSend({ root, date: '2026-07-02', job: 'ops-mwf-review-request', text: 'two', contentVersion: two })
+  const retry = reserveNotificationSend({ root, date: '2026-07-02', job: 'ops-mwf-stock-notice', text: 'two', contentVersion: two })
   assert.equal(otherDate.shouldSend, false)
   assert.equal(changed.shouldSend, true)
   assert.equal(retry.shouldSend, true)
