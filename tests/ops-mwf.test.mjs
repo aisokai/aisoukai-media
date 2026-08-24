@@ -6,9 +6,12 @@ import { isTelegramNotificationEnabled, notifySyncedDraftLedger, reconcileBefore
 test('weekly job reconciles the durable ledger immediately after its lock, including no-draft and missing-key runs', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
   const lock = source.indexOf('const runLock = acquireRunLock()')
+  const loadEnvironment = source.indexOf('  loadEnv()', lock)
   const reconcile = source.indexOf('const reconciled = await reconcileBeforeGeneration({')
   const missingApiKey = source.indexOf('!process.env.OPENAI_API_KEY')
   assert.ok(lock > 0)
+  assert.ok(loadEnvironment > lock, 'the local environment must load after the lock is acquired')
+  assert.ok(loadEnvironment < reconcile, 'the local environment must load before reconciliation can evaluate Telegram settings')
   assert.ok(reconcile > lock)
   assert.ok(missingApiKey > reconcile)
   assert.match(source, /Git同期はAI生成に依存しないため、生成設定がない実行でも先に突合する/)
