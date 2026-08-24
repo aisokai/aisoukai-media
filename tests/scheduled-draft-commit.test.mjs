@@ -31,6 +31,16 @@ medical_risk: high
 ---
 Draft body for ${title}
 `
+const approvedPost = (title) => `---
+title: ${title}
+reviewed: true
+draft: false
+auto_approved: false
+reviewed_at: "2026-08-20"
+reviewed_by: 先生
+---
+Approved body for ${title}
+`
 
 function hashes(content) {
   const buffer = Buffer.from(content)
@@ -896,4 +906,92 @@ test('remote sync refuses legacy provenance before any Git operation', () => {
   assert.match(result.reason, /allowlist外.*provenance/)
   assert.equal(calls.length, 0)
   assert.equal(readOwnedGeneratedDraftLedger(root).entries[0].provenance, 'legacy-v2')
+})
+
+// Human承認は admin 経路でファイルを書き換えるため、ledger記録時のhashとは必ず一致しなくなる。
+// この stale entry がバッチ全体を止めると、以降のdraftが恒久的に同期不能になる（2026-08-24 監査）。
+test('a Human-approved stale ledger entry is retired without blocking the remaining pending draft', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  writePost(root, path2, safeDraft('two'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path2, slug: slug2 } })
+  writePost(root, path1, approvedPost('one'))
+
+  const syncable = readOwnedGeneratedDraftLedger(root).entries.filter((item) => item.path === path2)
+  const calls = []
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner(calls, syncable),
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.synced, true)
+  assert.deepEqual(readOwnedGeneratedDraftLedger(root).entries.map((item) => item.path), [path2])
+  assert.equal(calls.some((call) => call.includes(path1)), false)
+})
+
+// 承認以外の理由で記録と一致しなくなった entry は、人の確認が必要なため退役させずに保持する。
+// ただし他の健全なdraftの同期を巻き添えで止めてはならない（2026-08-24 監査）。
+test('a ledger entry whose file no longer matches is retained and skipped without blocking others', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  writePost(root, path2, safeDraft('two'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path2, slug: slug2 } })
+  writePost(root, path1, safeDraft('one edited'))
+
+  const syncable = readOwnedGeneratedDraftLedger(root).entries.filter((item) => item.path === path2)
+  const calls = []
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner(calls, syncable),
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.synced, true)
+  assert.deepEqual(
+    readOwnedGeneratedDraftLedger(root).entries.map((item) => item.path).sort(),
+    [path1, path2].sort(),
+  )
+  assert.equal(calls.some((call) => call.includes(path1)), false)
+})
+
+// 2026-08-24 障害の再現: 承認済み legacy-v1 と hash 不一致 draft が ledger 先頭に滞留し、
+// 健全な未承認draftが約1ヶ月間 origin/main へ同期できなくなっていた。
+test('a stale approved legacy entry and a mismatched draft no longer block the healthy draft from syncing', () => {
+  const root = makeRoot()
+  const path3 = 'content/posts/2026-08-05-topic-0f1e2d3c4b5a6978.md'
+  writePost(root, path1, safeDraft('legacy'))
+  writePost(root, path2, safeDraft('mismatched'))
+  writePost(root, path3, safeDraft('healthy'))
+  const stale = entry(path1, safeDraft('legacy'))
+  stale.provenance = 'legacy-v1'
+  const mismatched = entry(path2, safeDraft('mismatched'))
+  mismatched.contentSha256 = 'f'.repeat(64)
+  writeFileSync(ledgerFile(root), `${JSON.stringify({
+    version: 3,
+    entries: [stale, mismatched, entry(path3, safeDraft('healthy'))],
+  })}\n`)
+  writePost(root, path1, approvedPost('legacy'))
+
+  const calls = []
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner(calls, [entry(path3, safeDraft('healthy'))]),
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.synced, true)
+  assert.deepEqual(
+    readOwnedGeneratedDraftLedger(root).entries.map((item) => item.path).sort(),
+    [path2, path3].sort(),
+  )
+  assert.equal(calls.some((call) => call.includes(path1) || call.includes(path2)), false)
 })

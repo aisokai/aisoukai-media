@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildScheduledReviewNotification, buildScheduledStockNotification, contentVersionForResolvedEntries, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification, shouldSendStockNoticeNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
+import { buildScheduledReviewNotification, buildScheduledStockNotification, contentVersionForResolvedEntries, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification, shouldSendStockNoticeNotification, stuckDraftLedgerNotice } from '../scripts/lib/scheduled-draft-notification.mjs'
 
 const generated = { ok: true, generated: true, path: 'content/posts/2026-08-12-topic.md' }
 const stocked = { ok: true, stocked: true, contentVersion: 'a'.repeat(64) }
@@ -104,4 +104,28 @@ test('only generation, stock, and malformed-result failures stop the review requ
   const empty = classifyScheduledDraftOutcome({ childStatus: 0, scheduledResult: { ok: true, generated: false } })
   assert.equal(empty.kind, 'no-draft')
   assert.equal(scheduledDraftNotificationBoundary(empty).shouldSend, false)
+})
+
+// 2026-08-24 障害: 同期保留がプロセス終了コードにも通知にも現れず、約1ヶ月間気づけなかった。
+// 滞留を検知したら毎回知らせる（承認・公開には一切関与しない観測専用の通知）。
+test('a deferred sync with unresolved ledger entries reports the backlog every run', () => {
+  const notice = stuckDraftLedgerNotice({
+    draftSyncResult: { ok: false, reason: 'origin/main と完全一致しないため本番同期を保留しました' },
+    ledgerEntries: [{ path: 'content/posts/2026-08-19-a.md' }, { path: 'content/posts/2026-08-24-b.md' }],
+  })
+
+  assert.equal(notice.shouldSend, true)
+  assert.equal(notice.stuckCount, 2)
+  assert.equal(notice.job, 'ops-mwf-stuck-ledger')
+  assert.match(notice.text, /2件/)
+  assert.match(notice.text, /origin\/main と完全一致しない/)
+  assert.doesNotMatch(notice.text, /承認|\/admin|https?:\/\//)
+})
+
+test('a synced result, an empty ledger, or a missing sync result never sends a backlog notice', () => {
+  const entries = [{ path: 'content/posts/2026-08-19-a.md' }]
+  assert.equal(stuckDraftLedgerNotice({ draftSyncResult: { ok: true, synced: true }, ledgerEntries: entries }).shouldSend, false)
+  assert.equal(stuckDraftLedgerNotice({ draftSyncResult: { ok: false, reason: 'x' }, ledgerEntries: [] }).shouldSend, false)
+  assert.equal(stuckDraftLedgerNotice({ ledgerEntries: entries }).shouldSend, false)
+  assert.equal(stuckDraftLedgerNotice({ draftSyncResult: { ok: false, reason: 'x' } }).shouldSend, false)
 })

@@ -111,3 +111,13 @@ test('approval remains the only publication gate', () => {
   assert.match(source, /approve \/ publish は実行していません/)
   assert.doesNotMatch(source, /approve-post|publish-post|git', \['push'/)
 })
+
+// 2026-08-24 障害: 同期保留が通知にも終了コードにも現れず約1ヶ月気づけなかった。
+test('a stuck ledger is reported on every run instead of failing silently', () => {
+  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  assert.match(source, /stuckDraftLedgerNotice/)
+  assert.match(source, /readOwnedGeneratedDraftLedger/)
+  assert.match(source, /滞留/)
+  // 観測専用であり、承認・公開の経路を新設しないこと
+  assert.doesNotMatch(source, /approve-post|publish-post/)
+})

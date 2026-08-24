@@ -209,6 +209,20 @@ function verifyEntryFile(root, entry) {
   }
 }
 
+// Human承認は admin 経路で frontmatter を reviewed:true / draft:false に書き換えるため、
+// ledger 記録時の hash とは必ず一致しなくなる。承認済み記事は「未承認draft」ではなく、
+// MWF が同期すべき対象でもないため、ledger の追跡記録だけを退役させる。
+function isHumanApprovedPost(root, entry) {
+  try {
+    const frontmatter = readFileSync(join(root, entry.path), 'utf8')
+      .match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)?.[1]
+    if (!frontmatter) return false
+    return /^reviewed:\s*true\s*$/m.test(frontmatter) && !/^draft:\s*true\s*$/m.test(frontmatter)
+  } catch {
+    return false
+  }
+}
+
 function verifyTrackedCleanBlob({ entry, runCommand }) {
   const tracked = runCommand('git', ['ls-files', '--error-unmatch', '--', entry.path])
   if (!tracked.ok || tracked.output.trim() !== entry.path) return fail(`管理対象draftを追跡確認できません: ${entry.path}`)
@@ -286,9 +300,39 @@ export function recoverOwnedGeneratedDraft({
     return { ok: true, committed: false, recovered: false, reason: '同期対象の管理済みdraftはありません' }
   }
 
+  // 1件でも検証に失敗すると全体を中断していたため、承認済みなどで恒久的に検証不能になった
+  // entry が以降のdraftを永久に同期不能にしていた（2026-08-24 監査）。
+  // 承認済みの entry は ledger から退役させ、それ以外の検証失敗は人の確認が必要なため保持する。
+  // いずれも commit・push・承認・公開は一切行わず、健全なdraftだけを同期対象にする。
+  const retiredEntries = []
+  const blockedEntries = []
+  const activeEntries = []
+  let firstBlockedFailure = null
   for (const entry of entries) {
     const verified = verifyEntryFile(root, entry)
-    if (!verified.ok) return verified
+    if (verified.ok) {
+      activeEntries.push(entry)
+    } else if (isHumanApprovedPost(root, entry)) {
+      retiredEntries.push(entry)
+    } else {
+      blockedEntries.push(entry)
+      firstBlockedFailure ??= verified
+    }
+  }
+  if (retiredEntries.length > 0) {
+    const retire = removeOrWriteLedger(root, [...activeEntries, ...blockedEntries], ledgerIo)
+    if (!retire.ok) return fail(retire.reason, { stocked: true })
+  }
+  if (activeEntries.length === 0) {
+    // 同期できるdraftが1件も無い場合は、従来どおり検証失敗をそのまま返して fail-closed を保つ。
+    if (firstBlockedFailure) return firstBlockedFailure
+    return {
+      ok: true,
+      committed: false,
+      recovered: false,
+      retiredEntries: retiredEntries.length,
+      reason: '同期対象の管理済みdraftはありません',
+    }
   }
 
   const readiness = assertGitReady(state.ledger)
@@ -300,7 +344,7 @@ export function recoverOwnedGeneratedDraft({
   // recovery path. It must start from an exact, clean origin/main base so it
   // can never carry unrelated local commits or resolve a divergence itself.
   if (syncRemote) {
-    if (entries.some((entry) => entry.provenance !== 'generated')) {
+    if (activeEntries.some((entry) => entry.provenance !== 'generated')) {
       return fail('既存allowlist外のprovenanceを含むため本番同期を保留しました')
     }
     if (!String(gitPath).startsWith('/')) return fail('git実行pathが絶対pathではないため本番同期を保留しました')
@@ -324,16 +368,16 @@ export function recoverOwnedGeneratedDraft({
 
   const status = runCommand(syncRemote ? gitPath : 'git', ['status', '--porcelain'])
   if (!status.ok) return fail('ローカル状態を確認できないため同期を保留しました')
-  const states = classifyOwnedDraftStatus(status.output, entries.map((entry) => entry.path))
+  const states = classifyOwnedDraftStatus(status.output, activeEntries.map((entry) => entry.path))
   if (!states) return fail('管理対象外の変更または不明な状態があるため同期を保留しました')
 
   const resolvedPaths = new Set()
   const pendingEntries = []
-  for (const entry of entries) {
+  for (const entry of activeEntries) {
     if (states[entry.path] === 'clean') {
       const tracked = verifyTrackedCleanBlob({ entry, runCommand: (command, args) => runCommand(syncRemote ? gitPath : command, args) })
       if (!tracked.ok) {
-        const retained = retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, ledgerIo)
+        const retained = retainUnresolvedAfterPartialVerification(root, [...activeEntries, ...blockedEntries], resolvedPaths, ledgerIo)
         return {
           ...tracked,
           reason: retained.persisted.ok ? tracked.reason : `${tracked.reason}; ${retained.persisted.reason}`,
@@ -344,7 +388,7 @@ export function recoverOwnedGeneratedDraft({
       resolvedPaths.add(entry.path)
     } else {
       if (entry.provenance === 'legacy-v1') {
-        const retained = retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, ledgerIo)
+        const retained = retainUnresolvedAfterPartialVerification(root, [...activeEntries, ...blockedEntries], resolvedPaths, ledgerIo)
         return fail('legacy v1 marker由来の未反映draftは内容provenanceが不足するためHuman同期待ちにします', {
           reason: retained.persisted.ok
             ? 'legacy v1 marker由来の未反映draftは内容provenanceが不足するためHuman同期待ちにします'
@@ -375,12 +419,12 @@ export function recoverOwnedGeneratedDraft({
         alreadySynced: true,
         recovered: true,
         remoteHead,
-        resolvedEntries: entries,
+        resolvedEntries: activeEntries,
         ledgerPending: true,
         reason: '管理対象draftはorigin/mainへの同期済み確認を完了し、Human review通知待ちです。',
       }
     }
-    const cleanup = removeOrWriteLedger(root, [], ledgerIo)
+    const cleanup = removeOrWriteLedger(root, blockedEntries, ledgerIo)
     if (!cleanup.ok) return fail(cleanup.reason, { committed: true, stocked: true })
     return {
       ok: true,

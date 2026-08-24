@@ -8,7 +8,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { loadGateConfig } from './lib/media-queue.mjs'
-import { rememberGeneratedDraft, syncOwnedGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
+import { readOwnedGeneratedDraftLedger, rememberGeneratedDraft, syncOwnedGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
 import {
   buildScheduledFailureNotification,
   buildScheduledReviewNotification,
@@ -18,6 +18,7 @@ import {
   notifySyncedDraftLedger,
   reconcileBeforeGeneration,
   scheduledDraftNotificationBoundary,
+  stuckDraftLedgerNotice,
 } from './lib/scheduled-draft-notification.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -195,6 +196,21 @@ const reconciled = await reconcileBeforeGeneration({
   notify: async ({ root, draftSyncResult }) => notifySyncedDraftLedger({ root, draftSyncResult, sendNotification: sendOpsTelegram }),
 })
 if (!reconciled.notification.ok) console.error(`❌ 同期済みledgerの通知または消込に失敗: ${reconciled.notification.reason}`)
+// 同期保留が滞留として残る場合は毎回知らせる。沈黙したまま停止し続けないための観測専用通知で、
+// 承認・公開・同期状態のいずれも変更しない。
+const stuck = stuckDraftLedgerNotice({
+  draftSyncResult: reconciled.draftSyncResult,
+  ledgerEntries: readOwnedGeneratedDraftLedger(ROOT)?.entries ?? [],
+})
+if (stuck.shouldSend) {
+  console.error(`⚠️ 本番へ未同期の下書きが${stuck.stuckCount}件滞留しています: ${reconciled.draftSyncResult.reason}`)
+  try {
+    const stuckSend = await sendOpsTelegram(stuck.text, { job: stuck.job })
+    if (stuckSend.suppressed === true) console.log('⏭ Telegram通知は media-gate の設定により送信しません')
+  } catch (error) {
+    console.error(`❌ 滞留通知の送信に失敗しました: ${error.message}`)
+  }
+}
 if (!SEND_DAYS.has(dayOfWeek) && !force) {
   console.log('⏭ 月・水・金以外のため実行しません')
   process.exit(0)

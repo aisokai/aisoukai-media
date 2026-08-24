@@ -41,6 +41,22 @@ export function buildScheduledFailureNotification() {
   return '記事ストックまたはTelegram通知に失敗しました。未送信として記録しました。必要に応じて運用確認してください。'
 }
 
+// 同期保留は従来、終了コードにも通知にも現れず、滞留が約1ヶ月間気づかれなかった（2026-08-24 障害）。
+// 保留かつ未解決entryが残っている場合は毎回知らせる。承認・公開には一切関与せず、
+// 本番管理画面のCTAもURLも持たない観測専用の通知である。
+export function stuckDraftLedgerNotice({ draftSyncResult, ledgerEntries } = {}) {
+  if (draftSyncResult?.ok !== false) return { shouldSend: false }
+  if (!Array.isArray(ledgerEntries) || ledgerEntries.length === 0) return { shouldSend: false }
+  const stuckCount = ledgerEntries.length
+  const reason = String(draftSyncResult.reason ?? '').trim() || '理由を確認できません'
+  return {
+    shouldSend: true,
+    job: 'ops-mwf-stuck-ledger',
+    stuckCount,
+    text: `⚠️ MWF: 本番へ未同期の下書きが${stuckCount}件たまっています。\n理由: ${reason}\n本番の管理画面にはまだ反映されていません。`,
+  }
+}
+
 export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, stockResult, draftSyncResult, draftData = {}, draftContent = '' } = {}) {
   if (!Number.isInteger(childStatus) || childStatus < 0) return incident('scheduled child の終了状態を確認できませんでした')
   if (childStatus !== 0) return incident(`scheduled child が exit ${childStatus} で停止しました`, childStatus)
