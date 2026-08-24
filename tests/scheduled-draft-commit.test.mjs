@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import {
   classifyOwnedDraftStatus,
+  finalizeSyncedDraftLedger,
   readOwnedGeneratedDraftLedger,
   recoverOwnedGeneratedDraft,
   rememberGeneratedDraft,
@@ -732,7 +733,8 @@ test('remote sync fetches an exact origin/main base, pushes only the owned draft
   assert.equal(result.ok, true)
   assert.equal(result.synced, true)
   assert.equal(result.remoteHead, 'b'.repeat(40))
-  assert.equal(existsSync(ledgerFile(root)), false)
+  assert.equal(result.ledgerPending, true)
+  assert.equal(existsSync(ledgerFile(root)), true)
   assert.ok(calls.some((call) => call.join(' ') === '/usr/bin/git fetch --quiet origin main'))
   assert.ok(calls.some((call) => call.join(' ') === '/usr/bin/git push origin HEAD:refs/heads/main'))
   assert.ok(calls.some((call) => call.join(' ') === '/usr/bin/git ls-remote --exit-code origin refs/heads/main'))
@@ -780,6 +782,94 @@ test('remote sync retains the ledger when the post-push remote SHA is not the co
   assert.equal(result.committed, true)
   assert.match(result.reason, /origin\/main SHA/)
   assert.equal(readOwnedGeneratedDraftLedger(root).entries.length, 1)
+})
+
+test('remote sync retains the ledger after an exact remote SHA until notification finalization', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner([], entries),
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.synced, true)
+  assert.equal(result.ledgerPending, true)
+  assert.deepEqual(result.resolvedEntries, entries)
+  assert.equal(existsSync(ledgerFile(root)), true)
+})
+
+test('finalize removes only exactly resolved entries and leaves unrelated work durable', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  writePost(root, path2, safeDraft('two'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  rememberGeneratedDraft({ root, scheduledResult: { path: path2, slug: slug2 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+
+  const result = finalizeSyncedDraftLedger({ root, resolvedEntries: [entries[0]] })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.finalized, true)
+  assert.deepEqual(readOwnedGeneratedDraftLedger(root).entries, [entries[1]])
+})
+
+test('finalize write failure is structured and preserves every ledger entry', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  writePost(root, path2, safeDraft('two'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  rememberGeneratedDraft({ root, scheduledResult: { path: path2, slug: slug2 } })
+  const before = readFileSync(ledgerFile(root), 'utf8')
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+
+  const result = finalizeSyncedDraftLedger({
+    root,
+    resolvedEntries: [entries[0]],
+    ledgerIo: { writeFileSync: () => { throw new Error('injected finalize write failure') } },
+  })
+
+  assert.equal(result.ok, false)
+  assert.equal(result.finalized, false)
+  assert.match(result.reason, /ledgerの書き込みに失敗/)
+  assert.equal(readFileSync(ledgerFile(root), 'utf8'), before)
+})
+
+test('already-pushed clean ledger entries are re-recognized as synced only when origin/main exactly matches HEAD', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+  const calls = []
+  const head = 'd'.repeat(40)
+  const runCommand = (command, args) => {
+    calls.push([command, ...args])
+    assert.equal(command, '/usr/bin/git')
+    if (args[0] === 'branch') return { ok: true, output: 'main' }
+    if (args[0] === 'fetch') return { ok: true, output: '' }
+    if (args[0] === 'rev-list') return { ok: true, output: '0\t0' }
+    if (args[0] === 'diff' && args[1] === '--cached') return { ok: true, output: '' }
+    if (args[0] === 'status') return { ok: true, output: '' }
+    if (args[0] === 'ls-files') return { ok: true, output: path1 }
+    if (args[0] === 'diff' && args[1] === '--quiet') return { ok: true, output: '' }
+    if (args[0] === 'rev-parse' && args[1] === `HEAD:${path1}`) return { ok: true, output: entries[0].gitBlob }
+    if (args[0] === 'rev-parse' && args[1] === 'HEAD') return { ok: true, output: head }
+    if (args[0] === 'ls-remote') return { ok: true, output: `${head}\trefs/heads/main` }
+    throw new Error(`unexpected command: ${command} ${args.join(' ')}`)
+  }
+
+  const result = syncOwnedGeneratedDraft({ root, assertGitReady: () => ({ ok: true }), indexLockExists: () => false, runCommand })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.synced, true)
+  assert.equal(result.alreadySynced, true)
+  assert.equal(result.ledgerPending, true)
+  assert.equal(calls.some((call) => call[1] === 'push' || call[1] === 'commit'), false)
+  assert.equal(existsSync(ledgerFile(root)), true)
 })
 
 test('remote sync refuses legacy provenance before any Git operation', () => {

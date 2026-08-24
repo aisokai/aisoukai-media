@@ -4,15 +4,19 @@
 import { spawnSync } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
+import { loadGateConfig } from './lib/media-queue.mjs'
 import { rememberGeneratedDraft, syncOwnedGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
 import {
   buildScheduledFailureNotification,
   buildScheduledReviewNotification,
   buildScheduledStockNotification,
   classifyScheduledDraftOutcome,
+  isTelegramNotificationEnabled,
+  notifySyncedDraftLedger,
+  reconcileBeforeGeneration,
   scheduledDraftNotificationBoundary,
 } from './lib/scheduled-draft-notification.mjs'
 
@@ -23,20 +27,6 @@ const LOCK_PATH = join(LOG_DIR, 'ops-mwf.lock')
 const LOCK_STALE_MS = 2 * 60 * 60 * 1000
 const SEND_DAYS = new Set([1, 3, 5])
 const DAY_NAMES_JA = ['日', '月', '火', '水', '木', '金', '土']
-const cliArgs = process.argv.slice(2)
-const force = cliArgs.includes('--force')
-const noGenerate = cliArgs.includes('--no-generate')
-const dryRun = cliArgs.includes('--dry-run')
-
-if (cliArgs.includes('--auto-publish')) {
-  console.error('❌ ops:mwf では --auto-publish を受け付けません。承認前の記事は掲載しません。')
-  process.exit(1)
-}
-if (dryRun) {
-  console.log('ops:mwf dry-run: 生成・ストック・通知は実行していません')
-  process.exit(0)
-}
-
 const nowJst = new Date(Date.now() + 9 * 3600 * 1000)
 const TODAY = nowJst.toISOString().slice(0, 10)
 const dayOfWeek = nowJst.getUTCDay()
@@ -59,16 +49,6 @@ function acquireRunLock() {
     return { acquired: false, reason: '別の ops:mwf が実行中です' }
   }
 }
-
-const runLock = acquireRunLock()
-if (!runLock.acquired) {
-  console.log(`⏭ ${runLock.reason}`)
-  process.exit(0)
-}
-process.on('exit', () => {
-  try { closeSync(runLock.fd) } catch {}
-  try { unlinkSync(LOCK_PATH) } catch {}
-})
 
 function loadEnv() {
   const envPath = join(ROOT, '.env.local')
@@ -114,6 +94,10 @@ async function sendTelegram(botToken, chatId, text) {
 }
 
 async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-stock-notice', contentVersion } = {}) {
+  // notifyTelegramIfConfigured cannot be reused here: it owns send success but
+  // not this workflow's reservation.commit/fail lifecycle. Reuse its shared
+  // loadGateConfig policy instead, before creating any dedupe reservation.
+  if (!isTelegramNotificationEnabled(loadGateConfig())) return { sent: false, suppressed: true }
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
   const reservation = reserveNotificationSend({ root: ROOT, date, job, text, contentVersion })
@@ -132,8 +116,85 @@ async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-stock-notice
   }
 }
 
-loadEnv()
+function notificationText(outcome) {
+  return outcome.kind === 'synced'
+    ? buildScheduledReviewNotification()
+    : outcome.kind === 'stocked'
+      ? buildScheduledStockNotification()
+      : buildScheduledFailureNotification()
+}
+
+async function notifyOutcome(outcome, draftSyncResult) {
+  if (outcome.kind === 'synced' && draftSyncResult?.ledgerPending === true) {
+    const result = await notifySyncedDraftLedger({
+      root: ROOT,
+      draftSyncResult,
+      sendNotification: sendOpsTelegram,
+    })
+    if (!result.ok) {
+      // 通知失敗時はledgerを保持し、次回の無条件突合で安全に再試行する。
+      console.error(`❌ 同期済みledgerの通知または消込に失敗: ${result.reason}`)
+      process.exitCode = 1
+      return result
+    }
+    if (result.suppressed === true) {
+      console.log('⏭ Telegram通知は media-gate の設定により送信しません')
+      return result
+    }
+    console.log('✅ Telegram通知処理を完了しました')
+    return result
+  }
+  const boundary = scheduledDraftNotificationBoundary(outcome)
+  if (!boundary.shouldSend) return { notified: false }
+  const text = notificationText(outcome)
+  try {
+    const notificationResult = await sendOpsTelegram(text, boundary)
+    if (notificationResult.suppressed === true) {
+      console.log('⏭ Telegram通知は media-gate の設定により送信しません')
+      return { notified: false, suppressed: true }
+    }
+    console.log('✅ Telegram通知処理を完了しました')
+    return { notified: true }
+  } catch (error) {
+    // 通知失敗時はledgerを保持し、次回の無条件突合で安全に再試行する。
+    console.error(`❌ Telegram送信失敗: ${error.message}`)
+    process.exitCode = 1
+    return { notified: false }
+  }
+}
+
+async function main() {
+  const cliArgs = process.argv.slice(2)
+  const force = cliArgs.includes('--force')
+  const noGenerate = cliArgs.includes('--no-generate')
+  const dryRun = cliArgs.includes('--dry-run')
+  if (cliArgs.includes('--auto-publish')) {
+    console.error('❌ ops:mwf では --auto-publish を受け付けません。承認前の記事は掲載しません。')
+    process.exit(1)
+  }
+  if (dryRun) {
+    console.log('ops:mwf dry-run: 生成・ストック・通知は実行していません')
+    process.exit(0)
+  }
+  const runLock = acquireRunLock()
+  if (!runLock.acquired) {
+    console.log(`⏭ ${runLock.reason}`)
+    process.exit(0)
+  }
+  process.on('exit', () => {
+    try { closeSync(runLock.fd) } catch {}
+    try { unlinkSync(LOCK_PATH) } catch {}
+  })
+
+  loadEnv()
 console.log(`ops:mwf ${TODAY}（${DAY_NAMES_JA[dayOfWeek]}）: CSV → 記事 → ストック → Telegram → Human承認 → 掲載`)
+// Git同期はAI生成に依存しないため、生成設定がない実行でも先に突合する。
+const reconciled = await reconcileBeforeGeneration({
+  root: ROOT,
+  runCommand: runGitCommand,
+  notify: async ({ root, draftSyncResult }) => notifySyncedDraftLedger({ root, draftSyncResult, sendNotification: sendOpsTelegram }),
+})
+if (!reconciled.notification.ok) console.error(`❌ 同期済みledgerの通知または消込に失敗: ${reconciled.notification.reason}`)
 if (!SEND_DAYS.has(dayOfWeek) && !force) {
   console.log('⏭ 月・水・金以外のため実行しません')
   process.exit(0)
@@ -149,9 +210,10 @@ if (noGenerate) {
   const childStatus = runScheduledArticle(resultPath)
   const scheduledResult = readJsonIfExists(resultPath)
   let outcome = classifyScheduledDraftOutcome({ childStatus, scheduledResult })
+  let draftSyncResult
   if (outcome.kind === 'generated-awaiting-stock') {
     const stockResult = rememberGeneratedDraft({ root: ROOT, scheduledResult })
-    const draftSyncResult = stockResult.ok === true && stockResult.stocked === true
+    draftSyncResult = stockResult.ok === true && stockResult.stocked === true
       ? syncOwnedGeneratedDraft({
           root: ROOT,
           runCommand: runGitCommand,
@@ -165,18 +227,7 @@ if (noGenerate) {
 
   const boundary = scheduledDraftNotificationBoundary(outcome)
   if (boundary.shouldSend) {
-    const text = outcome.kind === 'synced'
-      ? buildScheduledReviewNotification()
-      : outcome.kind === 'stocked'
-        ? buildScheduledStockNotification()
-        : buildScheduledFailureNotification()
-    try {
-      await sendOpsTelegram(text, boundary)
-      console.log('✅ Telegram通知処理を完了しました')
-    } catch (error) {
-      console.error(`❌ Telegram送信失敗: ${error.message}`)
-      process.exitCode = 1
-    }
+    await notifyOutcome(outcome, draftSyncResult)
   } else if (outcome.kind === 'no-draft') {
     console.log('⏭ 未使用ネタがないため生成しません')
   } else {
@@ -186,3 +237,6 @@ if (noGenerate) {
 }
 
 console.log('approve / publish は実行していません。掲載に進める唯一の条件はHuman承認です。')
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()

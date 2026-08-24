@@ -34,9 +34,10 @@ test('only exact Human approval makes a draft publishable', () => {
 
 test('all current Human-approved posts retain one locked, publishable version after migration', () => {
   const approvedPosts = currentHumanApprovedPosts()
-  assert.equal(approvedPosts.length, 33)
+  // 承認記事数は正常に増加し得るため、下限で承認記事の欠落だけを検知する。
+  assert.ok(approvedPosts.length >= 33)
   for (const { file, parsed } of approvedPosts) {
-    const status = getPostPublicationStatus(parsed.data, { today: '2026-08-11', content: parsed.content })
+    const status = getPostPublicationStatus(parsed.data, { today: '2026-08-17', content: parsed.content })
     assert.equal(status.publishable, true, file)
     assert.equal(parsed.data.reviewed_content_hash, getContentVersion(parsed.data, parsed.content), file)
   }

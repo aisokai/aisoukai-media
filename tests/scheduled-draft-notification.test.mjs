@@ -1,6 +1,7 @@
+import { createHash } from 'node:crypto'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildScheduledReviewNotification, buildScheduledStockNotification, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification, shouldSendStockNoticeNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
+import { buildScheduledReviewNotification, buildScheduledStockNotification, contentVersionForResolvedEntries, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification, shouldSendStockNoticeNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
 
 const generated = { ok: true, generated: true, path: 'content/posts/2026-08-12-topic.md' }
 const stocked = { ok: true, stocked: true, contentVersion: 'a'.repeat(64) }
@@ -51,6 +52,29 @@ test('only an exactly verified remote sync may use the production review CTA', (
   assert.equal(failed.kind, 'stocked')
   assert.equal(scheduledDraftNotificationBoundary(failed).job, 'ops-mwf-stock-notice')
   assert.doesNotMatch(buildScheduledStockNotification(), /\/admin|https?:\/\//)
+})
+
+test('a single review digest reports every resolved entry and has a set-based content version', () => {
+  const resolvedEntries = [
+    { path: 'content/posts/2026-08-12-topic.md', contentSha256: 'a'.repeat(64) },
+    { path: 'content/posts/2026-08-14-topic.md', contentSha256: 'b'.repeat(64) },
+  ]
+  const expectedVersion = createHash('sha256')
+    .update(['a'.repeat(64), 'b'.repeat(64)].join('\n'))
+    .digest('hex')
+
+  const notification = buildScheduledReviewNotification({ resolvedEntries })
+  assert.match(notification, /2件/)
+  assert.match(notification, /Human承認/)
+  assert.match(notification, /\/admin\/pending-review/)
+  assert.equal(contentVersionForResolvedEntries(resolvedEntries), expectedVersion)
+  assert.equal(contentVersionForResolvedEntries([...resolvedEntries].reverse()), expectedVersion)
+})
+
+test('a changed resolved-entry set produces a different digest notification key', () => {
+  const one = [{ path: 'content/posts/2026-08-12-topic.md', contentSha256: 'a'.repeat(64) }]
+  const two = [...one, { path: 'content/posts/2026-08-14-topic.md', contentSha256: 'b'.repeat(64) }]
+  assert.notEqual(contentVersionForResolvedEntries(one), contentVersionForResolvedEntries(two))
 })
 
 test('8/12 regression: stock, pending-sync, divergence, high-risk, and unapproved diagnostics do not suppress notification', () => {

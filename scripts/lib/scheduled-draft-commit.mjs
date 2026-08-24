@@ -232,6 +232,35 @@ function retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, 
   return { unresolvedCount: unresolved.length, persisted }
 }
 
+function exactEntryKey(entry) {
+  return `${entry.path}\u0000${entry.contentSha256}\u0000${entry.gitBlob}\u0000${entry.provenance}`
+}
+
+// A remote sync is not complete until its review notification has either been
+// sent or proven deduplicated. This seam makes that durable hand-off explicit.
+export function finalizeSyncedDraftLedger({ root, resolvedEntries, ledgerIo } = {}) {
+  const state = readLedgerState(root)
+  if (!state.ledger) {
+    if (state.exists) return { ok: false, finalized: false, reason: 'provenance ledgerが不正または読み取れないため消込を保留しました' }
+    return { ok: true, finalized: false, reason: '消込対象の管理済みdraftはありません' }
+  }
+  if (!Array.isArray(resolvedEntries) || resolvedEntries.length === 0) {
+    return { ok: false, finalized: false, reason: '消込対象のresolvedEntriesを安全に確認できません' }
+  }
+  const resolved = new Set(resolvedEntries.map(normalizeLedgerEntry).filter(Boolean).map(exactEntryKey))
+  if (resolved.size !== resolvedEntries.length) {
+    return { ok: false, finalized: false, reason: '消込対象のresolvedEntriesを安全に確認できません' }
+  }
+  const retained = state.ledger.entries.filter((entry) => !resolved.has(exactEntryKey(entry)))
+  if (retained.length === state.ledger.entries.length) {
+    return { ok: false, finalized: false, reason: '消込対象がprovenance ledgerと一致しません' }
+  }
+  const persisted = removeOrWriteLedger(root, retained, ledgerIo)
+  return persisted.ok
+    ? { ok: true, finalized: true, resolvedEntries: state.ledger.entries.length - retained.length, retainedEntries: retained.length }
+    : { ok: false, finalized: false, reason: persisted.reason, retainedEntries: retained.length }
+}
+
 export function recoverOwnedGeneratedDraft({
   root,
   runCommand,
@@ -329,7 +358,28 @@ export function recoverOwnedGeneratedDraft({
   }
 
   if (pendingEntries.length === 0) {
-    if (syncRemote) return fail('管理対象draftはlocal commit済みですが、本番同期の再試行はahead状態を許可しないため保留しました', { committed: true })
+    if (syncRemote) {
+      const local = runCommand(gitPath, ['rev-parse', 'HEAD'])
+      if (!local.ok || !/^[a-f0-9]{40}$/i.test(local.output.trim())) {
+        return fail('同期済み確認のためlocal HEADを確認できません', { committed: true })
+      }
+      const remote = runCommand(gitPath, ['ls-remote', '--exit-code', 'origin', 'refs/heads/main'])
+      const remoteHead = String(remote.output ?? '').trim().split(/\s+/)[0]
+      if (!remote.ok || !/^[a-f0-9]{40}$/i.test(remoteHead) || remoteHead !== local.output.trim()) {
+        return fail('origin/main SHAがlocal HEADと一致しないため本番同期を保留しました', { committed: true })
+      }
+      return {
+        ok: true,
+        committed: true,
+        synced: true,
+        alreadySynced: true,
+        recovered: true,
+        remoteHead,
+        resolvedEntries: entries,
+        ledgerPending: true,
+        reason: '管理対象draftはorigin/mainへの同期済み確認を完了し、Human review通知待ちです。',
+      }
+    }
     const cleanup = removeOrWriteLedger(root, [], ledgerIo)
     if (!cleanup.ok) return fail(cleanup.reason, { committed: true, stocked: true })
     return {
@@ -403,16 +453,15 @@ export function recoverOwnedGeneratedDraft({
     if (!remote.ok || !/^[a-f0-9]{40}$/i.test(remoteHead) || remoteHead !== commitHead) {
       return fail('push後のorigin/main SHAを確認できないためledgerを保持しました', { committed: true })
     }
-    const cleanup = removeOrWriteLedger(root, [], ledgerIo)
-    if (!cleanup.ok) return fail(cleanup.reason, { committed: true, synced: true, remoteHead })
     return {
       ok: true,
       committed: true,
       synced: true,
       recovered: true,
       remoteHead,
-      resolvedEntries: entries.length,
-      reason: '新しい未承認draftをorigin/mainへ同期しました。',
+      resolvedEntries: entries,
+      ledgerPending: true,
+      reason: '新しい未承認draftをorigin/mainへ同期し、Human review通知待ちです。',
     }
   }
 

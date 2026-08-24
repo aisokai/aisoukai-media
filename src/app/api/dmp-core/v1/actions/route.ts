@@ -3,13 +3,26 @@ import {
   validateActionInput,
   createAction,
 } from '@/../scripts/lib/dmp-action.mjs'
+import { requireAdmin } from '@/lib/adminAuth'
 import { getAll, set } from '@/lib/dmpActionStore'
 
 function jsonResponse(data: unknown, status = 200) {
   return NextResponse.json(data, { status })
 }
 
+async function requireAdminResponse() {
+  try {
+    await requireAdmin()
+    return null
+  } catch {
+    return jsonResponse({ ok: false, error: 'Unauthorized' }, 401)
+  }
+}
+
 export async function GET(request: NextRequest) {
+  const unauthorized = await requireAdminResponse()
+  if (unauthorized) return unauthorized
+
   const { searchParams } = request.nextUrl
   const statusFilter = searchParams.get('status')
   const channelFilter = searchParams.get('channel')
@@ -29,6 +42,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const unauthorized = await requireAdminResponse()
+  if (unauthorized) return unauthorized
+
   let body: unknown
   try {
     body = await request.json()

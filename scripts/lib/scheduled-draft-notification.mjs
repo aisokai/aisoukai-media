@@ -1,7 +1,15 @@
+import { createHash } from 'node:crypto'
 import { getContentVersion } from '../../src/lib/dmpArticleState.mjs'
+import { finalizeSyncedDraftLedger, syncOwnedGeneratedDraft } from './scheduled-draft-commit.mjs'
 
 function incident(reason, exitCode = 1) {
   return { kind: 'incident', exitCode, reason }
+}
+
+// A missing flag is intentionally OFF so an incomplete operator config can
+// never create a Telegram send path.
+export function isTelegramNotificationEnabled(config) {
+  return config?.flags?.telegram_notify === true
 }
 
 // A durable local stock record is not evidence that the production admin can
@@ -15,8 +23,18 @@ export function buildScheduledStockNotification() {
 // This CTA is intentionally reachable only after the exact origin/main SHA
 // verification performed by scheduled-draft-commit. It never approves or
 // publishes an article; the linked queue still requires a Human action.
-export function buildScheduledReviewNotification() {
-  return '新しい未承認記事を本番のレビュー待ちへ同期しました。内容を確認してHuman承認してください: https://aisoukai-media.vercel.app/admin/pending-review'
+export function buildScheduledReviewNotification({ resolvedEntries } = {}) {
+  const count = Array.isArray(resolvedEntries) ? resolvedEntries.length : 1
+  return `新しい未承認記事${count}件を本番のレビュー待ちへ同期しました。内容を確認してHuman承認してください: https://aisoukai-media.vercel.app/admin/pending-review`
+}
+
+// The version is a digest of the complete synced set, not a single article:
+// the same set dedupes, while a changed set remains eligible for one digest.
+export function contentVersionForResolvedEntries(resolvedEntries) {
+  if (!Array.isArray(resolvedEntries) || resolvedEntries.length === 0) return null
+  const versions = resolvedEntries.map((entry) => entry?.contentSha256)
+  if (!versions.every((version) => typeof version === 'string' && /^[a-f0-9]{64}$/.test(version))) return null
+  return createHash('sha256').update([...versions].sort().join('\n')).digest('hex')
 }
 
 export function buildScheduledFailureNotification() {
@@ -89,4 +107,43 @@ export function shouldSendScheduledIncidentNotification(outcome) {
 
 export function shouldSendStockUpdateNotification() {
   return false
+}
+
+function outcomeForRecoveredSync(draftSyncResult) {
+  const entry = draftSyncResult?.resolvedEntries?.[0]
+  if (!entry) return null
+  return classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: { ok: true, generated: true, path: entry.path },
+    stockResult: { ok: true, stocked: true, entry },
+    draftSyncResult,
+  })
+}
+
+export async function notifySyncedDraftLedger({ root, draftSyncResult, sendNotification, finalizeLedger = finalizeSyncedDraftLedger }) {
+  const outcome = outcomeForRecoveredSync(draftSyncResult)
+  if (!outcome) return { ok: true, notified: false, finalized: false }
+  try {
+    const resolvedEntries = draftSyncResult.resolvedEntries
+    const contentVersion = contentVersionForResolvedEntries(resolvedEntries)
+    if (!contentVersion) return { ok: false, notified: false, finalized: false, reason: '同期済みledgerのcontentVersionを安全に導出できません' }
+    const notificationResult = await sendNotification(
+      buildScheduledReviewNotification({ resolvedEntries }),
+      { ...scheduledDraftNotificationBoundary(outcome), contentVersion },
+    )
+    if (notificationResult.suppressed === true) return { ok: true, notified: false, finalized: false, suppressed: true }
+    if (!notificationResult.sent && !notificationResult.duplicate) return { ok: false, notified: false, finalized: false, reason: 'review通知の結果を安全に確認できません' }
+    const finalized = finalizeLedger({ root, resolvedEntries })
+    return finalized.ok
+      ? { ok: true, notified: true, finalized: true, duplicate: notificationResult.duplicate === true }
+      : { ok: false, notified: true, finalized: false, reason: finalized.reason }
+  } catch (error) {
+    return { ok: false, notified: false, finalized: false, reason: String(error?.message ?? 'review通知に失敗しました') }
+  }
+}
+
+export async function reconcileBeforeGeneration({ root, runCommand, sync = syncOwnedGeneratedDraft, notify = notifySyncedDraftLedger }) {
+  const draftSyncResult = sync({ root, runCommand, assertGitReady: () => ({ ok: true }) })
+  const notification = await notify({ root, draftSyncResult })
+  return { draftSyncResult, notification }
 }

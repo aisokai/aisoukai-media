@@ -1,5 +1,6 @@
 'use server'
 
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { redirect } from 'next/navigation'
 import { setAdminSession } from '@/lib/adminAuth'
 
@@ -30,6 +31,12 @@ function normalizeAdminReturnTo(value: FormDataEntryValue | null): string | null
   }
 }
 
+function passwordsMatch(candidate: string, expected: string) {
+  const candidateHash = createHash('sha256').update(candidate).digest()
+  const expectedHash = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(candidateHash, expectedHash)
+}
+
 export async function loginAdmin(_: LoginState, formData: FormData): Promise<LoginState> {
   const passwordValues = formData.getAll('password')
   const password = passwordValues.length === 1 && typeof passwordValues[0] === 'string'
@@ -43,7 +50,8 @@ export async function loginAdmin(_: LoginState, formData: FormData): Promise<Log
     return { ok: false, message: 'ADMIN_REVIEW_PASSWORD が未設定です' }
   }
 
-  if (password === null || password !== expected) {
+  const passwordMatches = passwordsMatch(password ?? '', expected)
+  if (password === null || !passwordMatches) {
     return { ok: false, message: 'パスコードが違います' }
   }
 
