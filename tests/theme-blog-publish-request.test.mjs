@@ -184,5 +184,5 @@ test('module boundary is a local adapter with no execution, I/O, model, network,
   assert.match(source, /import \{ THEME_BLOG_DRAFT_ARTIFACT_SCHEMA \} from '\.\/theme-blog-draft-artifact\.mjs'/)
   assert.match(source, /import \{ THEME_BLOG_APPROVAL_READINESS_SCHEMA \} from '\.\/theme-blog-approval-readiness\.mjs'/)
   assert.match(source, /import \{ THEME_BLOG_APPROVAL_DECISION_SCHEMA \} from '\.\/theme-blog-approval-decision\.mjs'/)
-  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|openai|telegram|notification|child_process|spawn|exec|process\.env|node:fs|node:https|node:http|document|window)\b/i)
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|openai|telegram|notification|child_process|spawn|exec|process\.env|node:(?:fs|https?)|document|window)\b/i)
 })

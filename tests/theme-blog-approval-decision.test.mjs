@@ -141,5 +141,5 @@ test('module boundary is a local transform with no human-gate execution, I/O, mo
   const source = await readFile(new URL('../scripts/lib/theme-blog-approval-decision.mjs', import.meta.url), 'utf8')
 
   assert.match(source, /import \{ THEME_BLOG_APPROVAL_READINESS_SCHEMA \} from '\.\/theme-blog-approval-readiness\.mjs'/)
-  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|openai|telegram|notification|child_process|spawn|exec|process\.env|node:fs|node:https|node:http|document|window|approve|publish|dispatch|send)\b/i)
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|openai|telegram|notification|child_process|spawn|exec|process\.env|node:(?:fs|https?)|document|window|approve|publish|dispatch|send)\b/i)
 })

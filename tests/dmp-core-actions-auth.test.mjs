@@ -17,9 +17,13 @@ async function loadActionsRoute({ requireAdmin, getAll = () => [], set = () => {
     '@/../scripts/lib/dmp-action.mjs': {
       validateActionInput: () => ({ valid: true, errors: [] }),
       createAction: (body) => ({ ok: true, data: { id: 'action-1', status: 'pending', ...body } }),
+      createActionTransport: () => ({
+        listActions: async () => ({ ok: true, data: getAll() }),
+        createAction: async ({ input }) => ({ ok: true, data: { id: 'action-1', status: 'pending', ...input } }),
+      }),
     },
     '@/lib/adminAuth': { requireAdmin },
-    '@/lib/dmpActionStore': { getAll, set },
+    '@/lib/dmpActionStore': { getAll, set, dmpActionCore: {} },
   }
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
@@ -31,8 +35,11 @@ async function loadSummaryRoute({ requireAdmin, getSummary = () => ({ total: 0 }
   const source = summaryRoute
   const modules = {
     'next/server': { NextResponse: createNextResponse() },
+    '@/../scripts/lib/dmp-action.mjs': {
+      createActionTransport: () => ({ getActionSummary: async () => ({ ok: true, data: getSummary() }) }),
+    },
     '@/lib/adminAuth': { requireAdmin },
-    '@/lib/dmpActionStore': { getSummary },
+    '@/lib/dmpActionStore': { getSummary, dmpActionCore: {} },
   }
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const exports = {}
@@ -68,7 +75,9 @@ test('DMP actions API retains successful GET and POST responses for authenticate
   assert.deepEqual(get.body.data.map((action) => action.id), ['action-1'])
   assert.equal(post.status, 200)
   assert.equal(post.body.ok, true)
-  assert.equal(saved.length, 1)
+  // 永続化は transport 側の責務に移ったため、ここでは認証済みPOSTが Action を返すことだけを見る。
+  // 保存そのものは scripts/lib/dmp-action-transport.test.mjs が検証する。
+  assert.equal(post.body.data.id, 'action-1')
 })
 
 test('DMP action summary rejects unauthenticated requests and retains its successful response', async () => {

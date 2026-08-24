@@ -139,5 +139,5 @@ test('module boundary is a local transform with no I/O, model, network, or UI in
   const source = await readFile(new URL('../scripts/lib/theme-blog-approval-readiness.mjs', import.meta.url), 'utf8')
 
   assert.match(source, /import \{ THEME_BLOG_DRAFT_ARTIFACT_SCHEMA \} from '\.\/theme-blog-draft-artifact\.mjs'/)
-  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|openai|telegram|child_process|spawn|exec|process\.env|node:fs|node:https|node:http|document|window)\b/i)
+  assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|openai|telegram|child_process|spawn|exec|process\.env|node:(?:fs|https?)|document|window)\b/i)
 })
