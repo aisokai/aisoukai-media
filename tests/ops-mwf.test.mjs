@@ -14,14 +14,14 @@ test('weekly job keeps the requested one-way flow and has no Git/admin stop gate
   assert.doesNotMatch(source, /git', \['fetch|checkScheduledGitReadiness|stocked-pending-sync|adminDiscoverability|convert-selected-topics/)
 })
 
-test('Telegram failures are explicit, durable, and retryable; only sent content dedupes', () => {
+test('local stock notices are explicit and durable, but legacy review requests are never retried', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  assert.match(source, /readRetryableNotification/)
-  assert.match(source, /retryFailedReviewNotification/)
-  assert.match(source, /await sendOpsTelegram\(pending\.text, \{ job: pending\.job, contentVersion: pending\.contentVersion \}\)/)
+  assert.match(source, /ops-mwf-stock-notice/)
+  assert.doesNotMatch(source, /readRetryableNotification|retryFailedReviewNotification|ops-mwf-review-request/)
   assert.match(source, /reservation\.fail\(\{ text/)
   assert.match(source, /process\.exitCode = 1/)
   assert.match(source, /reservation\.commit\(\{ text \}\)/)
+  assert.doesNotMatch(source, /resolveNotificationSiteUrl|admin\/pending-review/)
 })
 
 test('approval remains the only publication gate', () => {

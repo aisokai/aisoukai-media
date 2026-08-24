@@ -7,8 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
-import { resolveNotificationSiteUrl } from './lib/site-url.mjs'
-import { readRetryableNotification, reserveNotificationSend } from './lib/notification-dedupe.mjs'
+import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
 import { rememberGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
 import {
   buildScheduledFailureNotification,
@@ -100,7 +99,7 @@ async function sendTelegram(botToken, chatId, text) {
   if (!json.ok) throw new Error('Telegram API が送信を受理しませんでした')
 }
 
-async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-review-request', contentVersion } = {}) {
+async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-stock-notice', contentVersion } = {}) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
   const reservation = reserveNotificationSend({ root: ROOT, date, job, text, contentVersion })
@@ -119,25 +118,11 @@ async function sendOpsTelegram(text, { date = TODAY, job = 'ops-mwf-review-reque
   }
 }
 
-async function retryFailedReviewNotification() {
-  const pending = readRetryableNotification({ root: ROOT, job: 'ops-mwf-review-request' })
-  if (!pending) return false
-  await sendOpsTelegram(pending.text, { job: pending.job, contentVersion: pending.contentVersion })
-  return true
-}
-
 loadEnv()
 console.log(`ops:mwf ${TODAY}（${DAY_NAMES_JA[dayOfWeek]}）: CSV → 記事 → ストック → Telegram → Human承認 → 掲載`)
 if (!SEND_DAYS.has(dayOfWeek) && !force) {
   console.log('⏭ 月・水・金以外のため実行しません')
   process.exit(0)
-}
-
-try {
-  if (await retryFailedReviewNotification()) console.log('✅ 以前の未送信Telegram通知を再試行しました')
-} catch (error) {
-  console.error(`❌ Telegram 再試行失敗: ${error.message}`)
-  process.exitCode = 1
 }
 
 if (noGenerate) {
@@ -165,7 +150,7 @@ if (noGenerate) {
   const boundary = scheduledDraftNotificationBoundary(outcome)
   if (boundary.shouldSend) {
     const text = outcome.kind === 'stocked'
-      ? buildScheduledStockNotification({ dashboardUrl: `${resolveNotificationSiteUrl()}/admin/pending-review` })
+      ? buildScheduledStockNotification()
       : buildScheduledFailureNotification()
     try {
       await sendOpsTelegram(text, boundary)
