@@ -1,3 +1,11 @@
+<!-- BEGIN:mwf-unreviewed-draft-sync-policy -->
+## MWF 未審査下書き同期の限定承認（2026-08-24）
+
+既存 MWF 処理は、allowlist に一致する編集用記事artifactだけを GitHub `main` へ通常pushで同期できる。対象は常に `draft:true`、`reviewed:false`、`auto_approved:false` であり、同期は approve・publish・公開適格化を行わない。
+
+同期前には validation と remote metadata の fetch を必須とし、remote divergence、ahead/behind、対象外のstaged path、index lock、または validation failure のいずれでも fail-closed とする。force-push、reset、rebase、clean、branch deletion、`rm -rf`、approve、publish は禁止する。通常push後に remote `main` SHA が期待値と完全一致した場合だけ本番adminのreview CTAを通知できる。失敗時は local stock 通知だけとし、同期済みとは扱わない。
+<!-- END:mwf-unreviewed-draft-sync-policy -->
+
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
 
