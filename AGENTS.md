@@ -5,6 +5,34 @@
 
 同期前には validation と remote metadata の fetch を必須とし、remote divergence、ahead/behind、対象外のstaged path、index lock、または validation failure のいずれでも fail-closed とする。force-push、reset、rebase、clean、branch deletion、`rm -rf`、approve、publish は禁止する。通常push後に remote `main` SHA が期待値と完全一致した場合だけ本番adminのreview CTAを通知できる。失敗時は local stock 通知だけとし、同期済みとは扱わない。
 <!-- END:mwf-unreviewed-draft-sync-policy -->
+<!-- BEGIN:repository-policy -->
+# Canonical repository policy
+
+## Policy record
+
+- Policy version: `aisoukai-media-standard-non-stop-2026-08-18`
+- Gate profile: `STANDARD_NON_STOP`
+- Answer date: `2026-08-18`
+- Evidence reference: `teacher_message_2026_08_18_yes_gui_and_aisoukai_standard_non_stop_policy`
+- Teacher data handling declaration: `NO_SENSITIVE_DATA`
+- Declaration scope: DMP code, configuration, documentation, and tests only; no real data, secrets, credentials, patient data, or private-message bodies.
+
+## Declared boundary and operations
+
+- Affected paths and data flow are limited to non-sensitive DMP code, configuration, documentation, and test artifacts in this repository, processed locally without real-data access.
+- Metadata-only sources are repository policy, paths, and runtime configuration; the only sink is the local repository workspace.
+- Allowed reversible work in this declared scope: local edits, validation, tests, lint, builds, browser verification when UI changes require it, bounded repairs, targeted local commits after the seven completion gates, and—when separately declared by a v3 task contract—reviewed non-force push, repository sync, CI, preview or production application-code deploy, and machine-to-machine artifact transfer.
+- Teacher authorization (2026-08-24; `teacher_message_2026_08_24_explicit_unreviewed_draft_auto_sync_to_github_main_without_publication`): the existing MWF application flow may use a reviewed non-force push to synchronize only its allowlisted, unreviewed editorial draft artifacts to GitHub `main`. An eligible artifact must remain `draft:true`, `reviewed:false`, and `auto_approved:false`; synchronization must never approve, publish, or otherwise make it publicly eligible. This is a bounded extension of the existing flow, not authorization to add a scheduler, cron registration, agent dispatch, or a new storage/API service.
+- This MWF synchronization is fail-closed: before any normal push it must fetch remote metadata and reject ahead/behind or remote-divergence states, an index lock, target-external staged paths, an ineligible artifact, or a validation failure. It must use the current Node executable and absolute validator/git paths under restricted runtime PATHs; it must not use force-push, reset, rebase, clean, branch deletion, `rm -rf`, or broad staging. A production-admin review CTA may be emitted only after the pushed remote `main` SHA is exactly verified; otherwise the flow may report local stock only and must not claim synchronization.
+- Prohibited in this declared scope: reading or writing secrets, credentials, tokens, production environment values, patient data, or private-message text; `THIRD_PARTY_HUMAN_DATA_TRANSFER`; payment or contractual actions; destructive or irreversible operations; cron, auto-dispatch, send-keys, and live execution.
+- A Human Gate remains required for destructive or irreversible work, payment or contractual action, `THIRD_PARTY_HUMAN_DATA_TRANSFER`, and any teacher-declared `SENSITIVE_STRICT` real-data boundary. Re-question only when the objective crosses this declaration, target, risk class, or sensitive boundary.
+
+## v3 execution
+
+- The active development protocol is `manager_worker_reviewer_v3` with `execution_container: "visible_task"`; the teacher-facing secretary is not a development manager.
+- Every development intake records one Teacher-first data declaration, bounded non-overlapping worker ownership, operation risk, standing authorization, and the seven completion gates. Independent review must clear correctness and safety before completion.
+- Runtime model and effort remain `unverified` unless official evidence is available. Legacy v1/v2, proposal-bound, compatibility, report transport, and reconciliation workflows are retired and must not be recreated.
+<!-- END:repository-policy -->
 
 <!-- BEGIN:nextjs-agent-rules -->
 # This is NOT the Next.js you know
