@@ -22,8 +22,8 @@ publication_status: draft
 legal_check_status: pending
 image_check_status: pending
 medical_risk: medium
-image: "/images/library/preventive/preventive-4007710.jpg"
-image_alt: "虫眼鏡で歯型を覗き込む「歯科検診」の文字入り画像"
+image: "/images/library/preventive/preventive-34407493.jpg"
+image_alt: "歯ブラシを持って微笑む若い女性"
 ai_generated: true
 source_topic_id: "topic_dcc692cf85417e8e"
 source_theme_topic_id: "topic_dcc692cf85417e8e"
