@@ -6,6 +6,7 @@ const SAFE_POST_PATH = /^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/
 const LEDGER_VERSION = 3
 const LEDGER_FILE = 'ops-mwf-owned-draft.json'
 const LEDGER_REPO_PATH = `logs/${LEDGER_FILE}`
+const DEFAULT_GIT_PATH = '/usr/bin/git'
 
 function fail(reason, extra = {}) {
   return { ok: false, committed: false, pendingSync: true, reason, ...extra }
@@ -236,6 +237,9 @@ export function recoverOwnedGeneratedDraft({
   runCommand,
   assertGitReady = () => ({ ok: false, reason: 'remote preflight未指定' }),
   ledgerIo,
+  syncRemote = false,
+  gitPath = DEFAULT_GIT_PATH,
+  indexLockExists = (repositoryRoot) => existsSync(join(repositoryRoot, '.git', 'index.lock')),
 }) {
   const state = readLedgerState(root)
   if (!state.ledger) {
@@ -263,7 +267,33 @@ export function recoverOwnedGeneratedDraft({
     return fail(`ローカル同期を保留しました: ${readiness?.reason ?? '確認不能'}`)
   }
 
-  const status = runCommand('git', ['status', '--porcelain'])
+  // A scheduled remote sync is deliberately stricter than the legacy local
+  // recovery path. It must start from an exact, clean origin/main base so it
+  // can never carry unrelated local commits or resolve a divergence itself.
+  if (syncRemote) {
+    if (entries.some((entry) => entry.provenance !== 'generated')) {
+      return fail('既存allowlist外のprovenanceを含むため本番同期を保留しました')
+    }
+    if (!String(gitPath).startsWith('/')) return fail('git実行pathが絶対pathではないため本番同期を保留しました')
+    if (indexLockExists(root)) return fail('index lock が存在するため本番同期を保留しました')
+    const branch = runCommand(gitPath, ['branch', '--show-current'])
+    if (!branch.ok || branch.output.trim() !== 'main') return fail('main branchを確認できないため本番同期を保留しました')
+    const fetch = runCommand(gitPath, ['fetch', '--quiet', 'origin', 'main'])
+    if (!fetch.ok) return fail('origin/main の取得に失敗したため本番同期を保留しました')
+    const divergence = runCommand(gitPath, ['rev-list', '--left-right', '--count', 'HEAD...origin/main'])
+    const fields = String(divergence.output ?? '').trim().split(/\s+/)
+    const ahead = Number(fields[0])
+    const behind = Number(fields[1])
+    if (!divergence.ok || fields.length !== 2 || !Number.isInteger(ahead) || !Number.isInteger(behind) || ahead !== 0 || behind !== 0) {
+      return fail('origin/main と完全一致しないため本番同期を保留しました')
+    }
+    const foreignStaged = runCommand(gitPath, ['diff', '--cached', '--name-only'])
+    if (!foreignStaged.ok || String(foreignStaged.output ?? '').trim()) {
+      return fail('対象外のstage変更があるため本番同期を保留しました')
+    }
+  }
+
+  const status = runCommand(syncRemote ? gitPath : 'git', ['status', '--porcelain'])
   if (!status.ok) return fail('ローカル状態を確認できないため同期を保留しました')
   const states = classifyOwnedDraftStatus(status.output, entries.map((entry) => entry.path))
   if (!states) return fail('管理対象外の変更または不明な状態があるため同期を保留しました')
@@ -272,7 +302,7 @@ export function recoverOwnedGeneratedDraft({
   const pendingEntries = []
   for (const entry of entries) {
     if (states[entry.path] === 'clean') {
-      const tracked = verifyTrackedCleanBlob({ entry, runCommand })
+      const tracked = verifyTrackedCleanBlob({ entry, runCommand: (command, args) => runCommand(syncRemote ? gitPath : command, args) })
       if (!tracked.ok) {
         const retained = retainUnresolvedAfterPartialVerification(root, entries, resolvedPaths, ledgerIo)
         return {
@@ -299,6 +329,7 @@ export function recoverOwnedGeneratedDraft({
   }
 
   if (pendingEntries.length === 0) {
+    if (syncRemote) return fail('管理対象draftはlocal commit済みですが、本番同期の再試行はahead状態を許可しないため保留しました', { committed: true })
     const cleanup = removeOrWriteLedger(root, [], ledgerIo)
     if (!cleanup.ok) return fail(cleanup.reason, { committed: true, stocked: true })
     return {
@@ -318,50 +349,71 @@ export function recoverOwnedGeneratedDraft({
     .filter((entry) => states[entry.path] === 'untracked')
     .map((entry) => entry.path)
   if (untrackedPaths.length > 0) {
-    const add = runCommand('git', ['add', '--', ...untrackedPaths])
+    const add = runCommand(syncRemote ? gitPath : 'git', ['add', '--', ...untrackedPaths])
     if (!add.ok) return fail(`生成draftのstageに失敗したため同期を保留しました: ${add.output.slice(0, 300)}`)
   }
 
   const pendingPaths = pendingEntries.map((entry) => entry.path)
-  const staged = runCommand('git', ['diff', '--cached', '--name-only'])
+  const staged = runCommand(syncRemote ? gitPath : 'git', ['diff', '--cached', '--name-only'])
   if (!staged.ok || !samePaths(staged.output, pendingPaths)) {
     return fail('stage対象が管理対象draftだけではないため同期を保留しました')
   }
   for (const entry of pendingEntries) {
-    const stagedBlob = runCommand('git', ['rev-parse', `:${entry.path}`])
+    const stagedBlob = runCommand(syncRemote ? gitPath : 'git', ['rev-parse', `:${entry.path}`])
     if (!stagedBlob.ok || stagedBlob.output.trim() !== entry.gitBlob) {
       return fail(`stage済みdraftのblobが一致しないため同期を保留しました: ${entry.path}`)
     }
   }
 
-  const preCommitHead = runCommand('git', ['rev-parse', 'HEAD'])
+  const preCommitHead = runCommand(syncRemote ? gitPath : 'git', ['rev-parse', 'HEAD'])
   if (!preCommitHead.ok || !preCommitHead.output.trim()) return fail('同期前HEADを確認できません')
-  const commit = runCommand('git', ['commit', '-m', `drafts: stock ${pendingEntries.length} scheduled article${pendingEntries.length === 1 ? '' : 's'}`])
+  const commit = runCommand(syncRemote ? gitPath : 'git', ['commit', '-m', `drafts: stock ${pendingEntries.length} scheduled article${pendingEntries.length === 1 ? '' : 's'}`])
   if (!commit.ok) return fail(`生成draftのlocal commitに失敗したため同期を保留しました: ${commit.output.slice(0, 300)}`)
 
-  const newHead = runCommand('git', ['rev-parse', 'HEAD'])
+  const newHead = runCommand(syncRemote ? gitPath : 'git', ['rev-parse', 'HEAD'])
   if (!newHead.ok || !newHead.output.trim() || newHead.output.trim() === preCommitHead.output.trim()) {
     return fail('同期後HEADを確認できないためledgerを保持しました', { committed: true })
   }
   const commitHead = newHead.output.trim()
-  const parent = runCommand('git', ['rev-parse', `${commitHead}^`])
+  const parent = runCommand(syncRemote ? gitPath : 'git', ['rev-parse', `${commitHead}^`])
   if (!parent.ok || parent.output.trim() !== preCommitHead.output.trim()) {
     return fail('同期後HEADのparentが一致しないためledgerを保持しました', { committed: true })
   }
-  const changed = runCommand('git', ['diff-tree', '--no-commit-id', '--name-only', '-r', commitHead])
+  const changed = runCommand(syncRemote ? gitPath : 'git', ['diff-tree', '--no-commit-id', '--name-only', '-r', commitHead])
   if (!changed.ok || !samePaths(changed.output, pendingPaths)) {
     return fail('local commitに管理対象draft以外が含まれるためledgerを保持しました', { committed: true })
   }
   for (const entry of pendingEntries) {
-    const committedBlob = runCommand('git', ['rev-parse', `${commitHead}:${entry.path}`])
+    const committedBlob = runCommand(syncRemote ? gitPath : 'git', ['rev-parse', `${commitHead}:${entry.path}`])
     if (!committedBlob.ok || committedBlob.output.trim() !== entry.gitBlob) {
       return fail(`commit済みdraftのblobが一致しないためledgerを保持しました: ${entry.path}`, { committed: true })
     }
   }
-  const after = runCommand('git', ['status', '--porcelain'])
+  const after = runCommand(syncRemote ? gitPath : 'git', ['status', '--porcelain'])
   if (!after.ok || String(after.output ?? '').split(/\r?\n/).filter(Boolean)
     .some((line) => line.slice(3) !== LEDGER_REPO_PATH)) {
     return fail('draftはlocal commit済みですが、同期後に別の変更を検出したためledgerを保持しました', { committed: true })
+  }
+
+  if (syncRemote) {
+    const push = runCommand(gitPath, ['push', 'origin', 'HEAD:refs/heads/main'])
+    if (!push.ok) return fail(`管理対象draftの本番同期に失敗したためledgerを保持しました: ${push.output.slice(0, 300)}`, { committed: true })
+    const remote = runCommand(gitPath, ['ls-remote', '--exit-code', 'origin', 'refs/heads/main'])
+    const remoteHead = String(remote.output ?? '').trim().split(/\s+/)[0]
+    if (!remote.ok || !/^[a-f0-9]{40}$/i.test(remoteHead) || remoteHead !== commitHead) {
+      return fail('push後のorigin/main SHAを確認できないためledgerを保持しました', { committed: true })
+    }
+    const cleanup = removeOrWriteLedger(root, [], ledgerIo)
+    if (!cleanup.ok) return fail(cleanup.reason, { committed: true, synced: true, remoteHead })
+    return {
+      ok: true,
+      committed: true,
+      synced: true,
+      recovered: true,
+      remoteHead,
+      resolvedEntries: entries.length,
+      reason: '新しい未承認draftをorigin/mainへ同期しました。',
+    }
   }
 
   const cleanup = removeOrWriteLedger(root, [], ledgerIo)
@@ -373,6 +425,12 @@ export function recoverOwnedGeneratedDraft({
     resolvedEntries: entries.length,
     reason: '新しい記事を管理画面へ反映しました。',
   }
+}
+
+// The M/W/F job uses this opt-in remote variant. Keeping the local-only
+// recovery entry point above preserves callers that must never push.
+export function syncOwnedGeneratedDraft(options) {
+  return recoverOwnedGeneratedDraft({ ...options, syncRemote: true })
 }
 
 export function rememberGeneratedDraft({ root, scheduledResult, ledgerIo }) {

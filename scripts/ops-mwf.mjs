@@ -6,11 +6,11 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, w
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import matter from 'gray-matter'
 import { reserveNotificationSend } from './lib/notification-dedupe.mjs'
-import { rememberGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
+import { rememberGeneratedDraft, syncOwnedGeneratedDraft } from './lib/scheduled-draft-commit.mjs'
 import {
   buildScheduledFailureNotification,
+  buildScheduledReviewNotification,
   buildScheduledStockNotification,
   classifyScheduledDraftOutcome,
   scheduledDraftNotificationBoundary,
@@ -90,6 +90,20 @@ function readJsonIfExists(path) {
   try { return JSON.parse(readFileSync(path, 'utf8')) } catch { return null }
 }
 
+// launchd can provide a restricted PATH. Node and git are invoked by their
+// absolute executable paths; this wrapper never shells out or reads Git auth.
+function runGitCommand(command, args) {
+  const result = spawnSync(command, args, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: process.env.PATH ?? '/usr/bin:/bin' },
+  })
+  return {
+    ok: !result.error && result.status === 0,
+    output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
+  }
+}
+
 async function sendTelegram(botToken, chatId, text) {
   const res = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -137,21 +151,25 @@ if (noGenerate) {
   let outcome = classifyScheduledDraftOutcome({ childStatus, scheduledResult })
   if (outcome.kind === 'generated-awaiting-stock') {
     const stockResult = rememberGeneratedDraft({ root: ROOT, scheduledResult })
-    let draftData = {}
-    let draftContent = ''
-    try {
-      const parsed = matter(readFileSync(join(ROOT, scheduledResult.path), 'utf8'))
-      draftData = parsed.data
-      draftContent = parsed.content
-    } catch {}
-    outcome = classifyScheduledDraftOutcome({ childStatus, scheduledResult, stockResult, draftData, draftContent })
+    const draftSyncResult = stockResult.ok === true && stockResult.stocked === true
+      ? syncOwnedGeneratedDraft({
+          root: ROOT,
+          runCommand: runGitCommand,
+          // The sync helper performs the stricter fetch, divergence, staged
+          // path, index-lock, commit, push, and remote-SHA checks itself.
+          assertGitReady: () => ({ ok: true }),
+        })
+      : undefined
+    outcome = classifyScheduledDraftOutcome({ childStatus, scheduledResult, stockResult, draftSyncResult })
   }
 
   const boundary = scheduledDraftNotificationBoundary(outcome)
   if (boundary.shouldSend) {
-    const text = outcome.kind === 'stocked'
-      ? buildScheduledStockNotification()
-      : buildScheduledFailureNotification()
+    const text = outcome.kind === 'synced'
+      ? buildScheduledReviewNotification()
+      : outcome.kind === 'stocked'
+        ? buildScheduledStockNotification()
+        : buildScheduledFailureNotification()
     try {
       await sendOpsTelegram(text, boundary)
       console.log('✅ Telegram通知処理を完了しました')

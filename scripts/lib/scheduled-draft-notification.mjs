@@ -12,11 +12,18 @@ export function buildScheduledStockNotification() {
   return '新しい記事をローカルのストックに1件保存しました。本番の管理画面にはまだ反映されていません。'
 }
 
+// This CTA is intentionally reachable only after the exact origin/main SHA
+// verification performed by scheduled-draft-commit. It never approves or
+// publishes an article; the linked queue still requires a Human action.
+export function buildScheduledReviewNotification() {
+  return '新しい未承認記事を本番のレビュー待ちへ同期しました。内容を確認してHuman承認してください: https://aisoukai-media.vercel.app/admin/pending-review'
+}
+
 export function buildScheduledFailureNotification() {
   return '記事ストックまたはTelegram通知に失敗しました。未送信として記録しました。必要に応じて運用確認してください。'
 }
 
-export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, stockResult, draftData = {}, draftContent = '' } = {}) {
+export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, stockResult, draftSyncResult, draftData = {}, draftContent = '' } = {}) {
   if (!Number.isInteger(childStatus) || childStatus < 0) return incident('scheduled child の終了状態を確認できませんでした')
   if (childStatus !== 0) return incident(`scheduled child が exit ${childStatus} で停止しました`, childStatus)
   if (!scheduledResult || typeof scheduledResult !== 'object' || typeof scheduledResult.ok !== 'boolean' || typeof scheduledResult.generated !== 'boolean') {
@@ -27,14 +34,30 @@ export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, st
   if (stockResult === undefined) return { kind: 'generated-awaiting-stock', exitCode: 0, reason: '生成下書きの永続ストック待ちです' }
   if (stockResult?.ok !== true || stockResult?.stocked !== true) return incident(stockResult?.reason ?? '生成下書きをストックできませんでした')
 
+  const contentVersion = typeof stockResult?.entry?.contentSha256 === 'string'
+    ? stockResult.entry.contentSha256
+    : typeof stockResult.contentVersion === 'string'
+      ? stockResult.contentVersion
+      : getContentVersion(draftData, draftContent)
+  if (draftSyncResult?.ok === true && draftSyncResult?.synced === true) {
+    return {
+      kind: 'synced',
+      exitCode: 0,
+      generated: true,
+      stocked: true,
+      synced: true,
+      contentVersion,
+      articlePath: scheduledResult.path,
+      reason: '未承認draftをorigin/mainへ同期し、Human review通知処理へ進みます',
+    }
+  }
+
   return {
     kind: 'stocked',
     exitCode: 0,
     generated: true,
     stocked: true,
-    contentVersion: typeof stockResult.contentVersion === 'string'
-      ? stockResult.contentVersion
-      : getContentVersion(draftData, draftContent),
+    contentVersion,
     articlePath: scheduledResult.path,
     medicalRisk: String(draftData.medical_risk ?? ''),
     reason: '生成下書きをストックし、Telegram通知処理へ進みます',
@@ -42,6 +65,9 @@ export function classifyScheduledDraftOutcome({ childStatus, scheduledResult, st
 }
 
 export function scheduledDraftNotificationBoundary(outcome) {
+  if (outcome?.kind === 'synced' && outcome.exitCode === 0 && outcome.synced === true) {
+    return { kind: 'review-request', shouldSend: true, job: 'ops-mwf-review-request', contentVersion: outcome.contentVersion }
+  }
   if (outcome?.kind === 'stocked' && outcome.exitCode === 0 && outcome.generated === true && outcome.stocked === true) {
     return { kind: 'stock-notice', shouldSend: true, job: 'ops-mwf-stock-notice', contentVersion: outcome.contentVersion }
   }
