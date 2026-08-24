@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { buildScheduledStockNotification, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification, shouldSendStockNoticeNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
+import { buildScheduledReviewNotification, buildScheduledStockNotification, classifyScheduledDraftOutcome, scheduledDraftNotificationBoundary, shouldSendDraftReviewNotification, shouldSendStockNoticeNotification } from '../scripts/lib/scheduled-draft-notification.mjs'
 
 const generated = { ok: true, generated: true, path: 'content/posts/2026-08-12-topic.md' }
 const stocked = { ok: true, stocked: true, contentVersion: 'a'.repeat(64) }
@@ -23,6 +23,34 @@ test('a generated article reaches notification only after durable stock', () => 
   assert.equal(scheduledDraftNotificationBoundary(outcome).job, 'ops-mwf-stock-notice')
   assert.equal(shouldSendStockNoticeNotification(outcome), true)
   assert.equal(shouldSendDraftReviewNotification(outcome), false)
+})
+
+test('only an exactly verified remote sync may use the production review CTA', () => {
+  const synced = classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: generated,
+    stockResult: stocked,
+    draftSyncResult: { ok: true, synced: true, remoteHead: 'b'.repeat(40) },
+  })
+  assert.equal(synced.kind, 'synced')
+  assert.deepEqual(scheduledDraftNotificationBoundary(synced), {
+    kind: 'review-request',
+    shouldSend: true,
+    job: 'ops-mwf-review-request',
+    contentVersion: 'a'.repeat(64),
+  })
+  assert.match(buildScheduledReviewNotification(), /Human承認/)
+  assert.match(buildScheduledReviewNotification(), /\/admin\/pending-review/)
+
+  const failed = classifyScheduledDraftOutcome({
+    childStatus: 0,
+    scheduledResult: generated,
+    stockResult: stocked,
+    draftSyncResult: { ok: false, pendingSync: true, reason: 'origin/main diverged' },
+  })
+  assert.equal(failed.kind, 'stocked')
+  assert.equal(scheduledDraftNotificationBoundary(failed).job, 'ops-mwf-stock-notice')
+  assert.doesNotMatch(buildScheduledStockNotification(), /\/admin|https?:\/\//)
 })
 
 test('8/12 regression: stock, pending-sync, divergence, high-risk, and unapproved diagnostics do not suppress notification', () => {

@@ -9,6 +9,7 @@ import {
   readOwnedGeneratedDraftLedger,
   recoverOwnedGeneratedDraft,
   rememberGeneratedDraft,
+  syncOwnedGeneratedDraft,
 } from '../scripts/lib/scheduled-draft-commit.mjs'
 import {
   buildScheduledFailureNotification,
@@ -670,4 +671,139 @@ test('owned status parser distinguishes all owned paths from foreign and unsafe 
   })
   assert.equal(classifyOwnedDraftStatus(`?? ${path1}\n M README.md`, [path1]), null)
   assert.equal(classifyOwnedDraftStatus(` M ${path1}`, [path1]), null)
+})
+
+function remoteSyncRunner(calls, entries, { remoteHead = 'b'.repeat(40), readiness = '0\t0' } = {}) {
+  let statusCalls = 0
+  let headCalls = 0
+  let cachedDiffCalls = 0
+  const preHead = 'a'.repeat(40)
+  const commitHead = 'b'.repeat(40)
+  return (command, args) => {
+    calls.push([command, ...args])
+    if (command === process.execPath && args[0].endsWith('/scripts/validate-posts.mjs')) {
+      return { ok: true, output: '' }
+    }
+    assert.equal(command, '/usr/bin/git', 'remote sync must use the absolute Git executable')
+    if (args[0] === 'branch') return { ok: true, output: 'main' }
+    if (args[0] === 'fetch') return { ok: true, output: '' }
+    if (args[0] === 'rev-list') return { ok: true, output: readiness }
+    if (args[0] === 'status') {
+      statusCalls += 1
+      return { ok: true, output: statusCalls === 1 ? `?? ${entries[0].path}` : '' }
+    }
+    if (args[0] === 'diff' && args[1] === '--cached') {
+      cachedDiffCalls += 1
+      return { ok: true, output: cachedDiffCalls === 1 ? '' : entries.map((entry) => entry.path).join('\n') }
+    }
+    if (args[0] === 'add' || args[0] === 'commit' || args[0] === 'push') return { ok: true, output: '' }
+    if (args[0] === 'rev-parse' && args[1] === 'HEAD') {
+      headCalls += 1
+      return { ok: true, output: headCalls === 1 ? preHead : commitHead }
+    }
+    if (args[0] === 'rev-parse' && args[1] === `${commitHead}^`) return { ok: true, output: preHead }
+    if (args[0] === 'rev-parse' && String(args[1]).startsWith(':')) {
+      const entry = entries.find((item) => item.path === String(args[1]).slice(1))
+      return { ok: true, output: entry.gitBlob }
+    }
+    if (args[0] === 'rev-parse' && String(args[1]).startsWith(`${commitHead}:`)) {
+      const entry = entries.find((item) => item.path === String(args[1]).slice(commitHead.length + 1))
+      return { ok: true, output: entry.gitBlob }
+    }
+    if (args[0] === 'diff-tree') return { ok: true, output: entries.map((entry) => entry.path).join('\n') }
+    if (args[0] === 'ls-remote') return { ok: true, output: `${remoteHead}\trefs/heads/main` }
+    throw new Error(`unexpected remote-sync command: ${command} ${args.join(' ')}`)
+  }
+}
+
+test('remote sync fetches an exact origin/main base, pushes only the owned draft, and verifies remote SHA', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+  const calls = []
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner(calls, entries),
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.synced, true)
+  assert.equal(result.remoteHead, 'b'.repeat(40))
+  assert.equal(existsSync(ledgerFile(root)), false)
+  assert.ok(calls.some((call) => call.join(' ') === '/usr/bin/git fetch --quiet origin main'))
+  assert.ok(calls.some((call) => call.join(' ') === '/usr/bin/git push origin HEAD:refs/heads/main'))
+  assert.ok(calls.some((call) => call.join(' ') === '/usr/bin/git ls-remote --exit-code origin refs/heads/main'))
+  assert.equal(calls.some((call) => call[1] === 'reset' || call[1] === 'rebase' || call[1] === 'clean'), false)
+})
+
+test('remote sync fails closed before mutation for a non-absolute Git path, index lock, or divergent base', () => {
+  for (const options of [
+    { gitPath: 'git', indexLockExists: () => false },
+    { indexLockExists: () => true },
+    { indexLockExists: () => false, readiness: '1\t0' },
+  ]) {
+    const root = makeRoot()
+    writePost(root, path1, safeDraft('one'))
+    rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+    const entries = readOwnedGeneratedDraftLedger(root).entries
+    const calls = []
+    const result = syncOwnedGeneratedDraft({
+      root,
+      assertGitReady: () => ({ ok: true }),
+      gitPath: options.gitPath,
+      indexLockExists: options.indexLockExists,
+      runCommand: remoteSyncRunner(calls, entries, { readiness: options.readiness }),
+    })
+    assert.equal(result.ok, false)
+    assert.equal(result.pendingSync, true)
+    assert.equal(calls.some((call) => call[1] === 'add' || call[1] === 'commit' || call[1] === 'push'), false)
+    assert.equal(readOwnedGeneratedDraftLedger(root).entries.length, 1)
+  }
+})
+
+test('remote sync retains the ledger when the post-push remote SHA is not the committed SHA', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  const entries = readOwnedGeneratedDraftLedger(root).entries
+  const calls = []
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner(calls, entries, { remoteHead: 'c'.repeat(40) }),
+  })
+  assert.equal(result.ok, false)
+  assert.equal(result.committed, true)
+  assert.match(result.reason, /origin\/main SHA/)
+  assert.equal(readOwnedGeneratedDraftLedger(root).entries.length, 1)
+})
+
+test('remote sync refuses legacy provenance before any Git operation', () => {
+  const root = makeRoot()
+  const content = safeDraft('one')
+  writePost(root, path1, content)
+  writeFileSync(ledgerFile(root), `${JSON.stringify({
+    version: 2,
+    path: path1,
+    slug: slug1,
+    contentSha256: hashes(content).contentSha256,
+  })}\n`)
+  const calls = []
+  const result = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: (...args) => {
+      calls.push(args)
+      throw new Error('legacy provenance must stop before Git')
+    },
+  })
+  assert.equal(result.ok, false)
+  assert.match(result.reason, /allowlist外.*provenance/)
+  assert.equal(calls.length, 0)
+  assert.equal(readOwnedGeneratedDraftLedger(root).entries[0].provenance, 'legacy-v2')
 })
