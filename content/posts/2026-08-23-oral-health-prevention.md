@@ -1,37 +1,40 @@
 ---
-title: "口腔の健康を守る第一歩｜毎日のケアと定期検診を予防につなげる"
-date: "2026-08-23"
-publish_at: "2026-08-23"
-category: "予防歯科"
-excerpt: "口腔の健康を長く保つために、毎日のセルフケアと歯科医院での定期的な確認をどう組み合わせるかを、予防の視点から解説します。"
+title: 口腔の健康を守る第一歩｜毎日のケアと定期検診を予防につなげる
+date: '2026-08-23'
+publish_at: '2026-08-23'
+category: 予防歯科
+excerpt: 口腔の健康を長く保つために、毎日のセルフケアと歯科医院での定期的な確認をどう組み合わせるかを、予防の視点から解説します。
 tags:
-  - "予防歯科"
-  - "口腔ケア"
-  - "定期検診"
-  - "歯みがき"
-author: "藍想会メディア編集部"
-reviewed: false
-draft: true
-generated_at: "2026-08-23T00:00:00.000Z"
-stock_status: ready
-theme_id: "DMP-CANDIDATE-1"
-duplicate_of: ""
+  - 予防歯科
+  - 口腔ケア
+  - 定期検診
+  - 歯みがき
+author: 藍想会メディア編集部
+reviewed: true
+draft: false
+generated_at: '2026-08-23T00:00:00.000Z'
+stock_status: adopted
+theme_id: DMP-CANDIDATE-1
+duplicate_of: ''
 review_mode: human
 auto_approved: false
 publication_status: draft
 legal_check_status: pending
 image_check_status: pending
 medical_risk: medium
-image: "/images/library/preventive/preventive-34407493.jpg"
-image_alt: "歯ブラシを持って微笑む若い女性"
+image: /images/library/preventive/preventive-34407493.jpg
+image_alt: 歯ブラシを持って微笑む若い女性
 ai_generated: true
-source_topic_id: "topic_dcc692cf85417e8e"
-source_theme_topic_id: "topic_dcc692cf85417e8e"
-source_theme_snapshot_id: "notebook_event_691cd8bd-0c95-42e6-ad1e-be934a7aa101"
-source_theme_snapshot_hash: "b31c420d2dab1480090c5bcb5b4b3d395558065ec27c984ecc2ad7aa471c735d"
-source_theme_row_version: "1"
-source_notes: "公開文献「Oral health: prevention is key」を着想に、日常の予防行動を整理した未公開下書き"
-target_keyword: "口腔ケア 予防歯科"
+source_topic_id: topic_dcc692cf85417e8e
+source_theme_topic_id: topic_dcc692cf85417e8e
+source_theme_snapshot_id: notebook_event_691cd8bd-0c95-42e6-ad1e-be934a7aa101
+source_theme_snapshot_hash: b31c420d2dab1480090c5bcb5b4b3d395558065ec27c984ecc2ad7aa471c735d
+source_theme_row_version: '1'
+source_notes: '公開文献「Oral health: prevention is key」を着想に、日常の予防行動を整理した未公開下書き'
+target_keyword: 口腔ケア 予防歯科
+reviewed_at: '2026-08-25'
+reviewed_by: 三谷
+reviewed_content_hash: 4e565014d47c8f083e8997c453d3169bcd7f4dba0af80927498bb31a08e1bedb
 ---
 
 ## はじめに

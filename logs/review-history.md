@@ -555,3 +555,11 @@ reviewed_by: 三谷
 date: 2026-08-21
 publish_at: 2026-08-21
 
+## 2026-08-25T10:18:55.746+09:00
+datetime: 2026-08-25T10:18:55.746+09:00
+action: approve
+slug: 2026-08-23-oral-health-prevention
+reviewed_by: 三谷
+date: 2026-08-23
+publish_at: 2026-08-23
+
