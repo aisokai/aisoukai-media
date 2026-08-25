@@ -539,3 +539,11 @@ reviewed_by: 三谷
 date: 2026-08-17
 publish_at: 2026-08-17
 
+## 2026-08-25T10:18:13.329+09:00
+datetime: 2026-08-25T10:18:13.329+09:00
+action: approve
+slug: 2026-08-19-topic-20260511-010
+reviewed_by: 三谷
+date: 2026-08-19
+publish_at: 2026-08-19
+
