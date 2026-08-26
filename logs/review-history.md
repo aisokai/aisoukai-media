@@ -539,3 +539,37 @@ reviewed_by: 三谷
 date: 2026-08-17
 publish_at: 2026-08-17
 
+## 2026-08-25T10:18:13.329+09:00
+datetime: 2026-08-25T10:18:13.329+09:00
+action: approve
+slug: 2026-08-19-topic-20260511-010
+reviewed_by: 三谷
+date: 2026-08-19
+publish_at: 2026-08-19
+
+## 2026-08-25T10:18:43.270+09:00
+datetime: 2026-08-25T10:18:43.270+09:00
+action: approve
+slug: 2026-08-21-topic-20260511-011
+reviewed_by: 三谷
+date: 2026-08-21
+publish_at: 2026-08-21
+
+## 2026-08-25T10:18:55.746+09:00
+datetime: 2026-08-25T10:18:55.746+09:00
+action: approve
+slug: 2026-08-23-oral-health-prevention
+reviewed_by: 三谷
+date: 2026-08-23
+publish_at: 2026-08-23
+
+## 2026-08-25T10:19:28.523+09:00
+datetime: 2026-08-25T10:19:28.523+09:00
+action: reject
+slug: 2026-08-24-topic-20260511-012
+reviewed_by: 三谷
+reason: 内容が重複
+reject_reason: 内容が重複
+date: 2026-08-24
+publish_at: 2026-08-24
+
