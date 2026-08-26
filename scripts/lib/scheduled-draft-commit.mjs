@@ -503,7 +503,10 @@ export function recoverOwnedGeneratedDraft({
       synced: true,
       recovered: true,
       remoteHead,
-      resolvedEntries: entries,
+      // Only the entries verified for this exact commit may be handed to the
+      // notification finalizer. Blocked entries remain durable in the ledger
+      // for Human review and must never be cleared by a later notification.
+      resolvedEntries: activeEntries,
       ledgerPending: true,
       reason: '新しい未承認draftをorigin/mainへ同期し、Human review通知待ちです。',
     }

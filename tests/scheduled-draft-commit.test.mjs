@@ -954,11 +954,34 @@ test('a ledger entry whose file no longer matches is retained and skipped withou
 
   assert.equal(result.ok, true)
   assert.equal(result.synced, true)
+  assert.deepEqual(result.resolvedEntries.map((item) => item.path), [path2])
   assert.deepEqual(
     readOwnedGeneratedDraftLedger(root).entries.map((item) => item.path).sort(),
     [path1, path2].sort(),
   )
   assert.equal(calls.some((call) => call.includes(path1)), false)
+})
+
+test('notification finalization retains a mismatched ledger entry after a healthy draft sync', () => {
+  const root = makeRoot()
+  writePost(root, path1, safeDraft('one'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path1, slug: slug1 } })
+  writePost(root, path2, safeDraft('two'))
+  rememberGeneratedDraft({ root, scheduledResult: { path: path2, slug: slug2 } })
+  writePost(root, path1, safeDraft('one edited'))
+
+  const syncable = readOwnedGeneratedDraftLedger(root).entries.filter((item) => item.path === path2)
+  const synced = syncOwnedGeneratedDraft({
+    root,
+    assertGitReady: () => ({ ok: true }),
+    indexLockExists: () => false,
+    runCommand: remoteSyncRunner([], syncable),
+  })
+  const finalized = finalizeSyncedDraftLedger({ root, resolvedEntries: synced.resolvedEntries })
+
+  assert.equal(synced.ok, true)
+  assert.equal(finalized.ok, true)
+  assert.deepEqual(readOwnedGeneratedDraftLedger(root).entries.map((item) => item.path), [path1])
 })
 
 // 2026-08-24 障害の再現: 承認済み legacy-v1 と hash 不一致 draft が ledger 先頭に滞留し、
@@ -989,6 +1012,7 @@ test('a stale approved legacy entry and a mismatched draft no longer block the h
 
   assert.equal(result.ok, true)
   assert.equal(result.synced, true)
+  assert.deepEqual(result.resolvedEntries.map((item) => item.path), [path3])
   assert.deepEqual(
     readOwnedGeneratedDraftLedger(root).entries.map((item) => item.path).sort(),
     [path2, path3].sort(),

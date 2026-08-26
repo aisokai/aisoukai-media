@@ -2813,6 +2813,31 @@
       "license_source": "院内提供",
       "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）",
       "note": "お口の状態と生活に合わせて次回時期を決める場面"
+    },
+    {
+      "id": "pediatric-fixed-palatal-expander",
+      "path": "/images/library/pediatric/pediatric-fixed-palatal-expander.png",
+      "category": "pediatric",
+      "title": "歯科模型に装着された固定式口蓋拡大装置",
+      "alt": "歯科模型に装着された固定式口蓋拡大装置",
+      "width": 680,
+      "height": 486,
+      "format": "png",
+      "sha256": "0e4d4e67b581cd6e06bb7f433eb14c5797242cdd9b8180127d4006afb3b51b70",
+      "source_filename": "pediatric-fixed-palatal-expander.png",
+      "license_status": "assumed_approved",
+      "usage_status": "active",
+      "created_at": "2026-08-17T12:39:49.000Z",
+      "updated_at": "2026-08-17T12:39:49.000Z",
+      "tags": [
+        "小児矯正",
+        "固定式口蓋拡大装置",
+        "口蓋拡大",
+        "歯科模型"
+      ],
+      "license_source": "院内提供",
+      "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）",
+      "note": "歯科模型に装着された固定式口蓋拡大装置"
     }
   ]
 }
