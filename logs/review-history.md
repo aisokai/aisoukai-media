@@ -581,3 +581,13 @@ reviewed_by: 三谷
 date: 2026-07-27
 publish_at: 2026-07-27
 
+## 2026-08-28T15:56:53.701+09:00
+datetime: 2026-08-28T15:56:53.701+09:00
+action: reject
+slug: 2026-08-26-topic-20260511-003
+reviewed_by: 三谷
+reason: 季節外れ
+reject_reason: 季節外れ
+date: 2026-08-26
+publish_at: 2026-08-26
+
