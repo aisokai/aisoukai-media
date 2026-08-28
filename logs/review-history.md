@@ -573,3 +573,11 @@ reject_reason: 内容が重複
 date: 2026-08-24
 publish_at: 2026-08-24
 
+## 2026-08-28T15:56:37.871+09:00
+datetime: 2026-08-28T15:56:37.871+09:00
+action: approve
+slug: 2026-07-27-topic-13551a75692a460f
+reviewed_by: 三谷
+date: 2026-07-27
+publish_at: 2026-07-27
+
