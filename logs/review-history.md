@@ -591,3 +591,11 @@ reject_reason: 季節外れ
 date: 2026-08-26
 publish_at: 2026-08-26
 
+## 2026-08-28T15:57:31.088+09:00
+datetime: 2026-08-28T15:57:31.088+09:00
+action: approve
+slug: 2026-08-28-topic-20260511-005
+reviewed_by: 三谷
+date: 2026-08-28
+publish_at: 2026-08-28
+
