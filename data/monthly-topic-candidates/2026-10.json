@@ -276,7 +276,7 @@
       "duplicateRisk": "low",
       "priority": "medium",
       "recommendedPublishDate": "2026-10-09",
-      "status": "selected"
+      "status": "pending"
     },
     {
       "id": "2026-10-topic-018",
@@ -308,7 +308,7 @@
       "duplicateRisk": "low",
       "priority": "medium",
       "recommendedPublishDate": "2026-10-14",
-      "status": "pending"
+      "status": "backup"
     },
     {
       "id": "2026-10-topic-020",
