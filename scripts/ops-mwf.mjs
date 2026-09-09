@@ -81,8 +81,40 @@ function runGitCommand(command, args) {
   })
   return {
     ok: !result.error && result.status === 0,
-    output: `${result.stdout ?? ''}${result.stderr ?? ''}`,
+    // Successful metadata commands must not mix diagnostic stderr into SHAs,
+    // branch names or porcelain output (Git can emit harmless platform warnings).
+    output: result.status === 0 ? (result.stdout ?? '') : `${result.stdout ?? ''}${result.stderr ?? ''}`,
   }
+}
+
+// Preparation happens before generation can make the checkout dirty. The draft
+// sync helper still owns every validation, commit, push and remote-SHA gate.
+export function prepareMwfCheckout({ runCommand = runGitCommand, pathExists = existsSync, root = ROOT } = {}) {
+  const git = (args) => runCommand('/usr/bin/git', args)
+  const hold = (reason) => ({ ok: false, updated: false, reason })
+  const branch = git(['branch', '--show-current'])
+  if (!branch.ok || branch.output.trim() !== 'main') return hold('main以外のためGit準備を保留しました')
+  const lock = git(['rev-parse', '--git-path', 'index.lock'])
+  if (!lock.ok || !lock.output.trim() || pathExists(resolve(root, lock.output.trim()))) return hold('index lockを確認できないか存在するためGit準備を保留しました')
+  if (!git(['fetch', '--quiet', 'origin', 'main']).ok) return hold('origin/main の取得に失敗したためGit準備を保留しました')
+  const divergence = git(['rev-list', '--left-right', '--count', 'HEAD...origin/main'])
+  const counts = divergence.output.trim().match(/^(\d+)\s+(\d+)$/)
+  if (!divergence.ok || !counts || !Number.isSafeInteger(Number(counts[1])) || !Number.isSafeInteger(Number(counts[2]))) return hold('ahead/behindを確認できないためGit準備を保留しました')
+  if (Number(counts[1]) !== 0) return hold('aheadまたは分岐があるためGit準備を保留しました')
+  // Aligned checkouts may contain owned drafts: the existing sync validates them.
+  if (Number(counts[2]) === 0) return { ok: true, updated: false }
+  const target = git(['rev-parse', '--verify', 'origin/main^{commit}'])
+  if (!target.ok || !/^[a-f0-9]{40}$/.test(target.output.trim())) return hold('取得したmainのSHAを確認できないためGit準備を保留しました')
+  const status = git(['status', '--porcelain', '--untracked-files=all'])
+  if (!status.ok || status.output.trim()) return hold('未保存の変更または未追跡ファイルがあるためGit準備を保留しました')
+  if (pathExists(resolve(root, lock.output.trim()))) return hold('index lockが存在するためGit準備を保留しました')
+  // Disable autostash explicitly, even if a user's Git configuration enables it.
+  const merged = git(['-c', 'merge.autostash=false', 'merge', '--ff-only', '--no-edit', target.output.trim()])
+  if (!merged.ok) return hold('fast-forwardに失敗したためGit準備を保留しました')
+  const head = git(['rev-parse', 'HEAD'])
+  const after = git(['status', '--porcelain', '--untracked-files=all'])
+  if (!head.ok || head.output.trim() !== target.output.trim() || !after.ok || after.output.trim()) return hold('fast-forward後の状態を確認できないためGit準備を保留しました')
+  return { ok: true, updated: true, head: head.output.trim() }
 }
 
 async function sendTelegram(botToken, chatId, text) {
@@ -186,6 +218,14 @@ async function main() {
     try { closeSync(runLock.fd) } catch {}
     try { unlinkSync(LOCK_PATH) } catch {}
   })
+
+  const preparation = prepareMwfCheckout()
+  if (!preparation.ok) {
+    // A preparation hold is diagnostic: preserve local stock and stuck notices.
+    // The existing sync independently refuses unsafe or stale remote state.
+    console.error(`⚠️ ${preparation.reason}`)
+  }
+  if (preparation.updated) console.log('✅ origin/main へのfast-forward準備を完了しました')
 
   loadEnv()
 console.log(`ops:mwf ${TODAY}（${DAY_NAMES_JA[dayOfWeek]}）: CSV → 記事 → ストック → Telegram → Human承認 → 掲載`)
