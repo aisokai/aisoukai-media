@@ -3,24 +3,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { isTelegramNotificationEnabled, notifySyncedDraftLedger, reconcileBeforeGeneration } from '../scripts/lib/scheduled-draft-notification.mjs'
 
-test('weekly job reconciles the durable ledger immediately after its lock, including no-draft and missing-key runs', () => {
+test('retired entrypoint has no generation, sync, env, lock, or notification dependencies', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  const lock = source.indexOf('const runLock = acquireRunLock()')
-  const loadEnvironment = source.indexOf('  loadEnv()', lock)
-  const reconcile = source.indexOf('const reconciled = await reconcileBeforeGeneration({')
-  const missingApiKey = source.indexOf('!process.env.OPENAI_API_KEY')
-  assert.ok(lock > 0)
-  assert.ok(loadEnvironment > lock, 'the local environment must load after the lock is acquired')
-  assert.ok(loadEnvironment < reconcile, 'the local environment must load before reconciliation can evaluate Telegram settings')
-  assert.ok(reconcile > lock)
-  assert.ok(missingApiKey > reconcile)
-  assert.match(source, /Git同期はAI生成に依存しないため、生成設定がない実行でも先に突合する/)
-  assert.match(source, /SEND_DAYS/)
-  assert.match(source, /syncOwnedGeneratedDraft/)
-  assert.match(source, /process\.execPath/)
-  assert.match(source, /PATH: process\.env\.PATH/)
-  assert.doesNotMatch(source, /git add \.|git', \['push'/)
-  assert.doesNotMatch(source, /convert-selected-topics|approve-post|publish-post/)
+  assert.doesNotMatch(source, /scheduled-draft|media-queue|notification-dedupe|spawnSync|readFileSync|writeFileSync|unlinkSync|process\.env|fetch\(/)
+  assert.match(source, /status: 'retired'/)
 })
 
 test('review notification failure leaves the synced ledger untouched', async () => {
@@ -92,32 +78,4 @@ test('no-draft path still invokes the pre-generation ledger reconciliation', asy
   assert.equal(syncCalls, 1)
   assert.equal(notifyCalls, 1)
   assert.equal(result.draftSyncResult, draftSyncResult)
-})
-
-test('local stock notices stay CTA-free, while only a synced outcome can select the review-request job', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  assert.match(source, /ops-mwf-stock-notice/)
-  assert.match(source, /buildScheduledReviewNotification/)
-  assert.match(source, /outcome\.kind === 'synced'/)
-  assert.match(source, /reservation\.fail\(\{ text/)
-  assert.match(source, /process\.exitCode = 1/)
-  assert.match(source, /reservation\.commit\(\{ text \}\)/)
-  assert.doesNotMatch(source, /resolveNotificationSiteUrl|readRetryableNotification|retryFailedReviewNotification/)
-})
-
-test('approval remains the only publication gate', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  assert.match(source, /--auto-publish を受け付けません/)
-  assert.match(source, /approve \/ publish は実行していません/)
-  assert.doesNotMatch(source, /approve-post|publish-post|git', \['push'/)
-})
-
-// 2026-08-24 障害: 同期保留が通知にも終了コードにも現れず約1ヶ月気づけなかった。
-test('a stuck ledger is reported on every run instead of failing silently', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  assert.match(source, /stuckDraftLedgerNotice/)
-  assert.match(source, /readOwnedGeneratedDraftLedger/)
-  assert.match(source, /滞留/)
-  // 観測専用であり、承認・公開の経路を新設しないこと
-  assert.doesNotMatch(source, /approve-post|publish-post/)
 })

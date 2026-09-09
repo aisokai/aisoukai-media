@@ -63,7 +63,7 @@
     "image:misassign": "node scripts/image-misassign.mjs",
     "image:feedback": "node scripts/image-feedback.mjs",
     "test": "sh scripts/network-denied-launcher.sh",
-    "test:ops-mwf": "node --test tests/ops-mwf-checkout.test.mjs tests/ops-mwf.test.mjs tests/scheduled-draft-commit.test.mjs",
+    "test:ops-mwf": "node --test tests/ops-mwf-checkout.test.mjs tests/ops-mwf.test.mjs tests/scheduled-article-flow.test.mjs",
     "test:isolated-env": "node --test tests/activation.integration.mjs tests/content-status-notification.integration.mjs tests/gmb-api.integration.mjs tests/lineworks-adapter.integration.mjs tests/safety-gates.integration.mjs",
     "validate:safe-test-path": "node scripts/validate-safe-test-path.mjs",
     "validate:network-denied": "sh scripts/network-denied-launcher.sh",

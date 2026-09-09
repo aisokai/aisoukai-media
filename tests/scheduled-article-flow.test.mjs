@@ -61,10 +61,10 @@ test('a persisted article keeps image diagnostics for Human review and continues
   assert.match(source, /result\.reasons\.push\(`画像を設定できませんでした/)
 })
 
-test('ops review notification reports CSV exhaustion as no generated article', () => {
+test('retired ops entrypoint does not generate articles or send notifications', () => {
   const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
 
-  assert.match(source, /未使用ネタがないため生成しません/)
+  assert.match(source, /生成・Git同期・通知・approve \/ publish は実行していません/)
 })
 
 test('post validation rejects generated body corruption markers', () => {
