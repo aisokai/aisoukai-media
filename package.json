@@ -82,7 +82,7 @@
     "notify:topic-candidates": "node scripts/notify-topic-candidates.mjs",
     "ops:mwf:install": "node scripts/setup-launchd-mwf.mjs --install",
     "ops:mwf:uninstall": "node scripts/setup-launchd-mwf.mjs --uninstall",
-    "ops:mwf:status": "node scripts/setup-launchd-mwf.mjs --status",
+    "ops:mwf:status": "node scripts/ops-mwf.mjs --status",
     "media:queue:validate": "node scripts/validate-media-queue.mjs",
     "media:queue:list": "node scripts/list-media-queue.mjs",
     "media:notice:draft": "node scripts/generate-emergency-notice.mjs",
@@ -116,7 +116,13 @@
     "media:launchd:install": "node scripts/setup-launchd-media.mjs --install",
     "media:launchd:install-apply": "node scripts/setup-launchd-media.mjs --install-apply",
     "media:launchd:uninstall": "node scripts/setup-launchd-media.mjs --uninstall",
-    "media:launchd:status": "node scripts/setup-launchd-media.mjs --status"
+    "media:launchd:status": "node scripts/setup-launchd-media.mjs --status",
+    "test:mwf-delivery": "node --test tests/mwf-delivery.test.mjs tests/mwf-isolated-sync.test.mjs tests/mwf-admin-receipt.test.mjs tests/mwf-production.test.mjs tests/tiered-publication.test.mjs",
+    "test:ops-mwf": "node --test tests/ops-mwf.test.mjs tests/scheduled-article-flow.test.mjs tests/mwf-delivery.test.mjs tests/mwf-isolated-sync.test.mjs tests/mwf-admin-receipt.test.mjs tests/mwf-production.test.mjs tests/tiered-publication.test.mjs",
+    "ops:mwf:production": "node scripts/ops-mwf.mjs --production",
+    "ops:mwf:preserve": "node scripts/mwf-preserve-drafts.mjs",
+    "ops:mwf:minor": "node scripts/mwf-minor-edit.mjs",
+    "ops:mwf:plist": "node scripts/mwf-runner-plist.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

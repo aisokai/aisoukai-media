@@ -2,184 +2,18 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import matter from 'gray-matter'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
 const POSTS_DIR = join(ROOT, 'content', 'posts')
 
-const VALID_CATEGORIES = [
-  '虫歯治療', '根管治療', '歯周病治療', '予防歯科', '小児歯科',
-  '親知らず', 'インプラント', 'その他', 'お知らせ',
-]
-
-const REQUIRED_FIELDS = ['title', 'date', 'category', 'tags', 'author', 'reviewed', 'image']
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-.+\.md$/
-const VALID_MEDICAL_RISK = ['low', 'medium', 'high']
-const VALID_CHECK_STATUS = ['pending', 'passed', 'failed']
-const VALID_PUBLICATION_STATUS = ['draft', 'pending_review', 'auto_approved', 'human_approved']
-const VALID_STOCK_STATUS = ['ready', 'hold', 'rejected', 'adopted']
-
-function detectGeneratedDraftQualityIssues(body) {
-  const text = String(body ?? '')
-  const issues = []
-  const checks = [
-    { re: /\bbrief\b/i, reason: '本文にプロンプト断片 "brief" が混入しています' },
-    { re: /\b(undefined|null|NaN)\b/, reason: '本文に生成崩れを示す値が混入しています' },
-    { re: /\[[^\]]*(TODO|要確認|出典|引用|placeholder)[^\]]*\]/i, reason: '本文に未処理プレースホルダーが残っています' },
-    { re: /<\s*(title|body|article|section|placeholder)\s*>/i, reason: '本文に未処理タグ風プレースホルダーが残っています' },
-    { re: /[A-Za-z]{4,}(?:月|日|年|ヶ|か月|ヶ月)/, reason: '本文に英字断片と日付・期間表現が不自然に連結しています' },
-  ]
-
-  for (const check of checks) {
-    if (check.re.test(text) && !issues.includes(check.reason)) issues.push(check.reason)
-  }
-
-  return issues
-}
-
-function toDateStr(val) {
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
-  return String(val ?? '')
-}
-
+import { validatePostArtifact } from './lib/post-artifact-validation.mjs'
 function validatePost(filename) {
-  const errors   = []
-  const warnings = []
-  const filePath = join(POSTS_DIR, filename)
-
-  if (!FILENAME_RE.test(filename)) {
-    errors.push('ファイル名が YYYY-MM-DD-slug.md 形式ではありません')
-    return errors
-  }
-
-  let data, content
   try {
-    const raw = readFileSync(filePath, 'utf8')
-    const parsed = matter(raw)
-    data = parsed.data
-    content = parsed.content
-  } catch (e) {
-    errors.push(`frontmatter のパースに失敗しました: ${e.message}`)
-    return errors
-  }
-
-  for (const field of REQUIRED_FIELDS) {
-    if (data[field] === undefined || data[field] === null) {
-      errors.push(`${field} フィールドがありません`)
-    }
-  }
-
-  if (typeof data.title === 'string' && data.title.trim() === '') {
-    errors.push('title が空です')
-  }
-
-  const excerpt = typeof data.excerpt === 'string' && data.excerpt.trim() !== ''
-    ? data.excerpt
-    : (typeof data.description === 'string' ? data.description : '')
-
-  if (excerpt.trim() === '') {
-    errors.push('excerpt がありません（互換として description でも可）')
-  }
-
-  if (typeof data.author === 'string' && data.author.trim() === '') {
-    errors.push('author が空です')
-  }
-
-  if (typeof data.image === 'string' && data.image.trim() !== '') {
-    if (!data.image.startsWith('/')) {
-      errors.push(`image のパスが "/" で始まっていません: "${data.image}"`)
-    } else {
-      // image が指定されている場合、public/ 配下に実ファイルが存在するか確認する
-      const imageDiskPath = join(ROOT, 'public', data.image)
-      if (!existsSync(imageDiskPath)) {
-        errors.push(`image ファイルが public/ に存在しません: "${data.image}"`)
-      }
-    }
-    // image が設定されているのに image_alt が空の場合は警告（エラーにしない）
-    if (!data.image_alt || String(data.image_alt).trim() === '') {
-      warnings.push('image_alt が設定されていません（アクセシビリティのために image_alt の設定を推奨します）')
-    }
-  }
-
-  if (data.publication_status === 'human_approved') {
-    const image = String(data.image ?? '').trim()
-    const imageAlt = String(data.image_alt ?? '').trim()
-
-    if (!image) {
-      errors.push('公開対象記事の image が空です')
-    } else if (!image.startsWith('/images/')) {
-      errors.push(`公開対象記事の image は "/images/" で始まる必要があります: "${image}"`)
-    } else {
-      const imageDiskPath = join(ROOT, 'public', image)
-      if (!existsSync(imageDiskPath)) {
-        errors.push(`公開対象記事の image ファイルが public/ に存在しません: "${image}"`)
-      }
-    }
-
-    if (!imageAlt) {
-      errors.push('公開対象記事の image_alt が空です')
-    }
-  }
-
-  if (data.category !== undefined && !VALID_CATEGORIES.includes(data.category)) {
-    errors.push(`category が無効です: "${data.category}"`)
-  }
-
-  if (data.reviewed !== undefined && typeof data.reviewed !== 'boolean') {
-    errors.push(`reviewed が boolean ではありません (実際の型: ${typeof data.reviewed})`)
-  }
-
-  if (data.auto_approved !== undefined && typeof data.auto_approved !== 'boolean') {
-    errors.push(`auto_approved が boolean ではありません (実際の型: ${typeof data.auto_approved})`)
-  }
-
-  if (data.medical_risk !== undefined && !VALID_MEDICAL_RISK.includes(data.medical_risk)) {
-    errors.push(`medical_risk が無効です: "${data.medical_risk}"`)
-  }
-
-  if (data.legal_check_status !== undefined && !VALID_CHECK_STATUS.includes(data.legal_check_status)) {
-    errors.push(`legal_check_status が無効です: "${data.legal_check_status}"`)
-  }
-
-  if (data.image_check_status !== undefined && !VALID_CHECK_STATUS.includes(data.image_check_status)) {
-    errors.push(`image_check_status が無効です: "${data.image_check_status}"`)
-  }
-
-  if (data.publication_status !== undefined && !VALID_PUBLICATION_STATUS.includes(data.publication_status)) {
-    errors.push(`publication_status が無効です: "${data.publication_status}"`)
-  }
-
-  if (data.stock_status !== undefined && !VALID_STOCK_STATUS.includes(data.stock_status)) {
-    errors.push(`stock_status が無効です: "${data.stock_status}"`)
-  }
-
-  if (data.tags !== undefined && !Array.isArray(data.tags)) {
-    errors.push('tags が配列ではありません')
-  }
-
-  if (data.date !== undefined) {
-    const dateStr = toDateStr(data.date)
-    if (!DATE_RE.test(dateStr)) {
-      errors.push(`date の形式が不正です: "${dateStr}" (YYYY-MM-DD が必要)`)
-    } else {
-      const filenameDate = filename.slice(0, 10)
-      if (dateStr !== filenameDate) {
-        errors.push(`date (${dateStr}) がファイル名の日付 (${filenameDate}) と一致しません`)
-      }
-    }
-  }
-
-  if (!content || content.trim() === '') {
-    errors.push('本文が空です')
-  } else {
-    for (const issue of detectGeneratedDraftQualityIssues(content)) {
-      errors.push(issue)
-    }
-  }
-
-  return { errors, warnings }
+    return validatePostArtifact(filename, readFileSync(join(POSTS_DIR, filename), 'utf8'), {
+      imageExists: image => existsSync(join(ROOT, 'public', image)),
+    })
+  } catch { return { errors: ['記事ファイルを読み込めません'], warnings: [] } }
 }
 
 let files

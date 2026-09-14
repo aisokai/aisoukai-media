@@ -56,12 +56,12 @@ test('a later title or body edit loses publication until a fresh exact Human app
   assert.equal(changedBody.publishable, false)
 })
 
-test('monthly CSV metadata remains historical while the MWF entrypoint is retired', () => {
+test('monthly CSV generation and MWF schedule remain, while only successful sends dedupe', () => {
   const monthly = readFileSync('scripts/generate-monthly-topic-candidates.mjs', 'utf8')
-  const ops = readFileSync('scripts/ops-mwf.mjs', 'utf8')
+  const ops = readFileSync('scripts/lib/mwf-delivery.mjs', 'utf8')
   assert.match(monthly, /candidateCount = 24/)
   assert.match(monthly, /cadence: 'MWF'/)
-  assert.match(ops, /status: 'retired'/)
+  assert.match(ops, /Mon\/Wed\/Fri 08:30 Asia\/Tokyo/)
   const outcome = classifyScheduledDraftOutcome({
     childStatus: 0,
     scheduledResult: { ok: true, generated: true, path: 'content/posts/2026-08-01-test.md' },

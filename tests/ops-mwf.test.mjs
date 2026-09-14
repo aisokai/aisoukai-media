@@ -1,13 +1,8 @@
-import { readFileSync } from 'node:fs'
+// Legacy helper tests use injected effects only; the new runtime never imports them.
+import { runMwfCli } from '../scripts/ops-mwf.mjs'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { isTelegramNotificationEnabled, notifySyncedDraftLedger, reconcileBeforeGeneration } from '../scripts/lib/scheduled-draft-notification.mjs'
-
-test('retired entrypoint has no generation, sync, env, lock, or notification dependencies', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-  assert.doesNotMatch(source, /scheduled-draft|media-queue|notification-dedupe|spawnSync|readFileSync|writeFileSync|unlinkSync|process\.env|fetch\(/)
-  assert.match(source, /status: 'retired'/)
-})
 
 test('review notification failure leaves the synced ledger untouched', async () => {
   let finalizeCalls = 0
@@ -78,4 +73,11 @@ test('no-draft path still invokes the pre-generation ledger reconciliation', asy
   assert.equal(syncCalls, 1)
   assert.equal(notifyCalls, 1)
   assert.equal(result.draftSyncResult, draftSyncResult)
+})
+
+test('unbound runtime is stopped and old auto-publish options are rejected', async () => {
+  let status
+  assert.equal(await runMwfCli([], { output: value => { status = value } }), 2)
+  assert.equal(status.status, 'stopped')
+  await assert.rejects(runMwfCli(['--auto-publish']), /unsupported_argument/)
 })

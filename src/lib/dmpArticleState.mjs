@@ -1,5 +1,7 @@
 import { getReviewedContentFingerprint } from './reviewContentFingerprint.mjs'
 
+import { assessTieredPublication, isProtectedEditorialInput } from './tieredPublication.mjs'
+
 const HASH = /^[a-f0-9]{64}$/
 
 export function getContentVersion(data, content) {
@@ -17,23 +19,26 @@ export function isAdminDiscoverableVersion(adminDiscoverability, contentVersion)
 
 /**
  * @param {{
- *   data?: Record<string, unknown>, content?: string, today?: string,
+ *   data?: Record<string, unknown>, content?: string, today?: string, verificationSecret?: string, publicationContext?: object,
  *   adminDiscoverability?: null | { status: 'confirmed', source: 'admin-review-source', contentVersion: string }
  * }} input
  */
-export function getDmpArticleState({ data = {}, content = '', adminDiscoverability = null, today = '' } = {}) {
+export function getDmpArticleState({ data = {}, content = '', adminDiscoverability = null, today = '', verificationSecret, publicationContext } = {}) {
   const contentVersion = getContentVersion(data, content)
   const approvedExactVersion = data.reviewed === true
     && Boolean(String(data.reviewed_at ?? '').trim())
     && Boolean(String(data.reviewed_by ?? '').trim())
     && data.reviewed_content_hash === contentVersion
+  const autoApprovedExactVersion = assessTieredPublication(data, content, verificationSecret, publicationContext)
   const rejected = Boolean(data.rejection_reason)
-  const publishAt = String(data.publish_at ?? data.date ?? '')
+  const scheduledValue = data.publish_at ?? data.date ?? ''
+  const publishAt = scheduledValue instanceof Date ? scheduledValue.toISOString().slice(0,10) : String(scheduledValue)
   const future = Boolean(today && publishAt && publishAt > today)
-  const publishable = approvedExactVersion && !data.draft && !data.archived && !rejected && !future
+  const protectedData = isProtectedEditorialInput(data,content)
+  const publishable = (approvedExactVersion || autoApprovedExactVersion) && !protectedData && !data.draft && !data.archived && !rejected && !future
   const reviewReady = !data.archived && !rejected
     && isAdminDiscoverableVersion(adminDiscoverability, contentVersion)
-  return { contentVersion, approvedExactVersion, rejected, future, publishable, reviewReady,
+  return { contentVersion, approvedExactVersion, autoApprovedExactVersion, protectedData, rejected, future, publishable, reviewReady,
     state: reviewReady ? 'review-ready' : 'pending-review' }
 }
 

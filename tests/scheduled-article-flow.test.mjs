@@ -61,16 +61,8 @@ test('a persisted article keeps image diagnostics for Human review and continues
   assert.match(source, /result\.reasons\.push\(`画像を設定できませんでした/)
 })
 
-test('retired ops entrypoint does not generate articles or send notifications', () => {
-  const source = readFileSync('scripts/ops-mwf.mjs', 'utf8')
-
-  assert.match(source, /生成・Git同期・通知・approve \/ publish は実行していません/)
-})
-
-test('post validation rejects generated body corruption markers', () => {
-  const source = readFileSync('scripts/validate-posts.mjs', 'utf8')
-
-  assert.match(source, /detectGeneratedDraftQualityIssues/)
-  assert.match(source, /\\bbrief\\b/i)
-  assert.match(source, /本文にプロンプト断片/)
+test('post validation rejects generated body corruption markers through shared artifact validator', async () => {
+  const { validatePostArtifact } = await import('../scripts/lib/post-artifact-validation.mjs')
+  const result = validatePostArtifact('2026-09-14-synthetic.md', '---\ntitle: synthetic\n---\nbrief\n')
+  assert.ok(result.errors.some(error => error.includes('プロンプト断片')))
 })

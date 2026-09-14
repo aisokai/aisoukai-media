@@ -16,8 +16,8 @@ function getTodayJst(): string {
 // publish_at または date が今日より未来の場合は公開しない（スケジュール公開）。
 // AI生成記事は生成時 reviewed/auto_approved とも false で作られ、
 // Human approval 後に reviewed: true / reviewed_at / reviewed_by へ変更する。
-function isPublishReady(data: Record<string, unknown>, content = ''): boolean {
-  return getDmpArticleState({ data, content, adminDiscoverability: null, today: getTodayJst() }).publishable
+function isPublishReady(data: Record<string, unknown>, content = '', fileName = ''): boolean {
+  return getDmpArticleState({ data, content, adminDiscoverability: null, publicationContext: { path: `content/posts/${fileName}` }, today: getTodayJst() }).publishable
 }
 
 export type PostMeta = {
@@ -54,7 +54,7 @@ export function getAllPosts(): PostMeta[] {
     .filter((fileName) => {
       const fullPath = path.join(POSTS_DIR, fileName);
       const { data, content } = matter(fs.readFileSync(fullPath, 'utf8'));
-      return isPublishReady(data as Record<string, unknown>, content);
+      return isPublishReady(data as Record<string, unknown>, content, fileName);
     })
     .map((fileName): PostMeta => {
       const slug = fileName.replace(/\.md$/, '');
@@ -103,6 +103,13 @@ export type PendingReviewPost = {
   contentVersion: string;
 };
 
+export type PendingReviewPostSource = 'github' | 'local';
+
+export type PendingReviewPostsForAdmin = {
+  posts: PendingReviewPost[];
+  source: PendingReviewPostSource;
+};
+
 function toDateString(val: unknown): string {
   if (val instanceof Date) return val.toISOString().slice(0, 10);
   return String(val ?? '');
@@ -112,8 +119,8 @@ async function buildPendingReviewPost(fileName: string, raw: string): Promise<Pe
   const { data, content } = matter(raw);
 
   if (data['archived'] === true) return null;
-  const state = getDmpArticleState({ data, content });
-  if (state.approvedExactVersion) return null;
+  const state = getDmpArticleState({ data, content, publicationContext: { path: `content/posts/${fileName}` } });
+  if (state.approvedExactVersion || state.autoApprovedExactVersion) return null;
 
   const processed = await remark()
     .use(remarkHtml, { sanitize: true })
@@ -171,15 +178,21 @@ async function getPendingReviewPostsFromGitHub(): Promise<PendingReviewPost[]> {
   return sortPendingReviewPosts(results.filter(Boolean) as PendingReviewPost[]);
 }
 
-export async function getPendingReviewPostsForAdmin(): Promise<PendingReviewPost[]> {
-  if (!process.env.GITHUB_REVIEW_TOKEN) return getPendingReviewPosts();
+export async function getPendingReviewPostsForAdminWithSource(): Promise<PendingReviewPostsForAdmin> {
+  if (!process.env.GITHUB_REVIEW_TOKEN) {
+    return { posts: await getPendingReviewPosts(), source: 'local' };
+  }
 
   try {
-    return await getPendingReviewPostsFromGitHub();
+    return { posts: await getPendingReviewPostsFromGitHub(), source: 'github' };
   } catch (error) {
     console.error('GitHub pending review read failed; falling back to local files', error);
-    return getPendingReviewPosts();
+    return { posts: await getPendingReviewPosts(), source: 'local' };
   }
+}
+
+export async function getPendingReviewPostsForAdmin(): Promise<PendingReviewPost[]> {
+  return (await getPendingReviewPostsForAdminWithSource()).posts;
 }
 
 // contentHtml は remark-html(sanitize:true) で処理済みの信頼済みHTML。
@@ -191,7 +204,7 @@ export async function getPostBySlug(slug: string): Promise<Post | null> {
   const fileContents = fs.readFileSync(fullPath, 'utf8');
   const { data, content } = matter(fileContents);
 
-  if (!isPublishReady(data as Record<string, unknown>, content)) return null;
+  if (!isPublishReady(data as Record<string, unknown>, content, `${slug}.md`)) return null;
 
   const processed = await remark()
     .use(remarkHtml, { sanitize: true })

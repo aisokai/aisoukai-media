@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 // Approval state is intentionally excluded: a Human approval fingerprints the
 // article itself, not the metadata produced by that approval.
 const APPROVAL_FIELDS = new Set([
+  'tiered_review_proof',
   'reviewed',
   'reviewed_at',
   'reviewed_by',
@@ -36,6 +37,7 @@ export function hasStaleReviewedContent(data, content) {
 }
 
 const SERVER_OWNED_REVIEW_FIELDS = [
+  'tiered_review_proof',
   'reviewed',
   'reviewed_at',
   'reviewed_by',
@@ -63,12 +65,14 @@ export function applyAdminEditReviewState({
   const next = preserveServerOwnedReviewFields(submittedData, currentData)
   const materialChanged = getReviewedContentFingerprint(currentData, currentContent) !==
     getReviewedContentFingerprint(submittedData, submittedContent)
-  const requiresRereview = currentData.reviewed === true && (
+  const requiresRereview = (currentData.reviewed === true || Boolean(currentData.tiered_review_proof)) && (
     materialChanged || hasStaleReviewedContent(currentData, currentContent)
   )
 
   if (requiresRereview) {
     next.reviewed = false
+    next.auto_approved = false
+    next.draft = true
     next.stock_status = 'ready'
     next.review_invalidated_at = invalidatedAt
     next.review_invalidation_reason = '承認後に記事内容が編集されたため、Human review をやり直してください'

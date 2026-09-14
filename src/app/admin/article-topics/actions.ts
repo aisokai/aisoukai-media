@@ -10,7 +10,10 @@ import {
   loadAdminArticleTopics,
   type ArticleTopicSource,
 } from '@/lib/articleTopics'
-import { commitGitHubArticleTopicsCsv, readGitHubArticleTopicsCsv } from '@/lib/articleTopicsGithub'
+import { readGitHubArticleTopicsCsv } from '@/lib/articleTopicsGithub'
+
+import { issueTopicAdoption } from '@/lib/tieredPublication.mjs'
+import { commitGitHubFiles, readGitHubBranchHead } from '@/lib/githubContents'
 
 export type ArticleTopicActionResult = {
   ok: boolean
@@ -32,13 +35,14 @@ function validateTopicId(id: string) {
   if (!/^(TOPIC|MONTHLY)-[A-Z0-9-]+$/.test(id)) throw new Error('topic ID の形式が不正です')
 }
 
-async function saveCsv(content: string, id: string, source: ArticleTopicSource) {
+async function saveCsv(content: string, id: string, source: ArticleTopicSource, adoption: string | null, expectedHeadSha?: string) {
   if (source === 'github_main') {
-    const commit = await commitGitHubArticleTopicsCsv(content, id)
+    const commit = await commitGitHubFiles(`update article topic: ${id}`, [{ path: ARTICLE_TOPICS_RELATIVE_PATH, content }, ...(adoption ? [{ path: `data/topic-adoptions/${id}.json`, content: adoption }] : [])], { branch: 'main', expectedHeadSha })
     return `GitHub commit: ${commit.sha.slice(0, 7)}`
   }
 
   fs.writeFileSync(path.join(process.cwd(), ARTICLE_TOPICS_RELATIVE_PATH), content, 'utf8')
+  if (adoption) { fs.mkdirSync(path.join(process.cwd(), 'data/topic-adoptions'), { recursive: true }); fs.writeFileSync(path.join(process.cwd(), `data/topic-adoptions/${id}.json`), adoption, 'utf8') }
   return source === 'local_fallback'
     ? 'GitHub読込失敗時のローカルCSVを更新しました'
     : 'ローカルCSVを更新しました'
@@ -81,6 +85,7 @@ export async function updateArticleTopicAction({
       throw new Error('publish_date は YYYY-MM-DD で入力してください')
     }
 
+    const expectedHeadSha = process.env.GITHUB_REVIEW_TOKEN ? await readGitHubBranchHead() : undefined
     const loaded = await loadAdminArticleTopics(readGitHubArticleTopicsCsv)
     if (!loaded.ok) throw new Error(`記事ネタCSVの読込に失敗しました (${loaded.errorCode})`)
     const rows = loaded.data.rows.map((row) => [...row])
@@ -118,7 +123,9 @@ export async function updateArticleTopicAction({
     target[publishDateCol] = publishDate
     target[notesCol] = notes
 
-    const result = await saveCsv(articleTopicRowsToCsv(rows), id, loaded.source)
+    const adoptedRow = Object.fromEntries(headers.map((header, index) => [header, target[index] ?? '']))
+    const adoption = status === 'approved' ? JSON.stringify(issueTopicAdoption(adoptedRow), null, 2) + '\n' : null
+    const result = await saveCsv(articleTopicRowsToCsv(rows), id, loaded.source, adoption, expectedHeadSha)
     revalidatePath('/admin/article-topics')
     revalidatePath('/admin')
     return { ok: true, message: `保存しました。${result}` }

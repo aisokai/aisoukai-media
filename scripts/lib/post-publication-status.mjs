@@ -20,13 +20,13 @@ function addBlocker(blockers, code, message) {
   blockers.push({ code, message })
 }
 
-export function getPostPublicationStatus(data, { today = getTodayJst(), content = '' } = {}) {
+export function getPostPublicationStatus(data, { today = getTodayJst(), content = '', path } = {}) {
   const blockers = []
   const publishAt = data.publish_at ? toDateStr(data.publish_at) : toDateStr(data.date)
-  const state = getDmpArticleState({ data, content, today })
+  const state = getDmpArticleState({ data, content, today, publicationContext: { path } })
   const humanApproved = state.approvedExactVersion
-  const autoApproved = false
-  const approved = humanApproved
+  const autoApproved = state.autoApprovedExactVersion
+  const approved = humanApproved || autoApproved
 
   if (data.archived === true) {
     addBlocker(blockers, 'archived', 'archived:true のため公開対象外')
@@ -80,7 +80,7 @@ export function getPostPublicationStatus(data, { today = getTodayJst(), content 
 export function evaluatePostFile(filePath, options = {}) {
   const raw = readFileSync(filePath, 'utf8')
   const parsed = matter(raw)
-  const status = getPostPublicationStatus(parsed.data, { ...options, content: parsed.content })
+  const status = getPostPublicationStatus(parsed.data, { ...options, content: parsed.content, path: `content/posts/${basename(filePath)}` })
 
   return {
     ...status,

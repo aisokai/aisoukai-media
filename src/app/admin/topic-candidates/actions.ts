@@ -4,7 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { revalidatePath } from 'next/cache'
 import { requireAdmin } from '@/lib/adminAuth'
-import { commitGitHubFiles, readGitHubFile } from '@/lib/githubContents'
+import { commitGitHubFiles, readGitHubFile, readGitHubBranchHead } from '@/lib/githubContents'
 import {
   getMonthlyTopicCandidates,
   getTopicCandidatePath,
@@ -13,6 +13,8 @@ import {
   type TopicCandidateStatus,
   updateMonthlyTopicCandidateStatus,
 } from '@/lib/monthlyTopicCandidates'
+
+import { issueTopicAdoption } from '@/lib/tieredPublication.mjs'
 
 export type TopicCandidateActionResult = {
   ok: boolean
@@ -115,6 +117,7 @@ function buildSelectedTopicCsvLines(file: MonthlyTopicCandidateFile, existingCsv
   const existingIds = getExistingTopicIds(existingCsv)
   const discoveredAt = todayJst()
   const lines: string[] = []
+  const adoptions: { path: string; content: string }[] = []
 
   for (const topic of selected) {
     const id = `MONTHLY-${topic.id.replace(/-/g, '').toUpperCase()}`
@@ -137,10 +140,11 @@ function buildSelectedTopicCsvLines(file: MonthlyTopicCandidateFile, existingCsv
       notes: `月次ネタ候補 ${file.month} / MWF 月曜・水曜・金曜の週3投稿枠`,
     } satisfies Record<(typeof CSV_COLUMNS)[number], string>
 
+    adoptions.push({ path: `data/topic-adoptions/${id}.json`, content: JSON.stringify(issueTopicAdoption(row), null, 2) + '\n' })
     lines.push(CSV_COLUMNS.map((key) => csvEscape(row[key])).join(','))
   }
 
-  return { selectedCount: selected.length, lines }
+  return { selectedCount: selected.length, lines, adoptions }
 }
 
 async function loadCandidateFile(month: string) {
@@ -200,9 +204,10 @@ export async function finalizeSelectedTopicCandidatesAction(month: string): Prom
   try {
     await requireAdmin()
 
+    const expectedHeadSha = process.env.GITHUB_REVIEW_TOKEN ? await readGitHubBranchHead() : undefined
     const { file } = await loadCandidateFile(month)
     const currentCsv = await loadTopicsCsv()
-    const { selectedCount, lines } = buildSelectedTopicCsvLines(file, currentCsv)
+    const { selectedCount, lines, adoptions } = buildSelectedTopicCsvLines(file, currentCsv)
 
     if (lines.length === 0) {
       return { ok: true, message: `選択済み ${selectedCount} 件はすでに記事ネタCSVへ追加済みです` }
@@ -214,13 +219,15 @@ export async function finalizeSelectedTopicCandidatesAction(month: string): Prom
 
     if (!process.env.GITHUB_REVIEW_TOKEN) {
       fs.writeFileSync(path.join(process.cwd(), TOPICS_PATH), nextCsv, 'utf8')
+      fs.mkdirSync(path.join(process.cwd(), 'data/topic-adoptions'), { recursive: true })
+      for (const adoption of adoptions) fs.writeFileSync(path.join(process.cwd(), adoption.path), adoption.content, 'utf8')
       revalidatePath('/admin/topic-candidates')
       return { ok: true, message: `確定しました。記事ネタCSVへ ${lines.length} 件追加しました` }
     }
 
     const commit = await commitGitHubFiles(`finalize topic candidates: ${month}`, [
-      { path: TOPICS_PATH, content: nextCsv },
-    ])
+      { path: TOPICS_PATH, content: nextCsv }, ...adoptions,
+    ], { expectedHeadSha })
 
     revalidatePath('/admin/topic-candidates')
     return { ok: true, message: `確定しました。記事ネタCSVへ ${lines.length} 件追加しました。GitHub commit: ${commit.sha.slice(0, 7)}` }
