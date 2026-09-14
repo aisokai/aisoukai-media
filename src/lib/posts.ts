@@ -115,7 +115,7 @@ function toDateString(val: unknown): string {
   return String(val ?? '');
 }
 
-async function buildPendingReviewPost(fileName: string, raw: string): Promise<PendingReviewPost | null> {
+export async function buildPendingReviewPost(fileName: string, raw: string): Promise<PendingReviewPost | null> {
   const { data, content } = matter(raw);
 
   if (data['archived'] === true) return null;

@@ -18,8 +18,8 @@ export function deliveryId(slot, topicId) {
 export function validateDraft(raw, verificationSecret) {
   if (typeof raw !== 'string' || raw.length > 500000) throw new Error('invalid_draft')
   const { data, content } = matter(raw)
-  if ((!verifyTieredCertificate(data,content,verificationSecret) && (data.draft !== true || data.reviewed !== false || data.auto_approved !== false)) || !content.trim() || typeof data.title !== 'string') throw new Error('unreviewed_draft_required')
-  return { blob: hash(raw), contentVersion: getContentVersion(data, content) }
+  if (((data.draft !== true || data.reviewed !== false || data.auto_approved !== false) && !verifyTieredCertificate(data,content,verificationSecret)) || !content.trim() || typeof data.title !== 'string') throw new Error('unreviewed_draft_required')
+  return { blob: hash(raw), contentVersion: getContentVersion(data, content), ...(ID.test(data.source_topic_version??'')?{sourceTopicVersion:data.source_topic_version}:{}) }
 }
 function append(path, value) {
   const fd = openSync(path, 'a', 0o600)
@@ -139,13 +139,14 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         }
         if (['pending-reflection','reviewable','notification-failed'].includes(item.state)) {
           const proof = await adapters.reflect(item)
-          if (proof?.authenticated !== true || proof.source !== 'production-admin' || proof.path !== item.path || proof.contentVersion !== item.contentVersion || proof.blob !== item.blob || proof.reviewable !== true || proof.published !== (item.certified===true)) {
+          const serverProof=adapters.serverAuthority===true&&proof?.originBlob===item.blob&&ID.test(proof?.contentVersion??'')&&ID.test(proof?.blob??'')&&typeof proof?.published==='boolean'
+          if (proof?.authenticated !== true || proof.source !== 'production-admin' || proof.path !== item.path || (!serverProof&&(proof.contentVersion !== item.contentVersion || proof.blob !== item.blob || proof.published !== (item.certified===true))) || proof.reviewable !== true || (adapters.serverAuthority===true&&!serverProof)) {
             save({ state: 'pending-reflection', stage: 'reflection' }); continue
           }
-          save({ state: 'reviewable', stage: 'notification' })
+          save({ state: 'reviewable', stage: 'notification', ...(serverProof?{deliveredBlob:proof.blob,deliveredContentVersion:proof.contentVersion,serverPublished:proof.published,reviewReason:proof.reason??null}:{}) })
           // Never retry an ambiguous send automatically; Telegram lacks an idempotency key.
           save({ state: 'sending' })
-          const result = await adapters.notify({ idempotencyKey: item.id, path: item.path, contentVersion: item.contentVersion, published:item.certified===true })
+          const result = await adapters.notify({ idempotencyKey: item.id, path: item.path, contentVersion: item.deliveredContentVersion??item.contentVersion, published:item.serverPublished??item.certified===true })
           save({ state: result?.status === 'sent' ? 'notified' : result?.status === 'not-sent' ? 'notification-failed' : 'notification-unknown', ...(result?.status === 'sent' ? { notifiedAt: new Date().toISOString() } : {}) })
         }
       } catch {

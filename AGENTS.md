@@ -138,3 +138,9 @@ Policy version: `aisoukai-media-tiered-blog-2026-09-14`。
 - 公開一覧・詳細・category・sitemap・metadata・CLIで同一公開判定を使う。rejected、archived、future dateを除外する。患者情報・私的メッセージ・対象外送信・破壊操作は禁止のまま。
 - この実装phaseはローカルコードと架空データ検証のみ。実API・実env・記事実データ・push/deploy・ジョブ変更は実施しない。次段階の実運用は別途この範囲を表現できる検証済み契約に従う。
 <!-- END:blog-three-levels-20260914 -->
+
+
+## Server authority amendment (2026-09-14)
+
+Teacher evidence: `teacher_20260914_explicit_server_side_blog_authority_no_secret_replication`.
+Within this same blog objective, approval signing and publication authority remain exclusively on the existing production server. Do not copy, export, create an alias for, or replicate the admin signing key onto the Mac runner. The Mac uses its existing internal GitHub authentication to generate/synchronize only unreviewed drafts and bounded canonical request metadata. Anonymous HTTP wake requests confer no authority; the server independently validates the canonical request, genuine topic adoption and pinned preservation evidence, and claims each semantic operation once with signed CAS ownership before any external AI review. Missing server review configuration leaves an unreviewed draft and a truthful review request, never automatic publication. Old CSV approval flags and unverifiable history are not converted into authenticated adoption. All protected-data and destructive-operation prohibitions remain intact.

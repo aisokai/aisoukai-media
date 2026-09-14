@@ -41,10 +41,9 @@ function encodePath(path: string) {
 }
 
 async function readJson<T>(url: string, init: RequestInit, label: string): Promise<T> {
-  const res = await fetch(url, { ...init, cache: 'no-store' })
+  const res = await fetch(url, { ...init, cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30000) })
   if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`${label} failed: ${res.status} ${body}`)
+    throw Object.assign(new Error(`${label} failed: ${res.status}`), { code: res.status === 404 ? 'NOT_FOUND' : 'GITHUB_FAILED' })
   }
   return res.json() as Promise<T>
 }
@@ -73,10 +72,10 @@ export async function readGitHubBranchHead(): Promise<string> {
   return ref.object.sha
 }
 
-export async function readGitHubDirectory(path: string): Promise<GitHubDirectoryEntry[]> {
+export async function readGitHubDirectory(path: string, { ref }: { ref?: string } = {}): Promise<GitHubDirectoryEntry[]> {
   const { token, repo, branch } = getGitHubConfig()
   const json = await readJson<GitHubDirectoryEntry[]>(
-    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(branch)}`,
+    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(ref ?? branch)}`,
     { headers: githubHeaders(token) },
     `GitHub read directory ${path}`,
   )
@@ -175,4 +174,13 @@ export async function commitGitHubFiles(message: string, files: GitHubCommitFile
   )
 
   return commit
+}
+
+export async function readGitHubBytes(path: string, { ref }: { ref?: string } = {}) {
+  const { token, repo, branch } = getGitHubConfig()
+  const json = await readJson<{ content: string; sha: string; encoding: string }>(
+    `https://api.github.com/repos/${repo}/contents/${encodePath(path)}?ref=${encodeURIComponent(ref ?? branch)}`,
+    { headers: githubHeaders(token) }, 'GitHub read artifact bytes')
+  if (json.encoding !== 'base64') throw new Error('GitHub artifact encoding unsupported')
+  return { bytes: Buffer.from(json.content, 'base64'), sha: json.sha }
 }

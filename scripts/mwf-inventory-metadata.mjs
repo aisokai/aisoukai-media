@@ -26,14 +26,14 @@ export async function prepareMetadataInventory({preservationBytes,reconciliation
  for(const item of preservation.entries){if(!inventoryPath(item.path))throw Error('invalid_preservation_path');const raw=Buffer.from(await readLocal(item.path));if(inventoryHash(raw)!==item.blob)throw Error('preservation_changed');if(!entries.some(e=>e.path===item.path&&e.blob===item.blob))entries.push(metadataEntry({path:item.path,raw,source:'local',quarantine:quarantine.has(item.path)}))}
  return createInventory({preservation,reconciliation,preservationBytes,reconciliationBytes,entries,secret,prepareOnly})
 }
-export async function runMetadataCli(args,{env=process.env,spawnImpl=spawnSync,fetchImpl=fetch}={}){
+export async function runMetadataCli(args,{spawnImpl=spawnSync,fetchImpl=fetch}={}){
  const prepareOnly=args.includes('--prepare-only');args=args.filter(a=>a!=='--prepare-only')
  if(args.length!==6||args[0]!=='--preservation-inventory'||args[2]!=='--reconciliation'||args[4]!=='--preservation-dir')throw Error('explicit_inputs_required')
  const directory=resolve(args[5]);for(const p of [directory,OUTPUT])if(lstatSync(p).isSymbolicLink()||!lstatSync(p).isDirectory()||realpathSync(p)!==p)throw Error('unsafe_directory')
  if(resolve(args[1],'..')!==directory||resolve(args[3],'..')!==OUTPUT)throw Error('input_outside_scope')
- if(!prepareOnly&&!env.ADMIN_REVIEW_COOKIE_SECRET)throw Error('signing_configuration_missing')
+ if(!prepareOnly)throw Error('server_authority_signing_only')
  const github=async(path,revision)=>{if(path!=='content/posts'&&!inventoryPath(path)||!/^[a-f0-9]{40}$/.test(revision))throw Error('invalid_canonical_path');const result=spawnImpl('/opt/homebrew/bin/gh',['api','--hostname','github.com','--method','GET',`repos/aisokai/aisoukai-media/contents/${path}?ref=${revision}`],{encoding:'utf8',timeout:30000,maxBuffer:16*1024*1024,stdio:['ignore','pipe','pipe']});if(result.status!==0||result.error)throw Error('canonical_read_failed');const value=JSON.parse(result.stdout);if(path==='content/posts')return value;if(value.encoding!=='base64'||typeof value.content!=='string')throw Error('canonical_blob_invalid');return Buffer.from(value.content,'base64')}
- const inventory=await prepareMetadataInventory({preservationBytes:readOpaqueRegular(resolve(args[1])),reconciliationBytes:readOpaqueRegular(resolve(args[3])),readLocal:path=>readOpaqueRegular(join(directory,basename(path))),github,readHead:url=>readPublicEditorialHead(url,fetchImpl),secret:prepareOnly?undefined:env.ADMIN_REVIEW_COOKIE_SECRET,prepareOnly})
+ const inventory=await prepareMetadataInventory({preservationBytes:readOpaqueRegular(resolve(args[1])),reconciliationBytes:readOpaqueRegular(resolve(args[3])),readLocal:path=>readOpaqueRegular(join(directory,basename(path))),github,readHead:url=>readPublicEditorialHead(url,fetchImpl),secret:undefined,prepareOnly:true})
  const raw=JSON.stringify(inventory,null,2)+'\n',path=join(OUTPUT,`editorial-metadata-${inventoryHash(raw)}.json`);writeFileSync(path,raw,{flag:'wx',mode:0o600});const payload=inventory.payload
  return{path,unsigned:prepareOnly,entries:payload.entries.length,quarantine:payload.quarantine.length,metadataMissing:payload.entries.filter(e=>!e.metadata).length}
 }
