@@ -150,3 +150,11 @@ test('minor production entry fetches actual Human baseline, independently review
  assert.equal(result.ok,true);assert.equal(reviews,1);assert.equal(openDeliveryStore(f.root).read()[0].path,path)
  assert.match(f.getRaw(),/tier: minor/)
 })
+
+test('protected topic fields fail before generation or image transport, including CSV boolean strings',async()=>{
+ for(const extra of [{patient_intent:'患者ID synthetic'}, {notes:'患者ID synthetic'}, {sensitive_data:true}, {sensitive_data:'true'}, {contains_patient_data:'1'}, {contains_private_message:'yes'}, {sensitive_data:' UNKNOWN '}, {sensitive_data:'maybe'}, {sensitive_data:[]}, {data_sensitivity:' SENSITIVE '}, {data_sensitivity:'SENSITIVE_PATIENT'}]){
+  const f=fixture(),runtime=createProductionRuntime(f.options)
+  const result=await runtime.adapters.generate({idempotencyKey:'synthetic',slot:'2026-09-14T08:30:00+09:00',topic:{id:'new',title:'Synthetic',status:'approved',...extra}})
+  assert.equal(result.status,'not-generated');assert.equal(f.calls.length,0)
+ }
+})

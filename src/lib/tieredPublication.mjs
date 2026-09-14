@@ -86,6 +86,7 @@ export function assessTieredPublication(data,content,secret,context) {
 }
 
 export function isProtectedEditorialInput(data, text = '') {
-  if(data?.sensitive_data===true||data?.contains_patient_data===true||data?.contains_private_message===true||['patient','private','sensitive','unknown'].includes(data?.data_sensitivity))return true
+  const marked = value => (value != null && typeof value === 'object') || !['', 'false', '0', 'no'].includes(String(value ?? '').trim().toLowerCase())
+  if(marked(data?.sensitive_data)||marked(data?.contains_patient_data)||marked(data?.contains_private_message)||!['','none','internal_non_sensitive','non_sensitive','public'].includes(String(data?.data_sensitivity ?? '').trim().toLowerCase()))return true
   return /患者名|患者ID|生年月日|カルテ番号|個別症例|患者症例|実際の患者|private[_ -]?message|patient[_ -]?id|case report/i.test(JSON.stringify(data??{})+'\n'+text)
 }
