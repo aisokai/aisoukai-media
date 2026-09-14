@@ -83,13 +83,15 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
   try {
     let items = store.read()
     let intakeError = null
+    let candidateHolds = []
     let topic
     if (!retryOnly && select) {
       try {
         const selection = await select({ items, slot })
-        if (!selection) { retryOnly = true; intakeError = 'no-unused-topic' }
+        candidateHolds=selection?.holds??[]
+        if (!selection || selection.holdOnly) { retryOnly = true; intakeError = candidateHolds.length?'candidate-holds':'no-unused-topic' }
         else { topicId = selection.topicId; topic = selection.topic }
-      } catch { retryOnly = true; intakeError = 'topic-intake-failed' }
+      } catch(error) { retryOnly = true; intakeError = ['candidate_configuration_missing','historical_inventory_evidence_missing','preserved_artifact_changed'].includes(error?.message)?error.message:'topic-intake-failed' }
     }
     if (!retryOnly) {
       const id = deliveryId(slot, topicId)
@@ -151,6 +153,6 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
       }
     }
     const status = deliveryStatus(store)
-    return { ...status, intakeError, ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
+    return { ...status, intakeError, candidateHolds, ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
   } finally { release() }
 }

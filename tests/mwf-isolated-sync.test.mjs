@@ -47,3 +47,10 @@ test('per-artifact validation rejects malformed article before any Git capabilit
   assert.equal((await sync({id:'a'.repeat(64),path:`content/posts/2026-09-14-mwf-${'a'.repeat(64)}.md`,raw:bad,...validateDraft(bad)})).status,'conflict')
   assert.equal(calls,0)
 })
+
+test('comparison verifier runs against each fetched parent and rejects a raced changed set before another push',async()=>{
+ const f=fixture(),withEvidence=raw.replace('draft: true','source_comparison_hash: '+ 'a'.repeat(64)+'\ndraft: true'),item={...f.item,raw:withEvidence,...validateDraft(withEvidence)};let pushed=0;const parents=[]
+ const run=q=>{if(q.args[0]==='push'){pushed++;const parent=git(f.remote,['rev-parse','main']).output.trim(),c=git(f.remote,['commit-tree',f.tree,'-p',parent],'Synthetic changed comparison\n').output.trim();git(f.remote,['update-ref','refs/heads/main',c])}return f.run(q)}
+ const sync=createIsolatedSync({spool:join(f.root,'spool'),run,verifyComparisons:async({parent})=>{parents.push(parent);return parents.length===1}})
+ assert.equal((await sync(item)).status,'conflict');assert.equal(pushed,1);assert.equal(parents.length,2);assert.notEqual(parents[0],parents[1])
+})

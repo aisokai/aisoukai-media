@@ -10,7 +10,7 @@ import { getDmpArticleState } from '../../src/lib/dmpArticleState.mjs'
 import { verifyBlogEvidence, assessTieredPublication } from '../../src/lib/tieredPublication.mjs'
 import { validateDraft } from './mwf-delivery.mjs'
 
-export function createIsolatedSync({ spool, run, attempts = 3, verificationSecret }) {
+export function createIsolatedSync({ spool, run, attempts = 3, verificationSecret, verifyComparisons }) {
   if (typeof run !== 'function' || !Number.isInteger(attempts) || attempts < 1 || attempts > 5) throw new Error('invalid_sync_capability')
   const root = resolve(spool)
   return async function sync(item) {
@@ -51,6 +51,7 @@ export function createIsolatedSync({ spool, run, attempts = 3, verificationSecre
           const baseline=verifyBlogEvidence(proof?.baseline,'human-approved-baseline',verificationSecret)
           if(currentBlob!==item.expectedBaseBlob || proof?.tier!=='minor' || baseline?.contentVersion!==getDmpArticleState({data:old.data,content:old.content}).contentVersion || !getDmpArticleState({data:old.data,content:old.content}).approvedExactVersion) return {status:'conflict'}
         }
+        if(certified.data.source_comparison_hash && (typeof verifyComparisons!=='function'||!await verifyComparisons({parent,data:certified.data,path:item.path})))return {status:'conflict'}
         if(item.expectedBaseBlob && !existing.ok)return {status:'conflict'}
         // Verify true absence: a transport/object-read error is not absence.
         const entries = await requireOk(['ls-tree', '-r', '--name-only', parent, '--', item.path])

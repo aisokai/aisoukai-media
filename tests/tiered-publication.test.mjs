@@ -2,8 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
 import matter from 'gray-matter'
-import { issueTopicAdoption,topicContentVersion,certifyIndependentReview,assessTieredPublication,BLOG_POLICY_VERSION,imageLicenseVersion } from '../src/lib/tieredPublication.mjs'
+import { issueTopicAdoption,topicContentVersion,certifyIndependentReview,assessTieredPublication,BLOG_POLICY_VERSION,imageLicenseVersion,signBlogEvidence } from '../src/lib/tieredPublication.mjs'
 import { getDmpArticleState,applyTeacherApproval } from '../src/lib/dmpArticleState.mjs'
+import {comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
 import { createTieredReviewer } from '../scripts/lib/mwf-tiered-review.mjs'
 const secret='synthetic-test-signing-only',path='content/posts/2026-09-14-synthetic.md'
 const topic={id:'synthetic',title:'Synthetic',category:'その他',medical_risk:'low',status:'approved'}
@@ -44,12 +45,12 @@ test('minor requires actual exact Human baseline and separate diff reviewer; imp
 })
 test('actual independent-review adapter inspects image and comparisons, signs actual response identity only',async()=>{
  const calls=[]
- const review=createTieredReviewer({secret,githubFile:async p=>p==='data/article-topics.sample.csv'?'id,title,category,medical_risk,status\nsynthetic,Synthetic,その他,low,approved\n':p.startsWith('data/topic-adoptions/')?JSON.stringify(adoption):JSON.stringify({images:[{path:data.image,license_status:'verified',license_source:'Synthetic owner',license_note:'Synthetic confirmed ownership'}]}),githubDirectory:async()=>[],request:async(url,options)=>{
+ const review=createTieredReviewer({secret,githubFile:async p=>p==='data/article-topics.sample.csv'?'id,title,category,medical_risk,status\nsynthetic,Synthetic,その他,low,approved\n':p.startsWith('data/topic-adoptions/')?JSON.stringify(adoption):JSON.stringify({images:[{path:data.image,license_status:'verified',license_source:'Synthetic owner',license_note:'Synthetic confirmed ownership'}]}),getComparisons:async()=>comparisonSet([]),request:async(url,options)=>{
   calls.push({url,options})
   if(url.includes('vercel.app'))return{ok:true,headers:new Headers({'content-type':'image/png'}),arrayBuffer:async()=>Buffer.from('synthetic image bytes')}
   return{ok:true,json:async()=>({id:'independent-response',choices:[{finish_reason:'stop',message:{content:JSON.stringify(decision)}}]})}
  }})
- const result=await review({raw:matter.stringify(content,data),path})
+ const result=await review({raw:matter.stringify(content,{...data,source_candidate_receipt:signBlogEvidence('mwf-candidate-metadata-review',{topicId:topic.id,topicVersion:topicContentVersion(topic),comparisonHash:comparisonSet([]).hash,reviewerId:'openai:precheck',decision:'clear'},secret)}),path})
  assert.equal(result.status,'certified')
  const parsed=matter(result.raw);assert.equal(assessTieredPublication(parsed.data,parsed.content,secret,context),true)
  assert.equal(parsed.data.tiered_review_proof.payload.reviewerId,'openai:independent-response')
@@ -81,8 +82,8 @@ test('protected content cannot publish even with exact previous Human approval',
 })
 test('revoked adoption and protected input stop before provider or image transfer',async()=>{
  let requests=0
- const review=createTieredReviewer({secret,request:async()=>{requests++;throw Error('must not send')},githubDirectory:async()=>[],githubFile:async p=>p.includes('topic-adoptions')?JSON.stringify(adoption):'id,title,category,medical_risk,status\nsynthetic,Synthetic,その他,low,hold\n'})
- assert.equal((await review({raw:matter.stringify(content,data),path})).status,'draft')
+ const review=createTieredReviewer({secret,request:async()=>{requests++;throw Error('must not send')},getComparisons:async()=>comparisonSet([]),githubFile:async p=>p.includes('topic-adoptions')?JSON.stringify(adoption):'id,title,category,medical_risk,status\nsynthetic,Synthetic,その他,low,hold\n'})
+ assert.equal((await review({raw:matter.stringify(content,{...data,source_candidate_receipt:signBlogEvidence('mwf-candidate-metadata-review',{topicId:topic.id,topicVersion:topicContentVersion(topic),comparisonHash:comparisonSet([]).hash,reviewerId:'openai:precheck',decision:'clear'},secret)}),path})).status,'draft')
  assert.equal((await review({raw:matter.stringify(content,{...data,sensitive_data:true}),path})).status,'draft')
  assert.equal(requests,0)
 })
