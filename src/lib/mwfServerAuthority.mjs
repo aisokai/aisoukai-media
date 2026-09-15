@@ -4,17 +4,18 @@ export const serverHash=value=>createHash('sha256').update(typeof value==='strin
 const HASH=/^[a-f0-9]{64}$/
 export function serverRequestId(value){return serverHash(value)}
 export function validServerRequest(value,inventoryAnchor=MWF_INVENTORY_ANCHOR){
+ if(value?.schema===2)return Object.keys(value).sort().join(',')==='artifactBlob,artifactPath,baselineBlob,inventoryHash,operation,proposalPath,schema'&&value.operation==='minor-review'&&/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(value.artifactPath)&&HASH.test(value.artifactBlob)&&HASH.test(value.baselineBlob)&&value.proposalPath===`data/mwf/proposals/${value.artifactBlob}.json`&&value.inventoryHash===inventoryAnchor
  if(!value||Object.keys(value).sort().join(',')!=='artifactBlob,artifactPath,inventoryHash,operation,schema,slot,topicId,topicVersion'||value.schema!==1||!['prepare','review'].includes(value.operation)||!/^\d{4}-\d{2}-\d{2}T08:30:00\+09:00$/.test(value.slot)||!/^[A-Za-z0-9_-]{1,100}$/.test(value.topicId)||!HASH.test(value.topicVersion)||value.inventoryHash!==inventoryAnchor)return false
  const d=new Date(value.slot);if(!Number.isFinite(+d)||new Date(+d+9*3600000).toISOString().slice(0,10)!==value.slot.slice(0,10)||![1,3,5].includes(new Date(+d+9*3600000).getUTCDay()))return false
  return value.operation==='prepare'?value.artifactPath===null&&value.artifactBlob===null:value.artifactPath===`content/posts/${value.slot.slice(0,10)}-mwf-${serverHash(`${value.slot}\0${value.topicId}`)}.md`&&HASH.test(value.artifactBlob)
 }
-export const semanticRequestKey=value=>serverHash(`${value.operation}:${value.topicId}:${value.topicVersion}`)
+export const semanticRequestKey=value=>value.operation==='minor-review'?serverHash(`minor-review:${value.artifactPath}:${value.baselineBlob}:${value.artifactBlob}`):serverHash(`${value.operation}:${value.topicId}:${value.topicVersion}${value.operation==='prepare'?`:${value.slot}`:''}`)
 // Public input is ONLY a request ID. Authority comes from fixed canonical GitHub
 // requests, real Human adoption and server validation, never caller decisions.
 export function createServerAuthority({readHead,readJson,commit,validate,review,reflect,owner=()=>randomUUID(),now=()=>new Date(),reviewerAvailable=()=>false,seal,unseal}){
  async function load(id,ref){if(!HASH.test(id??''))throw Error('invalid_request');const value=await readJson(`data/mwf/requests/${id}.json`,ref);if(!validServerRequest(value)||serverRequestId(value)!==id)throw Error('invalid_request');return value}
  async function state(path,ref){try{const verified=unseal(await readJson(path,ref));if(!verified)throw Error('invalid_server_claim');return verified}catch(error){if(error?.code==='NOT_FOUND')return null;throw error}}
- async function status(id){try{const head=await readHead(),request=await load(id,head),claim=await state(`data/mwf/claims/${semanticRequestKey(request)}.json`,head);if(!claim||claim.requestId!==id)return{status:'pending',requestId:id};if(claim.status!=='done')return{status:'unknown',requestId:id};if(request.operation==='review')return{...claim.result,requestId:id,...await reflect(request,claim.result,head)};const verified=await validate(request,head);if(!verified?.ok||verified.comparisonHash!==claim.result.comparisonHash)return{status:'hold',reason:'prepare_evidence_stale',requestId:id};return{...claim.result,requestId:id}}catch{return{status:'unavailable'}}}
+ async function status(id){try{const head=await readHead(),request=await load(id,head),claim=await state(`data/mwf/claims/${semanticRequestKey(request)}.json`,head);if(!claim||claim.requestId!==id)return{status:'pending',requestId:id};if(claim.status!=='done')return{status:'unknown',requestId:id};if(request.operation!=='prepare')return{...claim.result,requestId:id,...await reflect(request,claim.result,head)};const verified=await validate(request,head);if(!verified?.ok)return{status:'hold',reason:'prepare_evidence_stale',requestId:id};return{...claim.result,comparisonHash:verified.comparisonHash,requestId:id}}catch{return{status:'unavailable'}}}
  async function wake(id){
   try{
    const head=await readHead(),request=await load(id,head),claimPath=`data/mwf/claims/${semanticRequestKey(request)}.json`
@@ -56,11 +57,23 @@ export function isClosedMwfDraftBytes(raw){
  return false
 }
 
-export function createMwfHttpHandlers(factory){
+// Authenticate with the caller's existing GitHub identity, never the server's token.
+// Only this fixed repository's push-capable identity may trigger or inspect work.
+export async function authenticateMwfGithubCaller(request,fetchImpl=fetch){
+ const authorization=request.headers.get('authorization')??''
+ if(!/^Bearer [A-Za-z0-9_]{20,255}$/.test(authorization))return false
+ try{
+  const response=await fetchImpl('https://api.github.com/repos/aisokai/aisoukai-media',{method:'GET',headers:{Authorization:authorization,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},redirect:'error',signal:AbortSignal.timeout(10000),cache:'no-store'})
+  if(!response.ok||response.redirected||response.url!=='https://api.github.com/repos/aisokai/aisoukai-media')return false
+  const repository=await response.json()
+  return repository.full_name==='aisokai/aisoukai-media'&&repository.permissions?.push===true
+ }catch{return false}
+}
+export function createMwfHttpHandlers(factory,authenticate=authenticateMwfGithubCaller){
  const headers={'Cache-Control':'no-store','X-Robots-Tag':'noindex'}
  return{
-  async POST(request){try{const origin=request.headers.get('origin');if(!/^application\/json(?:;|$)/i.test(request.headers.get('content-type')??'')||(origin&&origin!=='https://aisoukai-media.vercel.app')||request.headers.get('sec-fetch-site')==='cross-site')return Response.json({status:'invalid'},{status:403,headers});if(Number(request.headers.get('content-length')??0)>256)throw Error('invalid');const body=await request.text();if(body.length>256)throw Error('invalid');const input=JSON.parse(body);if(Object.keys(input).join(',')!=='requestId'||!HASH.test(input.requestId))throw Error('invalid');return Response.json(await factory().wake(input.requestId),{headers})}catch{return Response.json({status:'unavailable'},{status:503,headers})}},
-  async GET(request){try{const url=new URL(request.url),id=url.searchParams.get('requestId'),authority=factory();if(!id&&url.searchParams.size===0)return Response.json(await authority.diagnostics(),{headers});if(url.searchParams.size!==1||!HASH.test(id??''))throw Error('invalid');return Response.json(await authority.status(id),{headers})}catch{return Response.json({status:'unavailable'},{status:503,headers})}}
+  async POST(request){try{if(!await authenticate(request))return Response.json({status:'unauthorized'},{status:401,headers});const origin=request.headers.get('origin');if(!/^application\/json(?:;|$)/i.test(request.headers.get('content-type')??'')||(origin&&origin!=='https://aisoukai-media.vercel.app')||request.headers.get('sec-fetch-site')==='cross-site')return Response.json({status:'invalid'},{status:403,headers});if(Number(request.headers.get('content-length')??0)>256)throw Error('invalid');const body=await request.text();if(body.length>256)throw Error('invalid');const input=JSON.parse(body);if(Object.keys(input).join(',')!=='requestId'||!HASH.test(input.requestId))throw Error('invalid');return Response.json(await factory().wake(input.requestId),{headers})}catch{return Response.json({status:'unavailable'},{status:503,headers})}},
+  async GET(request){try{if(!await authenticate(request))return Response.json({status:'unauthorized'},{status:401,headers});const url=new URL(request.url),id=url.searchParams.get('requestId'),authority=factory();if(!id&&url.searchParams.size===0)return Response.json(await authority.diagnostics(),{headers});if(url.searchParams.size!==1||!HASH.test(id??''))throw Error('invalid');return Response.json(await authority.status(id),{headers})}catch{return Response.json({status:'unavailable'},{status:503,headers})}}
  }
 }
 

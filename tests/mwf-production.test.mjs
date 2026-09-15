@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdtempSync} from 'node:fs'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
-import {createProductionRuntime} from '../scripts/lib/mwf-production.mjs'
+import {createProductionRuntime,createGithubServerTransport} from '../scripts/lib/mwf-production.mjs'
 import {runMwfCli} from '../scripts/ops-mwf.mjs'
 import {openDeliveryStore} from '../scripts/lib/mwf-delivery.mjs'
 import {inventoryHash,comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
@@ -33,8 +33,18 @@ test('server-verified published bytes can differ from original draft but must bi
 test('saved sync retry continues with broken new intake and no regeneration',async()=>{const f=fixture(),spawn=f.options.spawnImpl;f.options.spawnImpl=(c,a,o)=>a[0]==='push'?{status:1,stdout:''}:spawn(c,a,o);await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(openDeliveryStore(f.root).read()[0].state,'sync-failed');f.options.spawnImpl=spawn;f.options.readText=()=>{throw Error('broken inventory')};delete f.options.env.OPENAI_API_KEY;await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(openDeliveryStore(f.root).read()[0].state,'notified');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)})
 test('protected candidate is rejected before any generation transport',async()=>{const f=fixture(),runtime=createProductionRuntime(f.options);const result=await runtime.adapters.generate({slot:runtime.slot,topic:{...f.topic,sensitive_data:'true'},idempotencyKey:'synthetic'});assert.equal(result.status,'not-generated');assert.equal(f.calls.length,0)})
 
-test('minor automation fails explicitly before reading supplied arguments or environment',async()=>{
- const {runMinorEdit}=await import('../scripts/mwf-minor-edit.mjs')
- const unreadable=new Proxy({}, {get(){throw Error('input_must_not_be_read')}})
- await assert.rejects(runMinorEdit(unreadable),/minor_server_authority_not_supported/)
+
+test('server transport uses only existing native GitHub auth at the fixed origin and never forwards failure details',async()=>{
+ const native={PATH:'/synthetic'},calls=[]
+ let failed=false
+ const transport=createGithubServerTransport({native,spawnImpl:(command,args,options)=>{
+  calls.push('auth');assert.equal(command,'/opt/homebrew/bin/gh');assert.deepEqual(args,['auth','token','--hostname','github.com']);assert.equal(options.env,native)
+  return failed?{status:1,stderr:'synthetic-private-diagnostic'}:{status:0,stdout:'synthetic_existing_github_identity\n'}
+ },request:async(url,options)=>{calls.push('request');assert.equal(options.headers.Authorization,'Bearer synthetic_existing_github_identity');assert.equal(options.headers['Content-Type'],'application/json');return{ok:true}}})
+ await assert.rejects(transport('https://unrelated.invalid',{}),/server_auth_destination_rejected/)
+ assert.equal(calls.length,0)
+ assert.equal((await transport('https://aisoukai-media.vercel.app/api/mwf',{headers:{'Content-Type':'application/json'}})).ok,true)
+ failed=true
+ await assert.rejects(transport('https://aisoukai-media.vercel.app/api/mwf',{}),{message:'server_auth_unavailable'})
+ assert.deepEqual(calls,['auth','request','auth'])
 })

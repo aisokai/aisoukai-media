@@ -1,58 +1,13 @@
-import { strict as assert } from 'node:assert'
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const CONFIG_PATH = resolve(ROOT, 'config/media-gate.json')
-const SETUP_PATH = resolve(ROOT, 'scripts/setup-launchd-mwf.mjs')
-
-test('launchd cleanup honors the approved Telegram notification gate and keeps normal generation copy aligned', () => {
-  const mediaGate = JSON.parse(readFileSync(CONFIG_PATH, 'utf8'))
-  const setupSource = readFileSync(SETUP_PATH, 'utf8')
-
-  assert.equal(mediaGate.flags.telegram_notify, true)
-  assert.match(setupSource, /const MEDIA_GATE_PATH = join\(ROOT, 'config', 'media-gate\.json'\)/)
-  assert.match(setupSource, /function readTelegramNotifyGate\(\)/)
-  assert.match(setupSource, /JSON\.parse\(readFileSync\(MEDIA_GATE_PATH, 'utf8'\)\)/)
-  assert.match(setupSource, /typeof config\.flags\.telegram_notify !== 'boolean'/)
-  assert.match(setupSource, /catch \{\s*return \{ enabled: false, valid: false \}/)
-  assert.match(setupSource, /function telegramEnvironmentXml\(gate\)/)
-  assert.match(setupSource, /if \(gate\.enabled === true\) return ''/)
-  assert.match(setupSource, /<key>EnvironmentVariables<\/key>/)
-  assert.match(setupSource, /<key>TELEGRAM_BOT_TOKEN<\/key>\s*<string><\/string>/)
-  assert.match(setupSource, /<key>TELEGRAM_CHAT_ID<\/key>\s*<string><\/string>/)
-  assert.match(setupSource, /const telegramGate = readTelegramNotifyGate\(\)/)
-  assert.match(setupSource, /\$\{telegramEnvironmentXml\(telegramGate\)\}/)
-  assert.match(setupSource, /const telegramEnvDisabled = \/<key>EnvironmentVariables/)
-  assert.match(setupSource, /const notificationsOff = telegramGate\.enabled !== true && telegramEnvDisabled/)
-  assert.match(setupSource, /telegram_notify=\$\{telegramGate\.enabled \? 'true' : 'false'\}/)
-  assert.match(setupSource, /media-gate 読込\/検証失敗（fail-closed）/)
-  assert.match(
-    setupSource,
-    /<string>\$\{NODE_BIN\}<\/string>\s*<string>\$\{SCRIPT_PATH\}<\/string>\s*<string>--force<\/string>/,
-  )
-  assert.doesNotMatch(setupSource, /<string>--dry-run<\/string>/)
-  assert.match(
-    setupSource,
-    /const normalMode = progArgs\.includes\('--force'\) && !progArgs\.includes\('--dry-run'\)/,
-  )
-  assert.match(
-    setupSource,
-    /console\.log\(`  実行モード: \$\{normalMode \? '✅ 通常生成（--force、Git preflight・Human reviewあり）' : '❌ 想定外の引数'\}`\)/,
-  )
-  assert.match(setupSource, /Telegram通知: .*無効（\$\{telegramBoundary\} \/ Telegram環境変数を空に固定）/)
-  assert.match(
-    setupSource,
-    /console\.log\('    → npm run ops:mwf:install で通常モードのジョブへ更新してください'\)/,
-  )
-  assert.match(setupSource, /npm run ops:mwf:install\s+— launchd に登録（月水金 08:30 通常生成）/)
-  assert.doesNotMatch(setupSource, /npm run ops:mwf:install[^\n]*dry-run/)
-})
-
-test('launchd setup source keeps the Human-only execution boundary', () => {
-  const setupSource = readFileSync(SETUP_PATH, 'utf8')
-
-  assert.match(setupSource, /^\/\/ Human が手動で実行する。AI が自動実行してはならない。$/m)
-})
+import assert from 'node:assert/strict'
+import {createHash} from 'node:crypto'
+import {createRunnerInstaller,runRunnerSetup,verifyRunnerRelease,MWF_LABEL} from '../scripts/setup-launchd-mwf.mjs'
+function fixture(){const calls=[],files=new Map([['/Users/caelus/Library/LaunchAgents/'+MWF_LABEL+'.plist','old']]);let loaded=true,running=false,fail=false,n=0
+ const installer=createRunnerInstaller({verify:input=>({...input,manifestHash:'a'.repeat(64)}),uid:()=>501,timezone:()=> 'Asia/Tokyo',nonce:()=>String(++n),readExists:p=>files.has(p),write:(p,v)=>files.set(p,v),mkdir:()=>{},move:(a,b)=>{files.set(b,files.get(a));files.delete(a)},launchctl:args=>{calls.push(args);if(args[0]==='list')return{ok:true,output:loaded?`${running?'123':'-'}\t0\t${MWF_LABEL}`:''};if(args[0]==='bootout')loaded=false;if(args[0]==='bootstrap'){if(fail){fail=false;return{ok:false}}loaded=true}return{ok:true}}})
+ return{installer,calls,files,setRunning:v=>running=v,setFail:()=>fail=true}
+}
+test('existing job installs reviewed immutable release, preserves old plist and never starts a run',()=>{const f=fixture(),commit='b'.repeat(40);assert.equal(runRunnerSetup(['--install','--commit',commit,'--manifest','/synthetic/manifest.json','--manifest-sha256','a'.repeat(64)],{installer:f.installer,output:v=>assert.equal(v.runStarted,false)}),0);const xml=[...f.files.values()].find(v=>v.includes('<?xml'));assert.match(xml,new RegExp(`/releases/${commit}/scripts/ops-mwf.mjs`));assert.match(xml,/<string>--production<\/string>/);assert.doesNotMatch(xml,/--force|RunAtLoad|KeepAlive/);assert.ok([...f.files.values()].includes('old'));assert.equal(f.calls.some(a=>['kickstart','start'].includes(a[0])),false)})
+test('active job is untouched and bootstrap failure restores old calendar configuration',()=>{const f=fixture();f.setRunning(true);assert.throws(()=>f.installer.install({commit:'b'.repeat(40)}),/running/);assert.deepEqual(f.calls,[['list']]);const g=fixture();g.setFail();assert.throws(()=>g.installer.install({commit:'b'.repeat(40)}),/bootstrap/);assert.equal(g.files.get('/Users/caelus/Library/LaunchAgents/'+MWF_LABEL+'.plist'),'old');assert.equal(g.installer.status().loaded,true)})
+test('unload preserves configuration and unreviewed install arguments never invoke installer',()=>{const f=fixture();assert.equal(f.installer.uninstall().configurationPreserved,true);assert.equal(f.files.size,1);assert.throws(()=>runRunnerSetup(['--install'],{installer:{install(){throw Error('must_not_run')}}}),/reviewed_release_arguments/)})
+test('manifest mismatch fails before release reads or git and wrong timezone fails before install',()=>{let reads=0;assert.throws(()=>verifyRunnerRelease({commit:'b'.repeat(40),manifest:'/synthetic/manifest.json',manifestHash:'a'.repeat(64)},{read:()=>{reads++;return Buffer.from('{}')},git:()=>{throw Error('must_not_run')}}),/manifest_hash/);assert.equal(reads,1);assert.throws(()=>createRunnerInstaller({timezone:()=> 'UTC'}).install({}),/timezone/)})
+test('manifest verifies every sorted file hash plus clean exact release revision',()=>{const paths=['AGENTS.md','package-lock.json','package.json','scripts/mwf-runner-plist.mjs','scripts/ops-mwf.mjs','scripts/setup-launchd-mwf.mjs','src/lib/mwfServerRuntime.ts'],sha256=createHash('sha256').update('synthetic').digest('hex'),raw=JSON.stringify({schema:1,files:paths.map(path=>({path,sha256}))}),manifestHash=createHash('sha256').update(raw).digest('hex'),input={commit:'b'.repeat(40),manifest:'/synthetic/manifest.json',manifestHash};const deps={read:path=>Buffer.from(path===input.manifest?raw:'synthetic'),stat:()=>({isFile:()=>true,isSymbolicLink:()=>false}),git:(_cwd,args)=>({ok:true,output:args[0]==='rev-parse'?input.commit:''})};assert.equal(verifyRunnerRelease(input,deps).commit,input.commit);assert.throws(()=>verifyRunnerRelease(input,{...deps,git:()=>({ok:true,output:'dirty'})}),/checkout_mismatch/)})

@@ -1,3 +1,4 @@
+import {serializeMwfArticle} from '../../src/lib/mwfArticleSerialization.mjs'
 import { createHash } from 'node:crypto'
 import { parseCsv } from '../csv-parser.mjs'
 import matter from 'gray-matter'
@@ -9,7 +10,7 @@ import {verifyCandidateReceipt} from './mwf-inventory.mjs'
 
 export { isProtectedEditorialInput } from '../../src/lib/tieredPublication.mjs'
 export function createTieredReviewer({ request, githubFile, getComparisons, secret }) {
-  return async function review({ raw, path, baselineRaw }) {
+  return async function review({ raw, path, baselineRaw, baselineApproval }) {
     try {
       const parsed=matter(raw), data=parsed.data, content=parsed.content
       if (isProtectedEditorialInput(data,content) || !['low','medium'].includes(data.medical_risk) || ['important','unknown'].includes(data.publication_tier) || !data.generation_run_id || data.archived || data.rejection_reason) return {status:'draft',reason:'important_or_unidentified'}
@@ -18,7 +19,9 @@ export function createTieredReviewer({ request, githubFile, getComparisons, secr
         const base=matter(baselineRaw)
         if(isProtectedEditorialInput(base.data,base.content))return {status:'draft',reason:'protected_baseline'}
         if (!getDmpArticleState({data:base.data,content:base.content,today:new Date().toISOString().slice(0,10)}).approvedExactVersion || base.data.archived || base.data.rejection_reason || base.data.draft) return {status:'draft',reason:'invalid_human_baseline'}
-        baseline={data:base.data,content:base.content}
+        baseline={data:base.data,content:base.content,evidence:baselineApproval,rawVersion:createHash('sha256').update(baselineRaw).digest('hex')}
+        const human=verifyBlogEvidence(baselineApproval,'human-approved-baseline',secret)
+        if(!human||human.humanAction!=='authenticated_admin_approve'||human.path!==path||human.rawVersion!==baseline.rawVersion||human.contentVersion!==base.data.reviewed_content_hash)return {status:'draft',reason:'human_baseline_unproven'}
       }
       const adoption=baselineRaw?undefined:JSON.parse(await githubFile(`data/topic-adoptions/${data.source_topic_id}.json`))
       const adopted=baselineRaw?null:verifyBlogEvidence(adoption,'teacher-topic-adoption',secret)
@@ -52,7 +55,7 @@ export function createTieredReviewer({ request, githubFile, getComparisons, secr
       if (baselineRaw && decision.tier!=='minor') return {status:'draft',reason:'important_change'}
       if (!baselineRaw && decision.tier!=='normal') return {status:'draft',reason:'important_change'}
       const next=certifyIndependentReview({data:{...data,source_comparison_hash:set.hash},content,reviewerId:`openai:${result.id}`,decision,adoption,baseline,path,imageEvidence:{gitBlob:createHash('sha1').update(Buffer.from(`blob ${imageBytes.length}\0`)).update(imageBytes).digest('hex'),hash:createHash('sha256').update(imageBytes).digest('hex'),licenseVersion:imageLicenseVersion(asset)},secret})
-      return next?{status:'certified',raw:matter.stringify(content,next)}:{status:'draft',reason:'review_not_passed'}
+      return next?{status:'certified',raw:serializeMwfArticle(content,next)}:{status:'draft',reason:'review_not_passed'}
     } catch { return {status:'draft',reason:'review_evidence_unavailable'} }
   }
 }

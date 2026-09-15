@@ -5,6 +5,7 @@ import matter from 'gray-matter'
 import { requireAdmin } from '@/lib/adminAuth'
 import { commitGitHubFiles, readGitHubBranchHead, readGitHubFile } from '@/lib/githubContents'
 import { approvePostMarkdown, rejectPostMarkdown } from '@/lib/reviewActions'
+import { issueHumanBaselineReceipt, humanApprovalPath } from '@/lib/mwfMinorAuthority.mjs'
 import { assertExpectedContentVersion, getDmpArticleState } from '@/lib/dmpArticleState.mjs'
 
 export type ReviewActionResult = {
@@ -82,8 +83,10 @@ export async function approvePostAction({
     }
 
     const update = approvePostMarkdown(postFile.content, slug, by, expectedContentVersion)
+    const baselineReceipt = issueHumanBaselineReceipt(update.nextPostMarkdown, postPath)
     const commit = await commitGitHubFiles(`approve post: ${slug}`, [
       { path: postPath, content: update.nextPostMarkdown },
+      { path: humanApprovalPath(baselineReceipt.payload.rawVersion), content: JSON.stringify(baselineReceipt) + '\n' },
       { path: 'logs/review-history.md', content: `${reviewLog}${update.logEntry}` },
     ], { expectedHeadSha })
 

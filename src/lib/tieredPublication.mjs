@@ -43,7 +43,7 @@ export function verifyTieredCertificate(data, content, secret) {
   if (proof.path!==data.publication_path || !/^[a-f0-9]{40}$/.test(proof.imageGitBlob??'') || !HASH.test(proof.imageHash??'') || !HASH.test(proof.licenseVersion??'') || data.image_content_hash!==proof.imageHash) return false
   if (proof.tier==='minor') {
     const base=verifyBlogEvidence(proof.baseline,'human-approved-baseline',secret)
-    return Boolean(base && HASH.test(base.contentVersion??'') && HASH.test(base.rawVersion??'') && base.path===proof.path && proof.changeKind==='typo-format-link')
+    return Boolean(base && base.humanAction==='authenticated_admin_approve' && base.reviewedBy && base.reviewedAt && HASH.test(base.contentVersion??'') && HASH.test(base.rawVersion??'') && base.path===proof.path && proof.changeKind==='typo-format-link')
   }
   const adoption=verifyBlogEvidence(proof.adoption,'teacher-topic-adoption',secret)
   return Boolean(adoption && adoption.topicId===data.source_topic_id && adoption.topicVersion===data.source_topic_version && adoption.editorialPolicy===BLOG_POLICY_VERSION)
@@ -54,13 +54,17 @@ export function certifyIndependentReview({data,content,reviewerId,decision,adopt
   if (!['minor','normal'].includes(decision?.tier) || decision.decision!=='pass' || decision.medicalMeaningChanged!==false || !CHECKS.every(check=>decision.checks?.[check]===true)) return null
   if (!/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(path??'')) return null
   if (decision.tier==='minor' && (!baseline || baseline.data.reviewed!==true || !baseline.data.reviewed_by || !baseline.data.reviewed_at || baseline.data.draft || baseline.data.archived || baseline.data.rejection_reason || baseline.data.reviewed_content_hash!==getReviewedContentFingerprint(baseline.data,baseline.content) || decision.changeKind!=='typo-format-link')) return null
+  if(decision.tier==='minor'){
+    const proof=verifyBlogEvidence(baseline.evidence,'human-approved-baseline',secret)
+    if(!proof||proof.humanAction!=='authenticated_admin_approve'||proof.path!==path||proof.rawVersion!==baseline.rawVersion||proof.contentVersion!==getReviewedContentFingerprint(baseline.data,baseline.content)||proof.reviewedBy!==String(baseline.data.reviewed_by)||proof.reviewedAt!==String(baseline.data.reviewed_at))return null
+  }
   if (decision.tier==='normal') {
     const adopted=verifyBlogEvidence(adoption,'teacher-topic-adoption',secret)
     if (!adopted || adopted.topicId!==data.source_topic_id || adopted.topicVersion!==data.source_topic_version) return null
   }
   if(!/^[a-f0-9]{40}$/.test(imageEvidence?.gitBlob??'') || !HASH.test(imageEvidence?.hash??'') || !HASH.test(imageEvidence?.licenseVersion??''))return null
   const next={...data,image_content_hash:imageEvidence.hash,publication_path:path,publication_tier:decision.tier,draft:false,auto_approved:true,reviewed:false,publication_status:'auto_approved'}
-  const payload={path,imageHash:imageEvidence.hash,imageGitBlob:imageEvidence.gitBlob,licenseVersion:imageEvidence.licenseVersion,contentVersion:getReviewedContentFingerprint(next,content),generatorId:next.generation_run_id,reviewerId,tier:decision.tier,decision:'pass',medicalMeaningChanged:false,checks:decision.checks,...(decision.tier==='minor'?{baseline:signBlogEvidence('human-approved-baseline',{path,contentVersion:getReviewedContentFingerprint(baseline.data,baseline.content),rawVersion:createHash('sha256').update(canonical(baseline)).digest('hex')},secret),changeKind:'typo-format-link'}:{adoption})}
+  const payload={path,imageHash:imageEvidence.hash,imageGitBlob:imageEvidence.gitBlob,licenseVersion:imageEvidence.licenseVersion,contentVersion:getReviewedContentFingerprint(next,content),generatorId:next.generation_run_id,reviewerId,tier:decision.tier,decision:'pass',medicalMeaningChanged:false,checks:decision.checks,...(decision.tier==='minor'?{baseline:baseline.evidence,changeKind:'typo-format-link'}:{adoption})}
   next.tiered_review_proof=signBlogEvidence('independent-article-review',payload,secret)
   return verifyTieredCertificate(next,content,secret)?next:null
 }

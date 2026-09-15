@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {createHash} from 'node:crypto'
 import matter from 'gray-matter'
 import { issueTopicAdoption,topicContentVersion,certifyIndependentReview,assessTieredPublication,BLOG_POLICY_VERSION,imageLicenseVersion,signBlogEvidence } from '../src/lib/tieredPublication.mjs'
+import {issueHumanBaselineReceipt} from '../src/lib/mwfMinorAuthority.mjs'
 import { getDmpArticleState,applyTeacherApproval } from '../src/lib/dmpArticleState.mjs'
 import {comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
 import { createTieredReviewer } from '../scripts/lib/mwf-tiered-review.mjs'
@@ -38,6 +39,10 @@ test('minor requires actual exact Human baseline and separate diff reviewer; imp
  const minor={...decision,tier:'minor',changeKind:'typo-format-link'}
  assert.equal(certify({decision:minor,previousHumanVersion:'a'.repeat(64)}),null)
  const baseline={data:applyTeacherApproval({data,content,reviewedBy:'Synthetic teacher',reviewedAt:'2026-09-14'}),content}
+ const baselineRaw=matter.stringify(content,baseline.data)
+ baseline.evidence=issueHumanBaselineReceipt(baselineRaw,path,secret)
+ baseline.rawVersion=createHash('sha256').update(baselineRaw).digest('hex')
+ assert.equal(certify({decision:minor,baseline:{data:baseline.data,content}}),null)
  const next=certify({decision:minor,adoption:undefined,baseline,content:content+'\n'})
  assert.ok(next);assert.equal(assessTieredPublication(next,content+'\n',secret,context),true)
  assert.equal(certify({decision:minor,baseline:{...baseline,content:'tampered'}}),null)
@@ -92,10 +97,19 @@ test('dedicated existing-job configuration keeps calendar only and never force/R
  const {mwfRunnerPlist}=await import('../scripts/mwf-runner-plist.mjs')
  const plist=mwfRunnerPlist('a'.repeat(40))
  assert.match(plist,/com.mitani.aisoukai-media-ops-mwf/);assert.match(plist,/--production/);assert.match(plist,/releases\/a{40}\/scripts\/ops-mwf/)
+ assert.match(plist,/<key>EnvironmentVariables<\/key><dict><key>MWF_RUNNER_VERSION<\/key><string>a{40}<\/string><\/dict>/)
  assert.doesNotMatch(plist,/RunAtLoad|KeepAlive|--force|kickstart|TELEGRAM_BOT_TOKEN/)
  assert.equal((plist.match(/<key>Weekday<\/key>/g)??[]).length,3)
 })
 
 test('certificate cannot be copied to another actual article path or evaluated without path evidence',()=>{
  const next=certify();assert.equal(assessTieredPublication(next,content,secret,{...context,path:"content/posts/2026-09-14-copy.md"}),false);assert.equal(assessTieredPublication(next,content,secret,{...context,path:undefined}),false)
+})
+
+test('runner revision supplied by plist overrides stale environment-file metadata without editing it',async()=>{
+ const {mkdtempSync,writeFileSync,readFileSync}=await import('node:fs'),{tmpdir}=await import('node:os'),{join}=await import('node:path'),{spawnSync}=await import('node:child_process')
+ const directory=mkdtempSync(join(tmpdir(),'mwf-version-fixture-')),fixture=join(directory,'runtime-metadata.fixture'),raw=`MWF_RUNNER_VERSION=${'b'.repeat(40)}\n`
+ writeFileSync(fixture,raw)
+ const result=spawnSync(process.execPath,[`--env-file=${fixture}`,'-e','process.stdout.write(process.env.MWF_RUNNER_VERSION)'],{env:{MWF_RUNNER_VERSION:'a'.repeat(40)},encoding:'utf8'})
+ assert.equal(result.status,0);assert.equal(result.stdout,'a'.repeat(40));assert.equal(readFileSync(fixture,'utf8'),raw)
 })

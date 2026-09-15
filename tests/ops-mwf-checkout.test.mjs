@@ -1,66 +1,23 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-// This former checkout-sync regression now verifies retirement. No Git fixture or
-// live repository execution is needed: only a copied entrypoint runs in tmp.
-const root = realpathSync(mkdtempSync(join(tmpdir(), 'mwf-retired-entrypoint-')))
-const scriptPath = join(root, 'ops-mwf.mjs')
-const scriptUrl = pathToFileURL(scriptPath).href
-writeFileSync(scriptPath, readFileSync(new URL('../scripts/ops-mwf.mjs', import.meta.url)))
-const guardPath = join(root, 'deny-effects.mjs')
-writeFileSync(guardPath, `
-import { registerHooks } from 'node:module'
-const allowed = new Set(['node:path', 'node:url', ${JSON.stringify(scriptUrl)}])
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (!allowed.has(specifier)) throw new Error('DENIED_IMPORT:' + specifier)
-    return nextResolve(specifier, context)
-  }
-})
-globalThis.fetch = () => { throw new Error('DENIED_FETCH') }
-globalThis.WebSocket = class { constructor() { throw new Error('DENIED_WEBSOCKET') } }
-`)
-const env = { PATH: '/usr/bin:/bin' }
-function run(args) {
-  return spawnSync(process.execPath, ['--import', pathToFileURL(guardPath).href, ...args], {
-    cwd: root, env, encoding: 'utf8', timeout: 5000,
-  })
-}
-
-for (const flags of [[], ['--force'], ['--no-generate'], ['--dry-run'], ['--auto-publish'], ['--force', '--no-generate']]) {
-  test(`retired CLI is side-effect-free with ${flags.join(' ') || 'no flags'}`, () => {
-    const before = readdirSync(root).sort()
-    const result = run([scriptPath, ...flags])
-    assert.equal(result.status, 0, result.stderr)
-    assert.equal(result.stderr, '')
-    assert.match(result.stdout, /退役済み/)
-    assert.match(result.stdout, /生成・Git同期・通知・approve \/ publish は実行していません/)
-    assert.deepEqual(readdirSync(root).sort(), before)
-  })
-}
-
-test('importing the retired entrypoint is silent under the same denial guard', () => {
-  const result = run(['--input-type=module', '-e', `await import(${JSON.stringify(scriptUrl)})`])
-  assert.equal(result.status, 0, result.stderr)
-  assert.equal(result.stdout, '')
-  assert.equal(result.stderr, '')
-})
-
-for (const specifier of ['node:fs', 'node:child_process', 'node:https', './scheduled-article-flow.mjs']) {
-  test(`guard rejects ${specifier} before any protected read, process, or transport`, () => {
-    const result = run(['--input-type=module', '-e', `await import(${JSON.stringify(specifier)})`])
-    assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /DENIED_IMPORT/)
-  })
-}
-
-test('guard rejects global fetch before network access', () => {
-  const result = run(['--input-type=module', '-e', "fetch('https://example.invalid')"])
-  assert.notEqual(result.status, 0)
-  assert.match(result.stderr, /DENIED_FETCH/)
-})
+// Exercise the actual CLI parser in a synthetic isolated checkout. Stub only the
+// effectful runtime/store modules; production source, data and auth never execute.
+const root=realpathSync(mkdtempSync(join(tmpdir(),'mwf-cli-checkout-')))
+const scriptPath=join(root,'ops-mwf.mjs'),scriptUrl=pathToFileURL(scriptPath).href
+writeFileSync(scriptPath,readFileSync(new URL('../scripts/ops-mwf.mjs',import.meta.url)))
+mkdirSync(join(root,'lib'))
+writeFileSync(join(root,'lib/mwf-production.mjs'),"export function createProductionRuntime(){throw Error('DENIED_PRODUCTION_RUNTIME')}\n")
+writeFileSync(join(root,'lib/mwf-delivery.mjs'),"export function openDeliveryStore(root){return {root}}; export function deliveryStatus(){return {status:'not-run',items:[]}}; export function runDelivery(){throw Error('DENIED_DELIVERY')}\n")
+const guardPath=join(root,'deny-effects.mjs')
+writeFileSync(guardPath,`\nimport {registerHooks} from 'node:module'\nconst allowed=new Set(['node:path','node:url',${JSON.stringify(scriptUrl)},'./lib/mwf-production.mjs','./lib/mwf-delivery.mjs'])\nregisterHooks({resolve(specifier,context,nextResolve){if(!allowed.has(specifier))throw Error('DENIED_IMPORT:'+specifier);return nextResolve(specifier,context)}})\nglobalThis.fetch=()=>{throw Error('DENIED_FETCH')}\n`)
+function run(args){return spawnSync(process.execPath,['--import',pathToFileURL(guardPath).href,...args],{cwd:root,env:{PATH:'/usr/bin:/bin'},encoding:'utf8',timeout:5000})}
+for(const flags of [['--force'],['--no-generate'],['--dry-run'],['--auto-publish']])test(`unsupported legacy ${flags[0]} fails without effects`,()=>{const before=readdirSync(root).sort(),result=run([scriptPath,...flags]);assert.equal(result.status,1);assert.match(result.stderr,/delivery_failed_check_local_status/);assert.deepEqual(readdirSync(root).sort(),before)})
+test('unbound runtime returns explicit stopped status, never a retired success',()=>{const result=run([scriptPath]);assert.equal(result.status,2);assert.equal(JSON.parse(result.stdout).reason,'explicit_state_root_and_runtime_capabilities_required')})
+test('status reads synthetic store without invoking delivery and importing actual parser is silent',()=>{const result=run([scriptPath,'--state-root','/synthetic/state','--status']);assert.equal(result.status,0);assert.deepEqual(JSON.parse(result.stdout),{status:'not-run',items:[]});const imported=run(['--input-type=module','-e',`await import(${JSON.stringify(scriptUrl)})`]);assert.equal(imported.status,0);assert.equal(imported.stdout,'');assert.equal(imported.stderr,'')})
+test('guard rejects process, filesystem and network effects',()=>{for(const specifier of ['node:fs','node:child_process','node:https']){const result=run(['--input-type=module','-e',`await import(${JSON.stringify(specifier)})`]);assert.notEqual(result.status,0);assert.match(result.stderr,/DENIED_IMPORT/)}const result=run(['--input-type=module','-e',"fetch('https://synthetic.invalid')"]);assert.notEqual(result.status,0);assert.match(result.stderr,/DENIED_FETCH/)})

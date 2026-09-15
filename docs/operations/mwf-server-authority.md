@@ -12,6 +12,6 @@ POST は JSON content type、最大256文字、requestId 一項目。Origin が�
 
 本番 reflection は exact canonical bytes と deployed bytes を照合する。pending 原稿は同じ admin 一件 mapper に通し、slug/contentVersion/非 reject を確認する。公開通知は JST 日付、画像、採用、実 path を含む共通公開条件に従う。旧全記事を admin helper で読み直して反映証明を作らない。
 
-GET diagnostics は adoption 件数、reviewer 設定の有無、anchor、状態のみを返し、秘密値・記事本文・題名を返さない。現環境は本番 AI 設定なし、真正な新方式採用証跡なしという独立した制約を持つ。コード配線の完成と実運用の公開成功を区別する。
+GET diagnostics は adoption 件数、reviewer 設定の有無、anchor、状態のみを返し、秘密値・記事本文・題名を返さない。過去に未確認だった本番 AI 設定と真正な新方式採用証跡について、2026-09-15 のローカル検証では現在状態を実測していない。コード配線の完成と実運用の公開成功を区別する。
 
 テストは合成 Git/API/provider、ローカル file protocol の bare Git のみ。実 API、記事読取、secret 設定、push/deploy/job 更新は worker 検証に含めない。

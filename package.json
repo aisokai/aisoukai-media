@@ -63,7 +63,6 @@
     "image:misassign": "node scripts/image-misassign.mjs",
     "image:feedback": "node scripts/image-feedback.mjs",
     "test": "sh scripts/network-denied-launcher.sh",
-    "test:ops-mwf": "node --test tests/ops-mwf-checkout.test.mjs tests/ops-mwf.test.mjs tests/scheduled-article-flow.test.mjs",
     "test:isolated-env": "node --test tests/activation.integration.mjs tests/content-status-notification.integration.mjs tests/gmb-api.integration.mjs tests/lineworks-adapter.integration.mjs tests/safety-gates.integration.mjs",
     "validate:safe-test-path": "node scripts/validate-safe-test-path.mjs",
     "validate:network-denied": "sh scripts/network-denied-launcher.sh",
@@ -117,12 +116,13 @@
     "media:launchd:install-apply": "node scripts/setup-launchd-media.mjs --install-apply",
     "media:launchd:uninstall": "node scripts/setup-launchd-media.mjs --uninstall",
     "media:launchd:status": "node scripts/setup-launchd-media.mjs --status",
-    "test:mwf-delivery": "node --test tests/mwf-delivery.test.mjs tests/mwf-isolated-sync.test.mjs tests/mwf-admin-receipt.test.mjs tests/mwf-production.test.mjs tests/tiered-publication.test.mjs",
-    "test:ops-mwf": "node --test tests/ops-mwf.test.mjs tests/scheduled-article-flow.test.mjs tests/mwf-delivery.test.mjs tests/mwf-isolated-sync.test.mjs tests/mwf-admin-receipt.test.mjs tests/mwf-production.test.mjs tests/tiered-publication.test.mjs",
+    "test:mwf-delivery": "node --test tests/mwf-delivery.test.mjs tests/mwf-isolated-sync.test.mjs tests/mwf-admin-receipt.test.mjs tests/mwf-production.test.mjs tests/mwf-inventory.test.mjs tests/mwf-server-authority.test.mjs tests/mwf-server-client.test.mjs tests/mwf-minor-authority.test.mjs tests/tiered-publication.test.mjs tests/mwf-article-serialization.test.mjs tests/setup-launchd-mwf-cleanup.test.mjs",
+    "test:ops-mwf": "node --test tests/ops-mwf.test.mjs tests/scheduled-article-flow.test.mjs tests/mwf-delivery.test.mjs tests/mwf-isolated-sync.test.mjs tests/mwf-admin-receipt.test.mjs tests/mwf-production.test.mjs tests/mwf-inventory.test.mjs tests/mwf-server-authority.test.mjs tests/mwf-server-client.test.mjs tests/mwf-minor-authority.test.mjs tests/tiered-publication.test.mjs tests/mwf-article-serialization.test.mjs tests/setup-launchd-mwf-cleanup.test.mjs tests/ops-mwf-checkout.test.mjs",
     "ops:mwf:production": "node scripts/ops-mwf.mjs --production",
     "ops:mwf:preserve": "node scripts/mwf-preserve-drafts.mjs",
     "ops:mwf:minor": "node scripts/mwf-minor-edit.mjs",
-    "ops:mwf:plist": "node scripts/mwf-runner-plist.mjs"
+    "ops:mwf:plist": "node scripts/mwf-runner-plist.mjs",
+    "ops:mwf:job-status": "node scripts/setup-launchd-mwf.mjs --status"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",

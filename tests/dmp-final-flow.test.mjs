@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { applyTeacherApproval, assertExpectedContentVersion, getDmpArticleState, getContentVersion } from '../src/lib/dmpArticleState.mjs'
 import { getPostPublicationStatus } from '../scripts/lib/post-publication-status.mjs'
 import matter from 'gray-matter'
@@ -13,12 +13,14 @@ import { join } from 'node:path'
 const data = { title: 'テスト', date: '2026-08-01', draft: false, reviewed: false }
 const content = '本文\n'
 
-function currentHumanApprovedPosts() {
-  return readdirSync('content/posts')
-    .filter((file) => file.endsWith('.md'))
-    .sort()
-    .map((file) => ({ file, parsed: matter(readFileSync(`content/posts/${file}`, 'utf8')) }))
-    .filter(({ parsed }) => parsed.data.reviewed === true && !parsed.data.draft && !parsed.data.archived && !parsed.data.rejection_reason)
+// Synthetic fixtures model locked Human approvals; routine tests never read the
+// production editorial inventory or infer its present approval count.
+function syntheticHumanApprovedPosts() {
+  return ['First synthetic article', 'Second synthetic article'].map((title, index) => {
+    const content = `Synthetic article ${index}\n`
+    const data = applyTeacherApproval({ data: { title, date: '2026-08-01', draft: true }, content, reviewedBy: 'Synthetic reviewer', reviewedAt: '2026-08-01' })
+    return { file: `synthetic-${index}.md`, parsed: matter(matter.stringify(content, data)) }
+  })
 }
 
 test('only exact Human approval makes a draft publishable', () => {
@@ -32,10 +34,9 @@ test('only exact Human approval makes a draft publishable', () => {
   assert.equal(version.length, 64)
 })
 
-test('all current Human-approved posts retain one locked, publishable version after migration', () => {
-  const approvedPosts = currentHumanApprovedPosts()
-  // 承認記事数は正常に増加し得るため、下限で承認記事の欠落だけを検知する。
-  assert.ok(approvedPosts.length >= 33)
+test('synthetic Human-approved artifacts retain one locked, publishable version after serialization', () => {
+  const approvedPosts = syntheticHumanApprovedPosts()
+  assert.equal(approvedPosts.length, 2)
   for (const { file, parsed } of approvedPosts) {
     const status = getPostPublicationStatus(parsed.data, { today: '2026-08-17', content: parsed.content })
     assert.equal(status.publishable, true, file)
@@ -44,7 +45,7 @@ test('all current Human-approved posts retain one locked, publishable version af
 })
 
 test('a later title or body edit loses publication until a fresh exact Human approval', () => {
-  const [{ parsed }] = currentHumanApprovedPosts()
+  const [{ parsed }] = syntheticHumanApprovedPosts()
   const exact = getPostPublicationStatus(parsed.data, { today: '2026-08-11', content: parsed.content })
   const changedTitle = getPostPublicationStatus(
     { ...parsed.data, title: `${parsed.data.title}（改訂）` },

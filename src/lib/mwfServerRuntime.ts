@@ -1,3 +1,4 @@
+import {serializeMwfArticle} from './mwfArticleSerialization.mjs'
 import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
 import matter from 'gray-matter'
@@ -8,10 +9,11 @@ import {getDmpArticleState} from './dmpArticleState.mjs'
 import {buildPendingReviewPost} from './posts'
 import {parseCsv} from '../../scripts/csv-parser.mjs'
 import {comparisonSet,metadataEntry,reviewCandidate} from '../../scripts/lib/mwf-inventory.mjs'
+import {validateMinorArtifacts,humanApprovalPath} from './mwfMinorAuthority.mjs'
 import {readPublicEditorialHead} from '../../scripts/mwf-inventory-metadata.mjs'
 import {createTieredReviewer} from '../../scripts/lib/mwf-tiered-review.mjs'
 
-type ServerRequest={operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string}
+type ServerRequest={operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string;baselineBlob?:string;proposalPath?:string}
 const cache=new Map<string, Promise<ReturnType<typeof comparisonSet>>>()
 export function createMwfServerRuntime(){
  const secret=process.env.ADMIN_REVIEW_COOKIE_SECRET
@@ -54,22 +56,31 @@ export function createMwfServerRuntime(){
  }
  async function validate(request:ServerRequest,ref:string){
   try{
+   if(request.operation==='minor-review'){
+    const approval=await json(humanApprovalPath(request.baselineBlob),ref)
+    const baselineBytes=(await readGitHubBytes(request.artifactPath!,{ref})).bytes,proposalBytes=(await readGitHubBytes(request.proposalPath!,{ref})).bytes
+    const minor=validateMinorArtifacts({request,baselineBytes,proposalBytes,approval,secret,today:new Date(Date.now()+9*3600000).toISOString().slice(0,10)})
+    if(!minor.ok)return minor
+    const set=await comparisons(ref,request.artifactPath)
+    if(set.entries.some((e:{metadata:unknown})=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{ok:false as const,reason:'comparison_metadata_incomplete'}
+    return{...minor,kind:'minor' as const,set,comparisonHash:set.hash}
+   }
    const topic=parseCsv(await text('data/article-topics.sample.csv',ref)).find((t:Record<string,string>)=>t.id===request.topicId)
    let adoption;try{adoption=await json(`data/topic-adoptions/${request.topicId}.json`,ref)}catch{/* Unknown adoption remains unproven; it never becomes publication authority. */}
    const evidence=verifyBlogEvidence(adoption,'teacher-topic-adoption',secret)
    const publicationAllowed=Boolean(topic&&topic.status==='approved'&&topicContentVersion(topic)===request.topicVersion&&!isProtectedEditorialInput(topic)&&evidence?.topicId===request.topicId&&evidence.topicVersion===request.topicVersion)
-   if(request.operation==='prepare'&&!publicationAllowed)return{ok:false,reason:'topic_adoption_unproven'}
+   if(request.operation==='prepare'&&!publicationAllowed)return{ok:false as const,reason:'topic_adoption_unproven'}
    const set=await comparisons(ref,request.artifactPath)
-   if(set.entries.some((e:{metadata:unknown})=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{ok:false,reason:'comparison_metadata_incomplete'}
-   if(request.operation==='prepare'&&set.entries.some((e:{metadata:{source_topic_id?:string;title:string}})=>e.metadata.source_topic_id===request.topicId||e.metadata.title.normalize('NFKC').toLowerCase().replace(/\s/g,'')===String(topic?.title_candidate??topic?.title).normalize('NFKC').toLowerCase().replace(/\s/g,'')))return{ok:false,reason:'duplicate_metadata'}
+   if(set.entries.some((e:{metadata:unknown})=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{ok:false as const,reason:'comparison_metadata_incomplete'}
+   if(request.operation==='prepare'&&set.entries.some((e:{metadata:{source_topic_id?:string;title:string}})=>e.metadata.source_topic_id===request.topicId||e.metadata.title.normalize('NFKC').toLowerCase().replace(/\s/g,'')===String(topic?.title_candidate??topic?.title).normalize('NFKC').toLowerCase().replace(/\s/g,'')))return{ok:false as const,reason:'duplicate_metadata'}
    let validatedBytes:Buffer|undefined
    if(request.operation==='review'){
-    const bytes=(await readGitHubBytes(request.artifactPath!,{ref})).bytes,decoded=decodeBoundArticle(bytes,request.artifactBlob);if(decoded===null)return{ok:false,reason:'draft_changed'}
+    const bytes=(await readGitHubBytes(request.artifactPath!,{ref})).bytes,decoded=decodeBoundArticle(bytes,request.artifactBlob);if(decoded===null)return{ok:false as const,reason:'draft_changed'}
     validatedBytes=bytes
-    const parsed=matter(decoded);if(parsed.data.draft!==true||parsed.data.reviewed!==false||parsed.data.auto_approved!==false||isProtectedEditorialInput(parsed.data,parsed.content)||parsed.data.source_topic_id!==request.topicId||parsed.data.source_topic_version!==request.topicVersion)return{ok:false,reason:'unreviewed_draft_required'}
+    const parsed=matter(decoded);if(parsed.data.draft!==true||parsed.data.reviewed!==false||parsed.data.auto_approved!==false||isProtectedEditorialInput(parsed.data,parsed.content)||parsed.data.source_topic_id!==request.topicId||parsed.data.source_topic_version!==request.topicVersion)return{ok:false as const,reason:'unreviewed_draft_required'}
    }
-   return{ok:true,topic,adoption,set,comparisonHash:set.hash,validatedBytes,publicationAllowed}
-  }catch{return{ok:false,reason:'canonical_evidence_unavailable'}}
+   return{ok:true as const,kind:'normal' as const,topic,adoption,set,comparisonHash:set.hash,validatedBytes,publicationAllowed}
+  }catch{return{ok:false as const,reason:'canonical_evidence_unavailable'}}
  }
  const provider=async(url:string,options:RequestInit&{reviewRequest?:boolean})=>{
   if(url==='https://api.openai.com/v1/chat/completions'){
@@ -84,24 +95,32 @@ export function createMwfServerRuntime(){
   seal:(value:unknown)=>signBlogEvidence('mwf-server-claim',value,secret),unseal:(value:unknown)=>verifyBlogEvidence(value,'mwf-server-claim',secret),
   validate,reviewerAvailable:()=>Boolean(process.env.OPENAI_API_KEY),
   review:async(request:ServerRequest,validated:Awaited<ReturnType<typeof validate>>)=>{
+   if(!validated.ok)return{result:{status:'hold',reason:validated.reason},files:[]}
+   if((validated.kind==='minor')!==(request.operation==='minor-review'))return{result:{status:'hold',reason:'review_kind_mismatch'},files:[]}
+   if(validated.kind==='minor'){
+    const reviewer=createTieredReviewer({secret,request:provider,githubFile:text,getComparisons:async()=>validated.set})
+    const result=await reviewer({raw:validated.proposalRaw,path:request.artifactPath,baselineRaw:validated.baselineRaw,baselineApproval:validated.baselineApproval})
+    return result.status==='certified'?{result:{status:'server-reviewed',artifactBlob:serverHash(result.raw)},files:[{path:request.artifactPath!,content:result.raw}]}:{result:{status:'minor-review-required',reason:result.reason},files:[]}
+   }
    const precheck=await reviewCandidate({topic:validated.topic,set:validated.set,adoption:validated.adoption,request:provider,secret})
    if(precheck.status!=='clear')return{result:{status:'draft-review-required',reason:precheck.reason},files:[]}
    const raw=validated.validatedBytes?decodeBoundArticle(validated.validatedBytes,request.artifactBlob):null
    if(raw===null)return{result:{status:'hold',reason:'draft_changed'},files:[]}
    const parsed=matter(raw)
-   const candidate=matter.stringify(parsed.content,{...parsed.data,source_candidate_receipt:precheck.receipt})
+   const candidate=serializeMwfArticle(parsed.content,{...parsed.data,source_candidate_receipt:precheck.receipt})
    const reviewer=createTieredReviewer({secret,request:provider,githubFile:text,getComparisons:async()=>validated.set})
-   const result=await reviewer({raw:candidate,path:request.artifactPath,baselineRaw:undefined})
+   const result=await reviewer({raw:candidate,path:request.artifactPath,baselineRaw:undefined,baselineApproval:undefined})
    return result.status==='certified'?{result:{status:'server-reviewed',artifactBlob:serverHash(result.raw)},files:[{path:request.artifactPath!,content:result.raw}]}:{result:{status:'draft-review-required',reason:result.reason},files:[]}
   },
   reflect:async(request:ServerRequest,result:{status:string;artifactBlob?:string},ref:string)=>{
    if(!['server-reviewed','draft-review-required'].includes(result.status))return{}
    const raw=(await readGitHubBytes(request.artifactPath!,{ref})).bytes
+   if(request.operation==='minor-review'&&result.status!=='server-reviewed')return{}
    const expected=result.status==='server-reviewed'?result.artifactBlob:request.artifactBlob
    const decoded=decodeBoundArticle(raw,expected,result.status!=='server-reviewed')
    if(decoded===null)return{reflection:'pending'}
    const parsed=matter(decoded)
-   const topic=parseCsv(await text('data/article-topics.sample.csv',ref)).find((t:Record<string,string>)=>t.id===request.topicId)
+   const topic=request.operation==='minor-review'?undefined:parseCsv(await text('data/article-topics.sample.csv',ref)).find((t:Record<string,string>)=>t.id===request.topicId)
    const state=getDmpArticleState({data:parsed.data,content:parsed.content,verificationSecret:secret,publicationContext:{path:request.artifactPath,topic},today:new Date(Date.now()+9*3600000).toISOString().slice(0,10)})
    if(isProtectedEditorialInput(parsed.data,parsed.content)||parsed.data.archived||parsed.data.rejection_reason)return{}
    const deployed=await readFile(join(process.cwd(),request.artifactPath!));if(serverHash(deployed)!==serverHash(raw))return{reflection:'pending'}

@@ -11,6 +11,7 @@ export function mwfRunnerPlist(commit) {
 <plist version="1.0"><dict>
 <key>Label</key><string>com.mitani.aisoukai-media-ops-mwf</string>
 <key>ProgramArguments</key><array><string>/opt/homebrew/bin/node</string><string>--env-file=/Users/caelus/projects/aisoukai-media/.env.local</string><string>--env-file=${root}/runtime-metadata.env</string><string>${release}/scripts/ops-mwf.mjs</string><string>--production</string></array>
+<key>EnvironmentVariables</key><dict><key>MWF_RUNNER_VERSION</key><string>${commit}</string></dict>
 <key>WorkingDirectory</key><string>${release}</string>
 <key>StartCalendarInterval</key><array>${[1,3,5].map(day=>`<dict><key>Weekday</key><integer>${day}</integer><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>`).join('')}</array>
 <key>StandardOutPath</key><string>${root}/state/runner.log</string>

@@ -30,6 +30,17 @@
 
 54件の保全、8件 local-only、4件 quarantine を維持する。schema1 reconciled:false を書き換えない。比較は許可された公開 editorial metadata のみで、原本全体は opaque hash、本文・私的 request を decode/AI 送信しない。固定 anchor と本番署名済み比較履歴に現行 canonical metadata を追加し、コードだけの SHA 更新や新記事の追加で全 intake を永久停止させない。
 
-現在の環境調査では本番 OPENAI_API_KEY がなく、自動公開 reviewer は unavailable。真正な topic adoption sidecar も未確認で、未証明候補は個別 hold となる。これらを復旧完了や公開成功と表現しない。過去の真正な証拠が確認できるものだけ移行対象とし、unsigned Git commit や記事承認ログからテーマ採用を捏造しない。
+過去の環境調査では本番 reviewer 設定と真正な topic adoption sidecar が未確認だった。2026-09-15 の独立ローカル検証では本番に接続しておらず、現在の有無は未実測。未証明候補は個別 hold となる。これらを復旧完了や公開成功と表現しない。過去の真正な証拠が確認できるものだけ移行対象とし、unsigned Git commit や記事承認ログからテーマ採用を捏造しない。
 
-新 MWF 経路は normal 下書き生成を対象とする。minor 自動 CLI は `minor_server_authority_not_supported` で読取前に明示停止する。既存 Human 承認と共通3段階公開 predicate は維持するが、minor 自動経路の server 移行は未対応。
+normal 下書きと minor 修正の本番審査経路を実装済み。minor CLI は `ops:mwf:minor -- --proposal /absolute/proposal.json` で固定先へ不変 proposal を同期する。真正な署名 Human 承認 baseline、医療意味不変の独立審査、同一 hash の本番反映確認が必要で、旧 reviewed:true だけでは進めない。詳細は [本番認証と minor 修正](../mwf-server-authentication.md) を参照。ローカル合成テストは実際の同期・審査・公開・通知の成功証跡ではない。
+
+## レビュー済み runner の導入手順
+
+既存 `ops:mwf:install` は reviewed commit と manifest を必須にし、開発 checkout / `--force` を登録しない。以下は別の `mwf_runner_install` 実行段階でのみ実行する。
+
+```sh
+npm run ops:mwf:install -- --commit <reviewed-sha> --manifest /absolute/release-manifest.json --manifest-sha256 <reviewed-manifest-sha256>
+npm run ops:mwf:job-status
+```
+
+先に固定 root の `releases/<reviewed-sha>` を用意し、manifest（`schema:1`, `files:[{path,sha256}]`、path 昇順）の全ファイルを独立レビュー済み bytes と一致させる。installer は SHA / clean tracked paths / manifest digest / 全内容 hash / Asia/Tokyo timezone を確認する。実行中の既存 job は変更しない。旧 plist は rename で保全し、bootstrap 失敗時は元に戻す。kickstart、RunAtLoad、ファイル削除、秘密値の取得やコピーは行わない。インストール成功は scheduled business recovery の証拠ではない。

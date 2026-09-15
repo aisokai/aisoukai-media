@@ -57,7 +57,8 @@ export function getPostPublicationStatus(data, { today = getTodayJst(), content 
     if (publishAtStr && publishAtStr > today) {
       addBlocker(blockers, 'future_publish_at', `publish_at:${publishAtStr} は未来日付`)
     }
-  } else if (data.date) {
+  }
+  if (data.date) {
     const dateStr = toDateStr(data.date)
     if (dateStr && dateStr > today) {
       addBlocker(blockers, 'future_date', `date:${dateStr} は未来日付`)

@@ -1,12 +1,11 @@
+import {serializeMwfArticle} from '../../src/lib/mwfArticleSerialization.mjs'
 // Mac runtime: generation, unreviewed sync and notification only. No admin key,
 // approval signing or publication privilege is loaded or exercised here.
-import {createHash} from 'node:crypto'
 import {readFileSync,openSync,closeSync,writeSync,fsyncSync,constants} from 'node:fs'
 import {spawnSync} from 'node:child_process'
 import {homedir} from 'node:os'
 import {fileURLToPath} from 'node:url'
 import {resolve,join,basename} from 'node:path'
-import matter from 'gray-matter'
 import {parseCsv} from '../csv-parser.mjs'
 import {buildArticlePrompt} from '../prompts/dental-article-prompt.mjs'
 import {createIsolatedSync} from './mwf-isolated-sync.mjs'
@@ -18,6 +17,16 @@ import {MWF_INVENTORY_ANCHOR} from '../../src/lib/mwfServerAuthority.mjs'
 import {createServerClient} from './mwf-server-client.mjs'
 const ORIGIN='https://github.com/aisokai/aisoukai-media.git'
 export function currentMwfSlot(now=new Date()){const d=new Date(+now+9*3600000);return[1,3,5].includes(d.getUTCDay())&&d.getUTCHours()*60+d.getUTCMinutes()>=510?`${d.toISOString().slice(0,10)}T08:30:00+09:00`:null}
+export function createGithubServerTransport({spawnImpl,native,request}){
+ return async function authenticateRequest(url,options){
+  if(url!=='https://aisoukai-media.vercel.app/api/mwf'&&!/^https:\/\/aisoukai-media\.vercel\.app\/api\/mwf\?requestId=[a-f0-9]{64}$/.test(url))throw Error('server_auth_destination_rejected')
+  // Existing native GitHub authentication is used only inside this runtime call.
+  // Never log, persist, or return the credential, including command diagnostics.
+  const auth=spawnImpl('/opt/homebrew/bin/gh',['auth','token','--hostname','github.com'],{env:native,encoding:'utf8',timeout:10000,stdio:['ignore','pipe','pipe']})
+  if(auth.status!==0||auth.error||!/^([A-Za-z0-9_]{20,255})\s*$/.test(auth.stdout??''))throw Error('server_auth_unavailable')
+  return request(url,{...options,headers:{...options.headers,Authorization:`Bearer ${auth.stdout.trim()}`}})
+ }
+}
 export function createProductionRuntime({env=process.env,readText=path=>readFileSync(path,'utf8'),fetchImpl=fetch,spawnImpl=spawnSync,now=()=>new Date(),inventoryAnchor=MWF_INVENTORY_ANCHOR,serverClient}={}){
  for(const key of ['MWF_STATE_ROOT','MWF_TOPICS_PATH','MWF_INVENTORY_PATH','MWF_RUNNER_VERSION'])if(!env[key]?.trim())throw Error('production_configuration_missing')
  for(const key of ['MWF_STATE_ROOT','MWF_TOPICS_PATH','MWF_INVENTORY_PATH'])if(!env[key].startsWith('/'))throw Error('absolute_runtime_paths_required')
@@ -38,7 +47,8 @@ export function createProductionRuntime({env=process.env,readText=path=>readFile
  async function csv(){const file=await github('GET','contents/data/article-topics.sample.csv?ref=main');return parseCsv(Buffer.from(file.content,'base64').toString('utf8'))}
  let client
  function inventory(){const raw=readText(env.MWF_INVENTORY_PATH);if(inventoryHash(raw)!==inventoryAnchor)throw Error('historical_inventory_evidence_missing');const data=JSON.parse(raw).payload;if(data?.schema!==2||!Array.isArray(data.entries))throw Error('historical_inventory_evidence_missing');return{raw,data}}
- function server(){if(!client)client=serverClient??createServerClient({github,request,inventoryRaw:inventory().raw,inventoryAnchor});return client}
+ const authenticateRequest=createGithubServerTransport({spawnImpl,native,request})
+ function server(){if(!client)client=serverClient??createServerClient({github,authenticateRequest,inventoryRaw:inventory().raw,inventoryAnchor});return client}
  function localComparisons(){const {data}=inventory();const entries=[...data.entries];for(const entry of entries.filter(e=>e.source==='local')){const path=join(env.MWF_PRESERVATION_DIR??'/Users/caelus/Library/Application Support/AisoukaiMWF/preservation/2026-09-14',basename(entry.path));if(inventoryHash(readOpaqueRegular(path))!==entry.blob)throw Error('preserved_artifact_changed')}
   const revision=github('GET','git/ref/heads/main').object.sha,listing=github('GET',`contents/content/posts?ref=${revision}`);if(!Array.isArray(listing)||listing.length>=1000)throw Error('comparison_listing_incomplete')
   for(const file of listing){if(file.type!=='file')throw Error('comparison_listing_invalid');if(entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))continue;const encoded=github('GET',`contents/${file.path}?ref=${revision}`);if(encoded.encoding!=='base64')throw Error('comparison_encoding_invalid');entries.push(metadataEntry({path:file.path,raw:Buffer.from(encoded.content,'base64'),source:'canonical',quarantine:data.quarantine.includes(file.path)}))}
@@ -77,11 +87,11 @@ export function createProductionRuntime({env=process.env,readText=path=>readFile
   const title=String(topic.title_candidate??topic.title??'').trim(),category=String(topic.category??'その他');if(!title)return{status:'not-generated'}
   try{const prompt=buildArticlePrompt({title,category,keyword:topic.target_keyword??topic.keyword??'',intent:topic.patient_intent??'',medicalRisk:topic.medical_risk??'medium',topic:topic.topic??title}),response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json','X-Client-Request-Id':idempotencyKey},body:JSON.stringify({model:'gpt-5-nano',max_completion_tokens:4000,reasoning_effort:'minimal',messages:[{role:'user',content:prompt}]})});if(!response.ok)return{status:[400,401,403,404,429].includes(response.status)?'not-generated':'unknown'};const result=await response.json(),body=result.choices?.[0]?.message?.content;if(!body||result.choices[0].finish_reason!=='stop')return{status:'unknown'}
    const selectedImage=await approvedImage()
-   const raw=matter.stringify(body+'\n',{title,date:slot.slice(0,10),category,tags:[],author:'藍想会メディア編集部',excerpt:`${title}について、受診目安と注意点を整理します。`,...selectedImage,draft:true,reviewed:false,auto_approved:false,publication_status:'draft',medical_risk:topic.medical_risk??'medium',generation_run_id:typeof result.id==='string'?`openai:${result.id}`:'',source_topic_id:topic.id,source_topic_version:topicContentVersion(topic)})
+   const raw=serializeMwfArticle(body+'\n',{title,date:slot.slice(0,10),category,tags:[],author:'藍想会メディア編集部',excerpt:`${title}について、受診目安と注意点を整理します。`,...selectedImage,draft:true,reviewed:false,auto_approved:false,publication_status:'draft',medical_risk:topic.medical_risk??'medium',generation_run_id:typeof result.id==='string'?`openai:${result.id}`:'',source_topic_id:topic.id,source_topic_version:topicContentVersion(topic)})
    if(validatePostArtifact(`${slot.slice(0,10)}-synthetic.md`,raw,{imageExists:()=>true}).errors.length)return{status:'unknown'};return{status:'generated',raw}
   }catch{return{status:'unknown'}}
  }
  const git=({directory,args,input})=>{const result=spawnImpl('/usr/bin/git',args.map(v=>v==='delivery-origin'?ORIGIN:v),{cwd:directory,env:gitEnv,input,encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});return{ok:result.status===0&&!result.error,output:result.stdout??''}}
  const notify=async({path,contentVersion,published})=>{if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'};try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text:`${published?'本番側の独立審査済み記事の公開反映を確認しました。':'未審査記事を管理画面で確認できます。'}\n${path}\n内容版: ${contentVersion}\nhttps://aisoukai-media.vercel.app/admin/pending-review`,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}}
- return{root,version:env.MWF_RUNNER_VERSION,slot:currentMwfSlot(now()),select,adapters:{serverAuthority:true,generate,sync:createIsolatedSync({spool:join(root,'git-spool'),run:git}),reflect:item=>server().reflect(item),notify}}
+ return{root,version:env.MWF_RUNNER_VERSION,slot:currentMwfSlot(now()),select,minor:input=>server().minor(input),adapters:{serverAuthority:true,generate,sync:createIsolatedSync({spool:join(root,'git-spool'),run:git}),reflect:item=>server().reflect(item),notify}}
 }

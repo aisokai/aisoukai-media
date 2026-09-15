@@ -31,9 +31,10 @@ export function getDmpArticleState({ data = {}, content = '', adminDiscoverabili
     && data.reviewed_content_hash === contentVersion
   const autoApprovedExactVersion = assessTieredPublication(data, content, verificationSecret, publicationContext)
   const rejected = Boolean(data.rejection_reason)
-  const scheduledValue = data.publish_at ?? data.date ?? ''
-  const publishAt = scheduledValue instanceof Date ? scheduledValue.toISOString().slice(0,10) : String(scheduledValue)
-  const future = Boolean(today && publishAt && publishAt > today)
+  const future = Boolean(today && [data.date, data.publish_at].some(value => {
+    const day = value instanceof Date ? value.toISOString().slice(0,10) : String(value ?? '')
+    return day && day > today
+  }))
   const protectedData = isProtectedEditorialInput(data,content)
   const publishable = (approvedExactVersion || autoApprovedExactVersion) && !protectedData && !data.draft && !data.archived && !rejected && !future
   const reviewReady = !data.archived && !rejected
