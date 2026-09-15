@@ -48,3 +48,47 @@ test('server transport uses only existing native GitHub auth at the fixed origin
  await assert.rejects(transport('https://aisoukai-media.vercel.app/api/mwf',{}),{message:'server_auth_unavailable'})
  assert.deepEqual(calls,['auth','request','auth'])
 })
+
+test('native comparison rejects unknown historical listing without fetching article bytes or generating',async()=>{
+ const f=fixture(),spawn=f.options.spawnImpl;let bodyReads=0
+ f.options.spawnImpl=(command,args,options)=>{const endpoint=args[5]??'';if(endpoint.includes('/content/posts?'))return{status:0,stdout:JSON.stringify([{type:'file',path:'content/posts/2026-08-01-unknown.md',sha:'e'.repeat(40)}])};if(endpoint.includes('/content/posts/')){bodyReads++;throw Error('historical_body_read_forbidden')}return spawn(command,args,options)}
+ await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}})
+ assert.equal(bodyReads,0);assert.equal(f.calls.length,0)
+})
+
+test('explicit Tuesday recovery uses true elapsed Monday slot, filters one topic, default Tuesday stays retry only',async()=>{
+ const f=fixture();f.options.now=()=>new Date('2026-09-15T03:00:00Z');let result
+ await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(f.calls.length,0)
+ await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.items.length,1);assert.equal(result.items[0].topicId,'topic');assert.equal(result.items[0].slot,'2026-09-14T08:30:00+09:00');assert.equal(result.items[0].state,'notified')
+ f.options.now=()=>new Date('2026-09-17T03:00:00Z');await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.items[0].slot,'2026-09-14T08:30:00+09:00');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)
+})
+test('recovery cannot select another topic or execute unrelated queued work',async()=>{
+ const f=fixture(),store=openDeliveryStore(f.root)
+ store.save({id:'d'.repeat(64),slot:'2026-09-11T08:30:00+09:00',topicId:'other',state:'selected',stage:'generation'})
+ let result;await runMwfCli(['--production','--recover-topic','missing'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.items.length,0);assert.equal(result.lastSuccessAt,null);assert.equal(f.calls.length,0);assert.equal(store.read()[0].state,'selected')
+})
+test('occupied recovery slot fails before selection or paid work',async()=>{
+ const f=fixture(),store=openDeliveryStore(f.root);store.save({id:'d'.repeat(64),slot:'2026-09-14T08:30:00+09:00',topicId:'other',state:'selected',stage:'generation'})
+ let result;await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.intakeError,'slot_or_topic_already_reserved');assert.equal(f.calls.length,0);assert.equal(store.read().length,1)
+})
+test('metadata runtime check only GETs authenticated fixed diagnostics and emits allowlisted metadata',async()=>{
+ const f=fixture(),spawn=f.options.spawnImpl
+ f.options.spawnImpl=(command,args,options)=>args[0]==='auth'?{status:0,stdout:'synthetic_existing_github_identity\n'}:spawn(command,args,options)
+ let calls=0;f.options.fetchImpl=async(url,options)=>{calls++;assert.equal(url,'https://aisoukai-media.vercel.app/api/mwf');assert.equal(options.method,'GET');return{ok:true,url,redirected:false,json:async()=>({status:'server-authority',aiReviewerAvailable:false,adoptionCount:9,inventoryAnchor:f.options.inventoryAnchor,ignored:'must not emit'})}}
+ let result;assert.equal(await runMwfCli(['--production','--check-runtime'],{productionOptions:f.options,output:v=>result=v}),0)
+ assert.equal(calls,1);assert.equal(result.adoptionCount,9);assert.equal(result.serverReviewerAvailable,false);assert.equal(Object.hasOwn(result,'ignored'),false);assert.equal(openDeliveryStore(f.root).read().length,0);assert.equal(f.git.some(c=>c.args[0]==='push'),false)
+})
+
+test('targeted later-day recovery resumes saved artifact and its original slot without regenerating',async()=>{
+ const f=fixture(),spawn=f.options.spawnImpl
+ f.options.spawnImpl=(command,args,options)=>args[0]==='push'?{status:1,stdout:''}:spawn(command,args,options)
+ await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:()=>{}})
+ assert.equal(openDeliveryStore(f.root).read()[0].state,'sync-failed')
+ f.options.spawnImpl=spawn;f.options.now=()=>new Date('2026-09-17T03:00:00Z');let result
+ await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.items[0].state,'notified');assert.equal(result.items[0].slot,'2026-09-14T08:30:00+09:00');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)
+})

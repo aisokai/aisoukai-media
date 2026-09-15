@@ -12,7 +12,7 @@ export function validServerRequest(value,inventoryAnchor=MWF_INVENTORY_ANCHOR){
 export const semanticRequestKey=value=>value.operation==='minor-review'?serverHash(`minor-review:${value.artifactPath}:${value.baselineBlob}:${value.artifactBlob}`):serverHash(`${value.operation}:${value.topicId}:${value.topicVersion}${value.operation==='prepare'?`:${value.slot}`:''}`)
 // Public input is ONLY a request ID. Authority comes from fixed canonical GitHub
 // requests, real Human adoption and server validation, never caller decisions.
-export function createServerAuthority({readHead,readJson,commit,validate,review,reflect,owner=()=>randomUUID(),now=()=>new Date(),reviewerAvailable=()=>false,seal,unseal}){
+export function createServerAuthority({readHead,readJson,commit,validate,review,reflect,owner=()=>randomUUID(),now=()=>new Date(),reviewerAvailable=()=>false,recordArtifacts,seal,unseal}){
  async function load(id,ref){if(!HASH.test(id??''))throw Error('invalid_request');const value=await readJson(`data/mwf/requests/${id}.json`,ref);if(!validServerRequest(value)||serverRequestId(value)!==id)throw Error('invalid_request');return value}
  async function state(path,ref){try{const verified=unseal(await readJson(path,ref));if(!verified)throw Error('invalid_server_claim');return verified}catch(error){if(error?.code==='NOT_FOUND')return null;throw error}}
  async function status(id){try{const head=await readHead(),request=await load(id,head),claim=await state(`data/mwf/claims/${semanticRequestKey(request)}.json`,head);if(!claim||claim.requestId!==id)return{status:'pending',requestId:id};if(claim.status!=='done')return{status:'unknown',requestId:id};if(request.operation!=='prepare')return{...claim.result,requestId:id,...await reflect(request,claim.result,head)};const verified=await validate(request,head);if(!verified?.ok)return{status:'hold',reason:'prepare_evidence_stale',requestId:id};return{...claim.result,comparisonHash:verified.comparisonHash,requestId:id}}catch{return{status:'unavailable'}}}
@@ -38,7 +38,8 @@ export function createServerAuthority({readHead,readJson,commit,validate,review,
    if(files.some(file=>file.path!==request.artifactPath))throw Error('result_path_rejected')
    const rechecked=await validate(request,latest)
    if(!rechecked?.ok||rechecked.comparisonHash!==validated.comparisonHash||rechecked.publicationAllowed!==validated.publicationAllowed){result={status:'hold',reason:'input_changed'};files=[]}
-   const done={...claim,status:'done',result}
+   const artifactEntries=recordArtifacts&&['server-reviewed','draft-review-required'].includes(result.status)?await recordArtifacts(request,rechecked,files):[]
+   const done={...claim,comparisonEntries:[...claim.comparisonEntries,...artifactEntries],status:'done',result}
    await commit([...files,{path:claimPath,content:JSON.stringify(seal(done))+'\n'}],latest)
    return status(id)
   }catch{return{status:'unknown',requestId:id}}

@@ -10,6 +10,7 @@ export type GitHubFile = {
 }
 
 export type GitHubDirectoryEntry = {
+  sha: string
   name: string
   path: string
   type: 'file' | 'dir' | string

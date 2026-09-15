@@ -60,3 +60,11 @@ test('review replay across slots remains single-charge',async()=>{
  assert.equal((await authority.wake(id)).reason,'semantic_request_already_claimed')
  assert.equal(f.paid(),1)
 })
+
+test('completed draft with missing reviewer records exact artifact metadata in signed claim',async()=>{
+ const f=fixture(),entry={path:f.request.artifactPath,gitBlob:'e'.repeat(40)};let recorded=0
+ f.setAvailable(false);f.options.recordArtifacts=async(request,validated,files)=>{recorded++;assert.equal(request.artifactPath,entry.path);assert.deepEqual(files,[]);return[entry]}
+ await createServerAuthority(f.options).wake(f.id)
+ const claim=verifyBlogEvidence(f.files.get(`data/mwf/claims/${semanticRequestKey(f.request)}.json`),'mwf-server-claim',key)
+ assert.equal(recorded,1);assert.deepEqual(claim.comparisonEntries,[entry]);assert.equal(claim.result.status,'draft-review-required');assert.equal(f.paid(),0)
+})

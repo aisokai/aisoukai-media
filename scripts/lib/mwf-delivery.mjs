@@ -69,8 +69,8 @@ export function openDeliveryStore(root) {
     },
   }
 }
-export function deliveryStatus(store, now = new Date()) {
-  const items = store.read()
+export function deliveryStatus(store, now = new Date(), onlyTopic) {
+  const items = store.read().filter(i=>!onlyTopic||i.topicId===onlyTopic)
   let next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 30))
   next = new Date(+next - 86400000)
   while (+next <= +now || ![1,3,5].includes(new Date(+next + 9*3600000).getUTCDay())) next = new Date(+next + 86400000)
@@ -78,11 +78,13 @@ export function deliveryStatus(store, now = new Date()) {
     lastSuccessAt: items.filter(i => i.state === 'notified').map(i => i.notifiedAt).sort().at(-1) ?? null,
     items: items.map(({ id, slot, topicId, state, stage, updatedAt, contentVersion }) => ({ id, slot, topicId, state, stage, updatedAt, contentVersion })) }
 }
-export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret }) {
+export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic }) {
   const release = store.acquire()
   try {
     let items = store.read()
-    let intakeError = null
+    if(onlyTopic){const existing=items.find(i=>i.topicId===onlyTopic);if(existing)slot=existing.slot}
+    let intakeError = onlyTopic&&items.some(i=>i.slot===slot&&i.topicId!==onlyTopic)?'slot_or_topic_already_reserved':null
+    if(intakeError)retryOnly=true
     let candidateHolds = []
     let topic
     if (!retryOnly && select) {
@@ -100,6 +102,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
       if (!intakeError && !items.some(i => i.id === id)) { store.save({ id, slot, topicId, ...(topic ? { topic } : {}), state: 'selected', stage: 'generation' }); items = store.read() }
     }
     for (let item of items) {
+      if(onlyTopic&&item.topicId!==onlyTopic)continue
       const save = patch => { item = { ...item, ...patch }; store.save(item) }
       try {
         if (['notified','notification-unknown','generation-unknown','conflict'].includes(item.state)) continue
@@ -153,7 +156,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         save({ state: item.state === 'sending' ? 'notification-unknown' : item.state === 'generating' ? 'generation-unknown' : item.stage === 'sync' ? 'sync-failed' : 'pending-reflection' })
       }
     }
-    const status = deliveryStatus(store)
+    const status = deliveryStatus(store,new Date(),onlyTopic)
     return { ...status, intakeError, candidateHolds, ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
   } finally { release() }
 }

@@ -10,7 +10,6 @@ import {buildPendingReviewPost} from './posts'
 import {parseCsv} from '../../scripts/csv-parser.mjs'
 import {comparisonSet,metadataEntry,reviewCandidate} from '../../scripts/lib/mwf-inventory.mjs'
 import {validateMinorArtifacts,humanApprovalPath} from './mwfMinorAuthority.mjs'
-import {readPublicEditorialHead} from '../../scripts/mwf-inventory-metadata.mjs'
 import {createTieredReviewer} from '../../scripts/lib/mwf-tiered-review.mjs'
 
 type ServerRequest={operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string;baselineBlob?:string;proposalPath?:string}
@@ -27,13 +26,7 @@ export function createMwfServerRuntime(){
    const envelope=JSON.parse(file.bytes.toString('utf8')),payload=envelope.payload
    if(payload?.schema!==2||payload.entries?.length!==54||payload.entries.filter((e:{source:string})=>e.source==='local').length!==8||payload.quarantine?.length!==4||!/^[a-f0-9]{64}$/.test(payload.preservationHash)||!/^[a-f0-9]{64}$/.test(payload.reconciliationHash))throw Error('inventory_evidence_incomplete')
    for(const entry of payload.entries){
-    if(entry.source==='canonical'){
-     const original=await readGitHubBytes(entry.path,{ref:payload.canonicalRevision})
-     if(serverHash(original.bytes)!==entry.blob)throw Error('inventory_original_changed')
-     const head=entry.quarantine?await readPublicEditorialHead(`https://aisoukai-media.vercel.app/blog/${entry.path.slice(14,-3)}`):undefined
-     const verified=metadataEntry({path:entry.path,raw:original.bytes,source:'canonical',quarantine:entry.quarantine,head})
-     if(JSON.stringify(verified.metadata)!==JSON.stringify(entry.metadata)||!verified.metadata)throw Error('inventory_public_metadata_unverified')
-    }else if(entry.source!=='local'||!entry.metadata||isProtectedEditorialInput(entry.metadata))throw Error('inventory_local_metadata_unverified')
+    if(!['canonical','local'].includes(entry.source)||!entry.metadata||isProtectedEditorialInput(entry.metadata)||!/^[a-f0-9]{40}$/.test(entry.gitBlob)||!/^[a-f0-9]{64}$/.test(entry.blob))throw Error('inventory_metadata_unverified')
    }
    // Local-only metadata is bound to the reviewed exact full inventory anchor;
    // arbitrary unsigned uploads cannot replace or omit preserved entries.
@@ -49,8 +42,9 @@ export function createMwfServerRuntime(){
   const files=await readGitHubDirectory('content/posts',{ref})
   if(files.length>=1000)throw Error('canonical_listing_incomplete')
   for(const file of files){if(file.type!=='file')throw Error('unsupported_canonical_entry');if(file.path===exclude)continue
-   const current=await readGitHubBytes(file.path,{ref});if(entries.some(e=>e.path===file.path&&e.gitBlob===current.sha))continue
-   entries.push(metadataEntry({path:file.path,raw:current.bytes,source:'canonical',quarantine:baseline.entries.some((e:{path:string;quarantine:boolean})=>e.path===file.path&&e.quarantine),head:undefined}))
+   if(entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))continue
+   // Unknown historical changes require trusted metadata; never fetch their bodies.
+   throw Error('comparison_metadata_unavailable')
   }
   return comparisonSet(entries.filter(e=>e.path!==exclude).sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))
  }
@@ -94,6 +88,14 @@ export function createMwfServerRuntime(){
   commit:async(files:{path:string;content:string}[],head:string)=>commitGitHubFiles('MWF server authority transition',files,{expectedHeadSha:head}),
   seal:(value:unknown)=>signBlogEvidence('mwf-server-claim',value,secret),unseal:(value:unknown)=>verifyBlogEvidence(value,'mwf-server-claim',secret),
   validate,reviewerAvailable:()=>Boolean(process.env.OPENAI_API_KEY),
+  recordArtifacts:(request:ServerRequest,validated:Awaited<ReturnType<typeof validate>>,files:{path:string;content:string}[])=>{
+   if(!validated.ok)return[]
+   const raw=files.find(file=>file.path===request.artifactPath)?.content??(validated.kind==='normal'?validated.validatedBytes:undefined)
+   if(!raw)return[]
+   const entry=metadataEntry({path:request.artifactPath,raw,source:'canonical',head:undefined})
+   if(!entry.metadata||isProtectedEditorialInput(entry.metadata))throw Error('artifact_metadata_unavailable')
+   return[entry]
+  },
   review:async(request:ServerRequest,validated:Awaited<ReturnType<typeof validate>>)=>{
    if(!validated.ok)return{result:{status:'hold',reason:validated.reason},files:[]}
    if((validated.kind==='minor')!==(request.operation==='minor-review'))return{result:{status:'hold',reason:'review_kind_mismatch'},files:[]}

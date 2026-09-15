@@ -11,7 +11,7 @@ import {buildArticlePrompt} from '../prompts/dental-article-prompt.mjs'
 import {createIsolatedSync} from './mwf-isolated-sync.mjs'
 import {validatePostArtifact} from './post-artifact-validation.mjs'
 import {readOpaqueRegular} from '../mwf-inventory-metadata.mjs'
-import {inventoryHash,metadataEntry,comparisonSet} from './mwf-inventory.mjs'
+import {inventoryHash,comparisonSet} from './mwf-inventory.mjs'
 import {topicContentVersion,isProtectedEditorialInput} from '../../src/lib/tieredPublication.mjs'
 import {MWF_INVENTORY_ANCHOR} from '../../src/lib/mwfServerAuthority.mjs'
 import {createServerClient} from './mwf-server-client.mjs'
@@ -27,7 +27,12 @@ export function createGithubServerTransport({spawnImpl,native,request}){
   return request(url,{...options,headers:{...options.headers,Authorization:`Bearer ${auth.stdout.trim()}`}})
  }
 }
-export function createProductionRuntime({env=process.env,readText=path=>readFileSync(path,'utf8'),fetchImpl=fetch,spawnImpl=spawnSync,now=()=>new Date(),inventoryAnchor=MWF_INVENTORY_ANCHOR,serverClient}={}){
+export function latestElapsedMwfSlot(now=new Date()){
+ const local=new Date(+now+9*3600000);let slot=new Date(Date.UTC(local.getUTCFullYear(),local.getUTCMonth(),local.getUTCDate(),8,30)-9*3600000)
+ while(+slot>+now||![1,3,5].includes(new Date(+slot+9*3600000).getUTCDay()))slot=new Date(+slot-86400000)
+ return `${new Date(+slot+9*3600000).toISOString().slice(0,10)}T08:30:00+09:00`
+}
+export function createProductionRuntime({recoveryTopic,env=process.env,readText=path=>readFileSync(path,'utf8'),fetchImpl=fetch,spawnImpl=spawnSync,now=()=>new Date(),inventoryAnchor=MWF_INVENTORY_ANCHOR,serverClient}={}){
  for(const key of ['MWF_STATE_ROOT','MWF_TOPICS_PATH','MWF_INVENTORY_PATH','MWF_RUNNER_VERSION'])if(!env[key]?.trim())throw Error('production_configuration_missing')
  for(const key of ['MWF_STATE_ROOT','MWF_TOPICS_PATH','MWF_INVENTORY_PATH'])if(!env[key].startsWith('/'))throw Error('absolute_runtime_paths_required')
  if(!/^[a-f0-9]{40}$/.test(env.MWF_RUNNER_VERSION))throw Error('runner_version_required')
@@ -51,10 +56,11 @@ export function createProductionRuntime({env=process.env,readText=path=>readFile
  function server(){if(!client)client=serverClient??createServerClient({github,authenticateRequest,inventoryRaw:inventory().raw,inventoryAnchor});return client}
  function localComparisons(){const {data}=inventory();const entries=[...data.entries];for(const entry of entries.filter(e=>e.source==='local')){const path=join(env.MWF_PRESERVATION_DIR??'/Users/caelus/Library/Application Support/AisoukaiMWF/preservation/2026-09-14',basename(entry.path));if(inventoryHash(readOpaqueRegular(path))!==entry.blob)throw Error('preserved_artifact_changed')}
   const revision=github('GET','git/ref/heads/main').object.sha,listing=github('GET',`contents/content/posts?ref=${revision}`);if(!Array.isArray(listing)||listing.length>=1000)throw Error('comparison_listing_incomplete')
-  for(const file of listing){if(file.type!=='file')throw Error('comparison_listing_invalid');if(entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))continue;const encoded=github('GET',`contents/${file.path}?ref=${revision}`);if(encoded.encoding!=='base64')throw Error('comparison_encoding_invalid');entries.push(metadataEntry({path:file.path,raw:Buffer.from(encoded.content,'base64'),source:'canonical',quarantine:data.quarantine.includes(file.path)}))}
+
   let claims=[];try{claims=github('GET',`contents/data/mwf/claims?ref=${revision}`)}catch(error){if(error.code!=='NOT_FOUND')throw error}
   if(!Array.isArray(claims)||claims.length>500)throw Error('comparison_history_invalid')
   for(const claim of claims){if(claim.type!=='file'||!/^data\/mwf\/claims\/[a-f0-9]{64}\.json$/.test(claim.path))throw Error('comparison_history_invalid');const encoded=github('GET',`contents/${claim.path}?ref=${revision}`),record=JSON.parse(Buffer.from(encoded.content,'base64').toString('utf8'));for(const old of record.payload?.comparisonEntries??[])if(!entries.some(e=>e.path===old.path&&e.blob===old.blob))entries.push(old)}
+  for(const file of listing){if(file.type!=='file')throw Error('comparison_listing_invalid');if(!entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))throw Error('comparison_metadata_unavailable')}
   return comparisonSet(entries.sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))
  }
  function cached(key){try{return readOpaqueRegular(join(root,'mac-draft-prechecks.jsonl')).toString('utf8').split('\n').filter(Boolean).map(v=>JSON.parse(v)).filter(v=>v.key===key).at(-1)}catch(error){if(error.code==='ENOENT')return null;throw Error('draft_precheck_cache_invalid')}}
@@ -69,10 +75,10 @@ export function createProductionRuntime({env=process.env,readText=path=>readFile
   try{const response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-5-nano',max_completion_tokens:2000,reasoning_effort:'minimal',response_format:{type:'json_object'},messages:[{role:'system',content:'Check candidate against all supplied public editorial metadata. Return only {"decision":"clear"|"related"|"ambiguous"}. Missing context or possible overlap means ambiguous/related. This is ONLY permission to create an unreviewed draft, never publication approval.'},{role:'user',content:JSON.stringify({topic:{id:topic.id,title:topic.title_candidate??topic.title,category:topic.category,keyword:topic.target_keyword??topic.keyword},comparisons:data.entries.map(e=>({path:e.path,...e.metadata}))})}]})});const result=await response.json();const decision=JSON.parse(result.choices?.[0]?.message?.content??'{}');const answer={key,status:response.ok&&result.choices?.[0]?.finish_reason==='stop'&&decision.decision==='clear'?'clear':'hold',reason:'metadata_precheck'};remember(answer);return answer}catch{return{status:'hold',reason:'precheck_unknown'}}
  }
  const select=async({items,slot})=>{
-  const evidence=inventory().data,existing=items.find(i=>i.slot===slot);if(existing)return{topicId:existing.topicId,topic:existing.topic}
+  const evidence=inventory().data,existing=items.find(i=>recoveryTopic?i.topicId===recoveryTopic:i.slot===slot);if(existing)return{topicId:existing.topicId,topic:existing.topic}
   const rows=await csv(),ids=rows.map(r=>String(r.id??r.topic_id??''));if(new Set(ids).size!==ids.length)throw Error('duplicate_topic_ids')
   const used=new Set([...evidence.usedTopicIds,...items.map(i=>i.topicId)]),holds=[]
-  for(const row of rows){const topic={...row,id:String(row.id??row.topic_id??'')};if(!/^[A-Za-z0-9_-]{1,100}$/.test(topic.id)||used.has(topic.id)||topic.status!=='approved')continue
+  for(const row of rows){if(recoveryTopic&&String(row.id??row.topic_id??'')!==recoveryTopic)continue;const topic={...row,id:String(row.id??row.topic_id??'')};if(!/^[A-Za-z0-9_-]{1,100}$/.test(topic.id)||used.has(topic.id)||topic.status!=='approved')continue
    try{github('GET',`contents/data/topic-adoptions/${topic.id}.json?ref=main`)}catch{holds.push({topicId:topic.id,reason:'topic_adoption_unproven'});continue}
    const version=topicContentVersion(topic),prepared=await server().prepare({slot,topicId:topic.id,topicVersion:version})
    if(prepared.status!=='ready'||prepared.topicVersion!==version){holds.push({topicId:topic.id,reason:prepared.reason??'server_prepare_pending'});continue}
@@ -93,5 +99,9 @@ export function createProductionRuntime({env=process.env,readText=path=>readFile
  }
  const git=({directory,args,input})=>{const result=spawnImpl('/usr/bin/git',args.map(v=>v==='delivery-origin'?ORIGIN:v),{cwd:directory,env:gitEnv,input,encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});return{ok:result.status===0&&!result.error,output:result.stdout??''}}
  const notify=async({path,contentVersion,published})=>{if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'};try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text:`${published?'本番側の独立審査済み記事の公開反映を確認しました。':'未審査記事を管理画面で確認できます。'}\n${path}\n内容版: ${contentVersion}\nhttps://aisoukai-media.vercel.app/admin/pending-review`,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}}
- return{root,version:env.MWF_RUNNER_VERSION,slot:currentMwfSlot(now()),select,minor:input=>server().minor(input),adapters:{serverAuthority:true,generate,sync:createIsolatedSync({spool:join(root,'git-spool'),run:git}),reflect:item=>server().reflect(item),notify}}
+ async function checkRuntime(){
+  const local={runnerVersion:env.MWF_RUNNER_VERSION,generatorAvailable:Boolean(env.OPENAI_API_KEY),notificationAvailable:Boolean(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID)}
+  try{const response=await authenticateRequest('https://aisoukai-media.vercel.app/api/mwf',{method:'GET'});if(!response.ok||response.redirected||response.url!=='https://aisoukai-media.vercel.app/api/mwf')throw Error('unavailable');const result=await response.json();if(result.status!=='server-authority'||typeof result.aiReviewerAvailable!=='boolean'||!Number.isSafeInteger(result.adoptionCount)||result.adoptionCount<0||result.inventoryAnchor!==inventoryAnchor)throw Error('invalid');return{...local,status:'ready',serverReviewerAvailable:result.aiReviewerAvailable,adoptionCount:result.adoptionCount,inventoryAnchor:result.inventoryAnchor}}catch{return{...local,status:'server-unavailable'}}
+ }
+ return{root,version:env.MWF_RUNNER_VERSION,slot:recoveryTopic?latestElapsedMwfSlot(now()):currentMwfSlot(now()),checkRuntime,select,minor:input=>server().minor(input),adapters:{serverAuthority:true,generate,sync:createIsolatedSync({spool:join(root,'git-spool'),run:git}),reflect:item=>server().reflect(item),notify}}
 }
