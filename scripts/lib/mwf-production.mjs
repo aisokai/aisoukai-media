@@ -1,3 +1,4 @@
+import {classifyPrecheckResponse,projectPrecheckCache,PRECHECK_REQUEST_VERSION,buildPrecheckRequest,canRepairLegacyPrecheck} from './mwf-precheck.mjs'
 import {serializeMwfArticle} from '../../src/lib/mwfArticleSerialization.mjs'
 // Mac runtime: generation, unreviewed sync and notification only. No admin key,
 // approval signing or publication privilege is loaded or exercised here.
@@ -69,10 +70,12 @@ export function createProductionRuntime({recoveryTopic,env=process.env,readText=
   if(isProtectedEditorialInput(topic))return{status:'hold',reason:'protected_topic'}
   const data=localComparisons();if(data.hash!==comparisonHash)return{status:'hold',reason:'comparison_evidence_changed'};if(data.entries.some(e=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{status:'hold',reason:'comparison_metadata_incomplete'}
   if(data.entries.some(e=>e.metadata.source_topic_id===topic.id||e.metadata.title.normalize('NFKC').toLowerCase().replace(/\s/g,'')===String(topic.title_candidate??topic.title).normalize('NFKC').toLowerCase().replace(/\s/g,'')))return{status:'hold',reason:'duplicate_metadata'}
-  const key=inventoryHash(`${topicContentVersion(topic)}:${comparisonHash}`),old=cached(key);if(old)return old
+  const legacyKey=inventoryHash(`${topicContentVersion(topic)}:${comparisonHash}`),key=inventoryHash(`${PRECHECK_REQUEST_VERSION}:${legacyKey}`)
+  const current=cached(key);if(current)return current
+  const old=cached(legacyKey);if(old&&!canRepairLegacyPrecheck(old,legacyKey,topic,data.entries))return projectPrecheckCache(old)
   if(!env.OPENAI_API_KEY)return{status:'hold',reason:'generation_configuration_missing'}
   remember({key,status:'hold',reason:'precheck_unknown'})
-  try{const response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'gpt-5-nano',max_completion_tokens:2000,reasoning_effort:'minimal',response_format:{type:'json_object'},messages:[{role:'system',content:'Check candidate against all supplied public editorial metadata. Return only {"decision":"clear"|"related"|"ambiguous"}. Missing context or possible overlap means ambiguous/related. This is ONLY permission to create an unreviewed draft, never publication approval.'},{role:'user',content:JSON.stringify({topic:{id:topic.id,title:topic.title_candidate??topic.title,category:topic.category,keyword:topic.target_keyword??topic.keyword},comparisons:data.entries.map(e=>({path:e.path,...e.metadata}))})}]})});const result=await response.json();const decision=JSON.parse(result.choices?.[0]?.message?.content??'{}');const answer={key,status:response.ok&&result.choices?.[0]?.finish_reason==='stop'&&decision.decision==='clear'?'clear':'hold',reason:'metadata_precheck'};remember(answer);return answer}catch{return{status:'hold',reason:'precheck_unknown'}}
+  try{const response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(buildPrecheckRequest(topic,data.entries))});let result;try{result=await response.json()}catch{}const answer={key,...classifyPrecheckResponse(response.status,result)};remember(answer);return answer}catch{return{status:'hold',reason:'precheck_unknown'}}
  }
  const select=async({items,slot})=>{
   const evidence=inventory().data,existing=items.find(i=>recoveryTopic?i.topicId===recoveryTopic:i.slot===slot);if(existing)return{topicId:existing.topicId,topic:existing.topic}

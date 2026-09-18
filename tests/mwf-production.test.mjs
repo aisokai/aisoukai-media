@@ -24,7 +24,7 @@ function fixture(){
    return{status:0,stdout:JSON.stringify(value)}
   }
   git.push({args,options});const op=args[0];if(op==='status')return{status:0,stdout:''};if(op==='show')return{status:1,stdout:''};if(op==='hash-object'){raw=options.input;return{status:0,stdout:'b'.repeat(40)}};const path=openDeliveryStore(root).read()[0]?.path;return{status:0,stdout:op==='rev-parse'?'a'.repeat(40):op==='write-tree'?'c'.repeat(40):op==='commit-tree'?'d'.repeat(40):op==='diff-tree'?path:op==='ls-remote'?`${'d'.repeat(40)} refs/heads/main\n`:''}
- },fetchImpl:async(url,options)=>{calls.push({url,options});if(url.includes('openai.com')){const input=JSON.parse(options.body);return{ok:true,json:async()=>({id:'actual-generator',choices:[{finish_reason:'stop',message:{content:input.messages[0].role==='system'?'{"decision":"clear"}':'## Synthetic\nPublic editorial.'}}]})}}return{ok:true,json:async()=>({ok:true,result:{message_id:1}})}}}
+ },fetchImpl:async(url,options)=>{calls.push({url,options});if(url.includes('openai.com')){const input=JSON.parse(options.body);return{ok:true,status:200,json:async()=>({id:'actual-generator',choices:[{finish_reason:'stop',message:{content:input.messages[0].role==='system'?'{"decision":"clear"}':'## Synthetic\nPublic editorial.'}}]})}}return{ok:true,json:async()=>({ok:true,result:{message_id:1}})}}}
  return{root,options,calls,git,getRaw:()=>raw,setAdopted:v=>adopted=v,setReady:v=>serverReady=v,setPublished:v=>published=v,topic}
 }
 test('Mac without admin/GitHub secret generates only unreviewed draft, syncs using native helper and notifies exact server pending reflection',async()=>{const f=fixture();let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0);assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.doesNotMatch(f.getRaw(),/tiered_review_proof/);assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2);assert.equal(f.git.find(c=>c.args[0]==='push').options.env.GIT_CONFIG_VALUE_0,'!/opt/homebrew/bin/gh auth git-credential');assert.equal(result.items[0].state,'notified');await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)})
@@ -91,4 +91,29 @@ test('targeted later-day recovery resumes saved artifact and its original slot w
  f.options.spawnImpl=spawn;f.options.now=()=>new Date('2026-09-17T03:00:00Z');let result
  await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
  assert.equal(result.items[0].state,'notified');assert.equal(result.items[0].slot,'2026-09-14T08:30:00+09:00');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)
+})
+
+test('precheck provider rejection remains classified on replay without another call',async()=>{
+ const f=fixture();let calls=0,result
+ f.options.fetchImpl=async()=>{calls++;return{ok:false,status:400,json:async()=>({error:{code:'unsupported_value',message:'DO_NOT_EMIT'}})}}
+ for(let i=0;i<2;i++){await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(result.candidateHolds[0].reason,'precheck_request_rejected');assert.doesNotMatch(JSON.stringify(result),/DO_NOT_EMIT/)}
+ assert.equal(calls,1)
+})
+test('known cached unknown is retained without cache mutation or provider call',async()=>{
+ const {writeFileSync,readFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs')
+ const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'precheck_unknown'})+'\n'
+ writeFileSync(path,raw);let result
+ await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.candidateHolds[0].reason,'precheck_unknown');assert.equal(f.calls.length,0);assert.equal(readFileSync(path,'utf8'),raw)
+})
+
+test('proven invalid legacy request is repaired once under new key without changing old record',async()=>{
+ const {writeFileSync,readFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs')
+ for(const outcome of ['related','timeout']){
+ const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'metadata_precheck'})+'\n'
+ writeFileSync(path,raw);let calls=0,result
+ f.options.fetchImpl=async(url,options)=>{calls++;assert.ok(JSON.parse(options.body).messages.some(m=>/json/i.test(m.content)));if(outcome==='timeout')throw Error('synthetic timeout');return{status:200,ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{"decision":"related"}'}}]})}}
+ for(let i=0;i<2;i++)await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(calls,1);assert.equal(result.candidateHolds[0].reason,outcome==='related'?'precheck_related':'precheck_unknown');assert.ok(readFileSync(path,'utf8').startsWith(raw));assert.equal(openDeliveryStore(f.root).read().length,0)
+ }
 })
