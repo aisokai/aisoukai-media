@@ -4,12 +4,20 @@ export const serverHash=value=>createHash('sha256').update(typeof value==='strin
 const HASH=/^[a-f0-9]{64}$/
 export function serverRequestId(value){return serverHash(value)}
 export function validServerRequest(value,inventoryAnchor=MWF_INVENTORY_ANCHOR){
+ if(value?.schema===4)return Object.keys(value).sort().join(',')==='artifactBlob,artifactPath,inventoryHash,operation,schema'&&value.operation==='restore-reflect'&&/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(value.artifactPath)&&HASH.test(value.artifactBlob)&&value.inventoryHash===inventoryAnchor
+ if(value?.schema===3){
+  if(Object.keys(value).sort().join(',')!=='artifactBlob,artifactPath,inventoryHash,operation,publicationMode,schema,slot,topicId,topicVersion'||value.publicationMode!=='draft-only')return false
+  const ordinary=Object.fromEntries(Object.entries(value).filter(([key])=>key!=='publicationMode'))
+  const normalPath=value.operation==='review'?`content/posts/${value.slot?.slice(0,10)}-mwf-${serverHash(`${value.slot}\0${value.topicId}`)}.md`:null
+  if(!validServerRequest({...ordinary,schema:1,artifactPath:normalPath},inventoryAnchor))return false
+  return value.operation==='prepare'?value.artifactPath===null:value.artifactPath===`content/posts/${value.slot.slice(0,10)}-mwf-${serverHash(`backfill:v1\0${value.slot}\0${value.topicId}`)}.md`
+ }
  if(value?.schema===2)return Object.keys(value).sort().join(',')==='artifactBlob,artifactPath,baselineBlob,inventoryHash,operation,proposalPath,schema'&&value.operation==='minor-review'&&/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(value.artifactPath)&&HASH.test(value.artifactBlob)&&HASH.test(value.baselineBlob)&&value.proposalPath===`data/mwf/proposals/${value.artifactBlob}.json`&&value.inventoryHash===inventoryAnchor
  if(!value||Object.keys(value).sort().join(',')!=='artifactBlob,artifactPath,inventoryHash,operation,schema,slot,topicId,topicVersion'||value.schema!==1||!['prepare','review'].includes(value.operation)||!/^\d{4}-\d{2}-\d{2}T08:30:00\+09:00$/.test(value.slot)||!/^[A-Za-z0-9_-]{1,100}$/.test(value.topicId)||!HASH.test(value.topicVersion)||value.inventoryHash!==inventoryAnchor)return false
  const d=new Date(value.slot);if(!Number.isFinite(+d)||new Date(+d+9*3600000).toISOString().slice(0,10)!==value.slot.slice(0,10)||![1,3,5].includes(new Date(+d+9*3600000).getUTCDay()))return false
  return value.operation==='prepare'?value.artifactPath===null&&value.artifactBlob===null:value.artifactPath===`content/posts/${value.slot.slice(0,10)}-mwf-${serverHash(`${value.slot}\0${value.topicId}`)}.md`&&HASH.test(value.artifactBlob)
 }
-export const semanticRequestKey=value=>value.operation==='minor-review'?serverHash(`minor-review:${value.artifactPath}:${value.baselineBlob}:${value.artifactBlob}`):serverHash(`${value.operation}:${value.topicId}:${value.topicVersion}${value.operation==='prepare'?`:${value.slot}`:''}`)
+export const semanticRequestKey=value=>value.operation==='restore-reflect'?serverHash(`restore:${value.artifactPath}:${value.artifactBlob}`):value.operation==='minor-review'?serverHash(`minor-review:${value.artifactPath}:${value.baselineBlob}:${value.artifactBlob}`):serverHash(`${value.operation==='prepare'&&value.schema===3?'backfill-prepare':value.operation}:${value.topicId}:${value.topicVersion}${value.operation==='prepare'?`:${value.slot}`:''}`)
 // Public input is ONLY a request ID. Authority comes from fixed canonical GitHub
 // requests, real Human adoption and server validation, never caller decisions.
 export function createServerAuthority({readHead,readJson,commit,validate,review,reflect,owner=()=>randomUUID(),now=()=>new Date(),reviewerAvailable=()=>false,recordArtifacts,seal,unseal}){
@@ -28,6 +36,8 @@ export function createServerAuthority({readHead,readJson,commit,validate,review,
    if(actual?.owner!==claimOwner||actual.requestId!==id)return{status:'unknown',requestId:id}
    let result,files=[]
    if(request.operation==='prepare')result={status:'ready',topicId:request.topicId,topicVersion:request.topicVersion,comparisonHash:validated.comparisonHash}
+   else if(request.schema===4)result={status:'draft-review-required',reason:'preserved_draft_restored',artifactBlob:request.artifactBlob}
+   else if(request.schema===3)result={status:'draft-review-required',reason:'backfill_draft_only',artifactBlob:request.artifactBlob}
    else if(validated.publicationAllowed===false)result={status:'draft-review-required',reason:'topic_adoption_unproven',artifactBlob:request.artifactBlob}
    else if(!reviewerAvailable())result={status:'draft-review-required',reason:'server_reviewer_configuration_missing',artifactBlob:request.artifactBlob}
    else {const decision=await review(request,validated);result=decision.result;files=decision.files??[]}

@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import {readFileSync} from 'node:fs'
+import {validateRestoreManifest} from './lib/mwf-restoration.mjs'
+import {MWF_INVENTORY_ANCHOR} from '../src/lib/mwfServerAuthority.mjs'
+import {validateBackfillManifest} from './lib/mwf-backfill.mjs'
 // Deployment remains disabled until authenticated runtime capabilities are bound.
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +12,7 @@ import { openDeliveryStore, deliveryStatus, runDelivery } from './lib/mwf-delive
 export async function runMwfCli(args, { adapters, productionOptions, output = value => console.log(JSON.stringify(value)) } = {}) {
   const options = {}
   for (let i = 0; i < args.length; i++) {
-    if (['--state-root','--slot','--topic','--recover-topic'].includes(args[i])) {
+    if (['--state-root','--slot','--topic','--recover-topic','--backfill','--restore'].includes(args[i])) {
       if (!args[i+1] || args[i+1].startsWith('--')) throw new Error('missing_argument')
       options[args[i++].slice(2)] = args[i]
     } else if (['--status','--retry-only','--production','--check-runtime'].includes(args[i])) options[args[i].slice(2)] = true
@@ -17,6 +21,22 @@ export async function runMwfCli(args, { adapters, productionOptions, output = va
   if((options['recover-topic']||options['check-runtime'])&&!options.production)throw new Error('production_required')
   if(options['recover-topic']&&!/^[A-Za-z0-9_-]{1,100}$/.test(options['recover-topic']))throw new Error('invalid_recovery_topic')
   if(options['check-runtime']&&(options.status||options['recover-topic']||options['retry-only']))throw new Error('check_runtime_only')
+  if(options.restore){
+    if(!options.production||Object.keys(options).some(key=>!['production','restore'].includes(key)))throw Error('restore_options_invalid')
+    const plan=validateRestoreManifest(JSON.parse(readFileSync(options.restore,'utf8')),MWF_INVENTORY_ANCHOR),runtime=createProductionRuntime(productionOptions),store=openDeliveryStore(runtime.root),results=[]
+    for(const item of plan.items)results.push(await runtime.restore(store,item))
+    const ok=results.every(result=>result.state==='notified');output({status:'restore',publicationMode:'draft-only',ok,items:results.map(({path,blob,state})=>({path,blob,state}))});return ok?0:1
+  }
+  if(options.backfill){
+    if(!options.production||Object.keys(options).some(key=>!['production','backfill'].includes(key)))throw Error('backfill_options_invalid')
+    const plan=validateBackfillManifest(JSON.parse(readFileSync(options.backfill,'utf8')),productionOptions?.now?.()??new Date()),results=[]
+    for(const item of plan.items){
+      const backfill={...item,canonicalRevision:plan.canonicalRevision},runtime=createProductionRuntime({...productionOptions,recoveryTopic:item.topicId,backfill}),store=openDeliveryStore(runtime.root)
+      const result=await runDelivery({store,slot:runtime.slot,onlyTopic:item.topicId,backfill,adapters:runtime.adapters,select:runtime.select})
+      results.push({topicId:item.topicId,plannedDate:item.plannedDate,...result})
+    }
+    const ok=results.every(result=>result.ok);output({status:'backfill',publicationMode:'draft-only',ok,results});return ok?0:1
+  }
   let runtime
   if (options.production) {
     if (options.slot || options.topic || options['state-root']) throw new Error('production_identity_is_configured_only')

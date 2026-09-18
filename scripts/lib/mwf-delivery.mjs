@@ -1,3 +1,4 @@
+import {backfillId} from './mwf-backfill.mjs'
 // Durable, article-scoped delivery. No credentials, network or publication here.
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, openSync, writeSync, fsyncSync, closeSync, renameSync, existsSync } from 'node:fs'
@@ -78,12 +79,13 @@ export function deliveryStatus(store, now = new Date(), onlyTopic) {
     lastSuccessAt: items.filter(i => i.state === 'notified').map(i => i.notifiedAt).sort().at(-1) ?? null,
     items: items.map(({ id, slot, topicId, state, stage, updatedAt, contentVersion }) => ({ id, slot, topicId, state, stage, updatedAt, contentVersion })) }
 }
-export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic }) {
+export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic, backfill }) {
   const release = store.acquire()
   try {
     let items = store.read()
-    if(onlyTopic){const existing=items.find(i=>i.topicId===onlyTopic);if(existing)slot=existing.slot}
-    let intakeError = onlyTopic&&items.some(i=>i.slot===slot&&i.topicId!==onlyTopic)?'slot_or_topic_already_reserved':null
+    if(backfill){const existing=items.find(i=>i.topicId===onlyTopic);if(existing&&(existing.deliveryMode!=='backfill'||existing.slot!==slot||existing.topic?.serverTopicVersion!==backfill.topicVersion))return{...deliveryStatus(store,new Date(),onlyTopic),ok:false,intakeError:'backfill_existing_topic_conflict'}}
+    if(onlyTopic&&!backfill){const existing=items.find(i=>i.topicId===onlyTopic);if(existing)slot=existing.slot}
+    let intakeError = onlyTopic&&!backfill&&items.some(i=>i.deliveryMode!=='backfill'&&i.slot===slot&&i.topicId!==onlyTopic)?'slot_or_topic_already_reserved':null
     if(intakeError)retryOnly=true
     let candidateHolds = []
     let topic
@@ -96,13 +98,14 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
       } catch(error) { retryOnly = true; intakeError = ['candidate_configuration_missing','historical_inventory_evidence_missing','preserved_artifact_changed'].includes(error?.message)?error.message:'topic-intake-failed' }
     }
     if (!retryOnly) {
-      const id = deliveryId(slot, topicId)
+      const id = backfill?backfillId(slot,topicId):deliveryId(slot, topicId)
       // One topic per scheduled slot, and one scheduled generation per topic.
-      if (items.some(i => (i.slot === slot || i.topicId === topicId) && i.id !== id)) intakeError = 'slot_or_topic_already_reserved'
-      if (!intakeError && !items.some(i => i.id === id)) { store.save({ id, slot, topicId, ...(topic ? { topic } : {}), state: 'selected', stage: 'generation' }); items = store.read() }
+      if (items.some(i => ((!backfill&&i.deliveryMode!=='backfill'&&i.slot === slot) || i.topicId === topicId) && i.id !== id)) intakeError = 'slot_or_topic_already_reserved'
+      if (!intakeError && !items.some(i => i.id === id)) { store.save({ id, slot, topicId, ...(backfill?{deliveryMode:'backfill',plannedDate:backfill.plannedDate}:{}), ...(topic ? { topic } : {}), state: 'selected', stage: 'generation' }); items = store.read() }
     }
     for (let item of items) {
       if(onlyTopic&&item.topicId!==onlyTopic)continue
+      if(!onlyTopic&&['backfill','restore'].includes(item.deliveryMode))continue
       const save = patch => { item = { ...item, ...patch }; store.save(item) }
       try {
         if (['notified','notification-unknown','generation-unknown','conflict'].includes(item.state)) continue
@@ -119,11 +122,12 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
             raw = result.raw
             validateDraft(raw, verificationSecret)
             store.artifact(item.id, raw)
+            save({generatedAt:new Date().toISOString()})
           }
           save({ state: 'saved', stage: 'sync', ...validateDraft(raw, verificationSecret), path: `content/posts/${item.slot.slice(0,10)}-mwf-${item.id}.md` })
         }
         if (!raw || validateDraft(raw, verificationSecret).blob !== item.blob) throw new Error('artifact_mismatch')
-        if (item.state==='saved' && !item.reviewAttempted && adapters.review) {
+        if (item.deliveryMode!=='backfill' && item.state==='saved' && !item.reviewAttempted && adapters.review) {
           save({reviewAttempted:true,stage:'independent-review'})
           const reviewed=await adapters.review({raw,path:item.path,expectedBaseBlob:item.expectedBaseBlob})
           if (reviewed?.status==='certified') {
@@ -134,6 +138,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
           } else save({reviewReason:reviewed?.reason??'review_unavailable',stage:'sync'})
         }
         if (['saved','sync-failed'].includes(item.state)) {
+          if(item.deliveryMode==='backfill'&&item.certified===true)throw Error('backfill_must_remain_draft')
           const result = await adapters.sync({ ...item, raw })
           if (result?.status !== 'synced' || result.blob !== item.blob || !/^[a-f0-9]{40,64}$/.test(result.commit ?? '')) {
             save({ state: result?.status === 'conflict' ? 'conflict' : 'sync-failed', stage: 'sync' }); continue
@@ -143,7 +148,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         if (['pending-reflection','reviewable','notification-failed'].includes(item.state)) {
           const proof = await adapters.reflect(item)
           const serverProof=adapters.serverAuthority===true&&proof?.originBlob===item.blob&&ID.test(proof?.contentVersion??'')&&ID.test(proof?.blob??'')&&typeof proof?.published==='boolean'
-          if (proof?.authenticated !== true || proof.source !== 'production-admin' || proof.path !== item.path || (!serverProof&&(proof.contentVersion !== item.contentVersion || proof.blob !== item.blob || proof.published !== (item.certified===true))) || proof.reviewable !== true || (adapters.serverAuthority===true&&!serverProof)) {
+          if ((item.deliveryMode==='backfill'&&(proof?.published!==false||proof?.blob!==item.blob)) || proof?.authenticated !== true || proof.source !== 'production-admin' || proof.path !== item.path || (!serverProof&&(proof.contentVersion !== item.contentVersion || proof.blob !== item.blob || proof.published !== (item.certified===true))) || proof.reviewable !== true || (adapters.serverAuthority===true&&!serverProof)) {
             save({ state: 'pending-reflection', stage: 'reflection' }); continue
           }
           save({ state: 'reviewable', stage: 'notification', ...(serverProof?{deliveredBlob:proof.blob,deliveredContentVersion:proof.contentVersion,serverPublished:proof.published,reviewReason:proof.reason??null}:{}) })

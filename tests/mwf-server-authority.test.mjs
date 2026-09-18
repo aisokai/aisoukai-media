@@ -68,3 +68,10 @@ test('completed draft with missing reviewer records exact artifact metadata in s
  const claim=verifyBlogEvidence(f.files.get(`data/mwf/claims/${semanticRequestKey(f.request)}.json`),'mwf-server-claim',key)
  assert.equal(recorded,1);assert.deepEqual(claim.comparisonEntries,[entry]);assert.equal(claim.result.status,'draft-review-required');assert.equal(f.paid(),0)
 })
+
+test('backfill authority never invokes available reviewer and persists draft-only result',async()=>{
+ const f=fixture(),request={...f.request,schema:3,publicationMode:'draft-only',artifactPath:`content/posts/${f.request.slot.slice(0,10)}-mwf-${serverHash(`backfill:v1\0${f.request.slot}\0${f.request.topicId}`)}.md`},id=serverRequestId(request)
+ f.files.set(`data/mwf/requests/${id}.json`,request);f.options.reflect=async()=>({published:false,reviewable:true})
+ const result=await createServerAuthority(f.options).wake(id)
+ assert.equal(result.status,'draft-review-required');assert.equal(result.reason,'backfill_draft_only');assert.equal(result.published,false);assert.equal(f.paid(),0)
+})

@@ -27,8 +27,8 @@ export function createServerClient({github,inventoryRaw,inventoryAnchor=MWF_INVE
   }
  }
  async function call(id,wake=false){try{const url=wake?ENDPOINT:`${ENDPOINT}?requestId=${id}`,response=await authenticateRequest(url,{method:wake?'POST':'GET',...(wake?{headers:{'Content-Type':'application/json'},body:JSON.stringify({requestId:id})}:{})});if(!response.ok||response.redirected||response.url!==url||!/^application\/json(?:;|$)/i.test(response.headers.get('content-type')??''))return{status:'unavailable'};const result=await response.json();return result.requestId===id?result:{status:'unavailable'}}catch{return{status:'unknown'}}}
- async function prepare({slot,topicId,topicVersion}){const value={schema:1,operation:'prepare',slot,topicId,topicVersion,artifactPath:null,artifactBlob:null,inventoryHash:inventoryAnchor},id=await submit(value);const woken=await call(id,true);return woken.status==='hold'?woken:call(id)}
- async function reflect(item){const value={schema:1,operation:'review',slot:item.slot,topicId:item.topicId,topicVersion:item.topic?.serverTopicVersion??(item.topic?topicContentVersion(item.topic):item.sourceTopicVersion),artifactPath:item.path,artifactBlob:item.blob,inventoryHash:inventoryAnchor},id=await submit(value);await call(id,true);const result=await call(id);if(result.originBlob!==item.blob||result.path!==item.path)return{status:result.status};return result}
+ async function prepare({slot,topicId,topicVersion,publicationMode}){const value={schema:publicationMode==='draft-only'?3:1,...(publicationMode==='draft-only'?{publicationMode}:{}),operation:'prepare',slot,topicId,topicVersion,artifactPath:null,artifactBlob:null,inventoryHash:inventoryAnchor},id=await submit(value);const woken=await call(id,true);return woken.status==='hold'?woken:call(id)}
+ async function reflect(item){const value={schema:item.deliveryMode==='backfill'?3:1,...(item.deliveryMode==='backfill'?{publicationMode:'draft-only'}:{}),operation:'review',slot:item.slot,topicId:item.topicId,topicVersion:item.topic?.serverTopicVersion??(item.topic?topicContentVersion(item.topic):item.sourceTopicVersion),artifactPath:item.path,artifactBlob:item.blob,inventoryHash:inventoryAnchor},id=await submit(value);await call(id,true);const result=await call(id);if(result.originBlob!==item.blob||result.path!==item.path)return{status:result.status};return result}
  async function minor({proposalRaw}){
   const proposal=parseMinorProposal(proposalRaw);if(!proposal)throw Error('minor_proposal_invalid')
   const artifactBlob=serverHash(proposalRaw),value={schema:2,operation:'minor-review',artifactPath:proposal.artifactPath,baselineBlob:proposal.baselineBlob,artifactBlob,proposalPath:`data/mwf/proposals/${artifactBlob}.json`,inventoryHash:inventoryAnchor}
@@ -38,5 +38,6 @@ export function createServerClient({github,inventoryRaw,inventoryAnchor=MWF_INVE
   if(result.status==='server-reviewed'&&(result.authenticated!==true||result.path!==proposal.artifactPath||result.originBlob!==artifactBlob||result.published!==true||result.reviewable!==true||result.source!=='production-admin'||!/^[a-f0-9]{64}$/.test(result.blob??'')||!/^[a-f0-9]{64}$/.test(result.contentVersion??'')))return{status:'pending-reflection',requestId:id}
   return result
  }
- return{prepare,reflect,minor,submit,call}
+ async function restore(item){const value={schema:4,operation:'restore-reflect',artifactPath:item.path,artifactBlob:item.blob,inventoryHash:inventoryAnchor},id=await submit(value);await call(id,true);return call(id)}
+ return{prepare,reflect,minor,restore,submit,call}
 }

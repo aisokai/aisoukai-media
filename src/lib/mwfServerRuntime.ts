@@ -1,3 +1,5 @@
+import {isPreservedUnreviewedDraft} from '../../scripts/lib/mwf-restoration.mjs'
+import {approvedComparisonUpdates} from '../../scripts/lib/mwf-human-comparisons.mjs'
 import {serializeMwfArticle} from './mwfArticleSerialization.mjs'
 import {readFile} from 'node:fs/promises'
 import {join} from 'node:path'
@@ -12,7 +14,7 @@ import {comparisonSet,metadataEntry,reviewCandidate} from '../../scripts/lib/mwf
 import {validateMinorArtifacts,humanApprovalPath} from './mwfMinorAuthority.mjs'
 import {createTieredReviewer} from '../../scripts/lib/mwf-tiered-review.mjs'
 
-type ServerRequest={operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string;baselineBlob?:string;proposalPath?:string}
+type ServerRequest={schema?:number;publicationMode?:string;slot?:string;operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string;baselineBlob?:string;proposalPath?:string}
 const cache=new Map<string, Promise<ReturnType<typeof comparisonSet>>>()
 export function createMwfServerRuntime(){
  const secret=process.env.ADMIN_REVIEW_COOKIE_SECRET
@@ -38,18 +40,26 @@ export function createMwfServerRuntime(){
   const baseline=await baseInventory(),entries=[...baseline.entries]
   let history:Awaited<ReturnType<typeof readGitHubDirectory>>=[];try{history=await readGitHubDirectory('data/mwf/claims',{ref})}catch(error){if((error as {code?:string}).code!=='NOT_FOUND')throw error}
   if(history.length>500)throw Error('comparison_history_limit')
-  for(const file of history){if(file.type!=='file'||!/^data\/mwf\/claims\/[a-f0-9]{64}\.json$/.test(file.path))throw Error('history_path_invalid');const claim=verifyBlogEvidence(await json(file.path,ref),'mwf-server-claim',secret);if(!claim)throw Error('history_signature_invalid');for(const old of claim.comparisonEntries??[])if(!entries.some(e=>e.path===old.path&&e.blob===old.blob))entries.push(old)}
+  for(const file of history){if(file.type!=='file'||!/^data\/mwf\/claims\/[a-f0-9]{64}\.json$/.test(file.path))throw Error('history_path_invalid');const claim=verifyBlogEvidence(await json(file.path,ref),'mwf-server-claim',secret);if(!claim)throw Error('history_signature_invalid');for(const old of claim.comparisonEntries??[])if(!entries.some(e=>e.path===old.path&&e.blob===old.blob&&e.source===old.source))entries.push(old)}
   const files=await readGitHubDirectory('content/posts',{ref})
   if(files.length>=1000)throw Error('canonical_listing_incomplete')
-  for(const file of files){if(file.type!=='file')throw Error('unsupported_canonical_entry');if(file.path===exclude)continue
-   if(entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))continue
-   // Unknown historical changes require trusted metadata; never fetch their bodies.
-   throw Error('comparison_metadata_unavailable')
-  }
+  const relevant=files.filter(file=>file.path!==exclude)
+  if(relevant.some(file=>file.type!=='file'))throw Error('unsupported_canonical_entry')
+  entries.push(...await approvedComparisonUpdates({entries,files:relevant,
+   listReceipts:async()=>{try{return await readGitHubDirectory('data/mwf/human-approvals',{ref})}catch(error){if((error as {code?:string}).code==='NOT_FOUND')return[];throw error}},
+   readReceipt:(path:string)=>json(path,ref),verifyReceipt:(value:unknown)=>verifyBlogEvidence(value,'human-approved-baseline',secret),
+   readBytes:async(path:string)=>(await readGitHubBytes(path,{ref})).bytes}))
   return comparisonSet(entries.filter(e=>e.path!==exclude).sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))
  }
  async function validate(request:ServerRequest,ref:string){
   try{
+   if(request.operation==='restore-reflect'){
+    const set=await baseInventory(),entry=set.entries.find((e:{path:string;blob:string;source:string;quarantine:boolean})=>e.path===request.artifactPath&&e.blob===request.artifactBlob&&e.source==='local'&&!e.quarantine)
+    if(!entry)return{ok:false as const,reason:'preservation_unproven'}
+    const raw=(await readGitHubBytes(request.artifactPath!,{ref})).bytes
+    if(serverHash(raw)!==request.artifactBlob||!isPreservedUnreviewedDraft(raw,request.artifactPath))return{ok:false as const,reason:'preserved_draft_changed'}
+    return{ok:true as const,kind:'restore' as const,set,comparisonHash:set.hash,publicationAllowed:false,restoreEntry:{path:entry.path,source:'canonical',blob:entry.blob,gitBlob:entry.gitBlob,quarantine:false,metadata:entry.metadata}}
+   }
    if(request.operation==='minor-review'){
     const approval=await json(humanApprovalPath(request.baselineBlob),ref)
     const baselineBytes=(await readGitHubBytes(request.artifactPath!,{ref})).bytes,proposalBytes=(await readGitHubBytes(request.proposalPath!,{ref})).bytes
@@ -64,6 +74,7 @@ export function createMwfServerRuntime(){
    const evidence=verifyBlogEvidence(adoption,'teacher-topic-adoption',secret)
    const publicationAllowed=Boolean(topic&&topic.status==='approved'&&topicContentVersion(topic)===request.topicVersion&&!isProtectedEditorialInput(topic)&&evidence?.topicId===request.topicId&&evidence.topicVersion===request.topicVersion)
    if(request.operation==='prepare'&&!publicationAllowed)return{ok:false as const,reason:'topic_adoption_unproven'}
+   if(request.schema===3&&(topic?.publish_date!==request.slot?.slice(0,10)||new Date(request.slot!).getTime()>Date.now()))return{ok:false as const,reason:'backfill_date_mismatch'}
    const set=await comparisons(ref,request.artifactPath)
    if(set.entries.some((e:{metadata:unknown})=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{ok:false as const,reason:'comparison_metadata_incomplete'}
    if(request.operation==='prepare'&&set.entries.some((e:{metadata:{source_topic_id?:string;title:string}})=>e.metadata.source_topic_id===request.topicId||e.metadata.title.normalize('NFKC').toLowerCase().replace(/\s/g,'')===String(topic?.title_candidate??topic?.title).normalize('NFKC').toLowerCase().replace(/\s/g,'')))return{ok:false as const,reason:'duplicate_metadata'}
@@ -90,6 +101,7 @@ export function createMwfServerRuntime(){
   validate,reviewerAvailable:()=>Boolean(process.env.OPENAI_API_KEY),
   recordArtifacts:(request:ServerRequest,validated:Awaited<ReturnType<typeof validate>>,files:{path:string;content:string}[])=>{
    if(!validated.ok)return[]
+   if(validated.kind==='restore')return[validated.restoreEntry]
    const raw=files.find(file=>file.path===request.artifactPath)?.content??(validated.kind==='normal'?validated.validatedBytes:undefined)
    if(!raw)return[]
    const entry=metadataEntry({path:request.artifactPath,raw,source:'canonical',head:undefined})
@@ -98,6 +110,7 @@ export function createMwfServerRuntime(){
   },
   review:async(request:ServerRequest,validated:Awaited<ReturnType<typeof validate>>)=>{
    if(!validated.ok)return{result:{status:'hold',reason:validated.reason},files:[]}
+   if(validated.kind==='restore')return{result:{status:'draft-review-required',reason:'preserved_draft_restored'},files:[]}
    if((validated.kind==='minor')!==(request.operation==='minor-review'))return{result:{status:'hold',reason:'review_kind_mismatch'},files:[]}
    if(validated.kind==='minor'){
     const reviewer=createTieredReviewer({secret,request:provider,githubFile:text,getComparisons:async()=>validated.set})
@@ -115,6 +128,12 @@ export function createMwfServerRuntime(){
    return result.status==='certified'?{result:{status:'server-reviewed',artifactBlob:serverHash(result.raw)},files:[{path:request.artifactPath!,content:result.raw}]}:{result:{status:'draft-review-required',reason:result.reason},files:[]}
   },
   reflect:async(request:ServerRequest,result:{status:string;artifactBlob?:string},ref:string)=>{
+   if(request.operation==='restore-reflect'){
+    const checked=await validate(request,ref);if(!checked.ok||checked.kind!=='restore')return{reflection:'pending'}
+    const deployed=await readFile(join(process.cwd(),request.artifactPath!))
+    if(serverHash(deployed)!==request.artifactBlob||!isPreservedUnreviewedDraft(deployed,request.artifactPath))return{reflection:'pending'}
+    return{authenticated:true,source:'production-restore',path:request.artifactPath,originBlob:request.artifactBlob,blob:request.artifactBlob,artifactVersion:request.artifactBlob,reviewable:true,published:false,sourceRevision:ref}
+   }
    if(!['server-reviewed','draft-review-required'].includes(result.status))return{}
    const raw=(await readGitHubBytes(request.artifactPath!,{ref})).bytes
    if(request.operation==='minor-review'&&result.status!=='server-reviewed')return{}

@@ -144,3 +144,25 @@ test('ambiguous reason in legacy key does not acquire current request provenance
  await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
  assert.equal(result.items.length,0);assert.equal(result.candidateHolds[0].reason,'precheck_ambiguous');assert.equal(f.calls.length,0);assert.equal(readFileSync(path,'utf8'),raw)
 })
+
+test('Mac selects next topic after Human approval using receipts and metadata only',async()=>{
+ const {metadataEntry}=await import('../scripts/lib/mwf-inventory.mjs'),{signBlogEvidence}=await import('../src/lib/tieredPublication.mjs')
+ const f=fixture(),spawn=f.options.spawnImpl,path='content/posts/2026-09-18-existing.md',old=Buffer.from('---\ntitle: Prior\nexcerpt: Prior excerpt\ncategory: その他\nreviewed: false\n---\nSynthetic body'),raw=Buffer.from(old.toString().replace('reviewed: false','reviewed: true')),entry=metadataEntry({path,raw:old,source:'canonical'}),approved=metadataEntry({path,raw,source:'canonical'})
+ const inventoryRaw=JSON.stringify({payload:{schema:2,entries:[entry],quarantine:[],usedTopicIds:[]}}),receipt=signBlogEvidence('human-approved-baseline',{path,rawVersion:inventoryHash(raw),contentVersion:'a'.repeat(64),humanAction:'authenticated_admin_approve',reviewedBy:'Synthetic',reviewedAt:'2026-09-19T01:00:00Z'},'synthetic'),receiptPath=`data/mwf/human-approvals/${inventoryHash(raw)}.json`
+ f.options.readText=()=>inventoryRaw;f.options.inventoryAnchor=inventoryHash(inventoryRaw);f.options.serverClient.prepare=async({topicVersion})=>({status:'ready',topicVersion,comparisonHash:comparisonSet([entry,approved].sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`))).hash})
+ let bodyReads=0
+ f.options.spawnImpl=(command,args,options)=>{const endpoint=args[5]??'';if(endpoint.includes('contents/content/posts?'))return{status:0,stdout:JSON.stringify([{type:'file',path,sha:approved.gitBlob}])};if(endpoint.includes('contents/content/posts/')){bodyReads++;throw Error('forbidden_body_read')};if(endpoint.includes('human-approvals?'))return{status:0,stdout:JSON.stringify([{type:'file',path:receiptPath}])};if(endpoint.includes(receiptPath))return{status:0,stdout:JSON.stringify({encoding:'base64',content:Buffer.from(JSON.stringify(receipt)).toString('base64')})};return spawn(command,args,options)}
+ let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0);assert.equal(result.items[0].state,'notified');assert.equal(bodyReads,0)
+})
+
+test('backfill CLI pins planned date and topic version and passes draft-only through prepare and reflection',async()=>{
+ const {writeFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs')
+ const f=fixture(),spawn=f.options.spawnImpl,topic={id:'MONTHLY-202609TOPIC008',title:'Synthetic',category:'その他',status:'approved',publish_date:'2026-09-18'},topicVersion=topicContentVersion(topic),file=join(f.root,'backfill-plan.json')
+ writeFileSync(file,JSON.stringify({schema:1,publicationMode:'draft-only',canonicalRevision:'a'.repeat(40),items:[{topicId:topic.id,plannedDate:topic.publish_date,topicVersion}]}))
+ f.options.now=()=>new Date('2026-09-19T03:00:00Z')
+ f.options.spawnImpl=(command,args,options)=>{if((args[5]??'').includes('article-topics')){assert.ok(args[5].endsWith(`ref=${'a'.repeat(40)}`));return{status:0,stdout:JSON.stringify({encoding:'base64',content:Buffer.from(`id,title,category,status,publish_date\n${topic.id},Synthetic,その他,approved,2026-09-18\n`).toString('base64')})}}return spawn(command,args,options)}
+ f.options.serverClient.prepare=async value=>{assert.equal(value.publicationMode,'draft-only');assert.equal(value.topicVersion,topicVersion);return{status:'ready',topicVersion,comparisonHash:comparisonSet([]).hash}}
+ const reflect=f.options.serverClient.reflect;f.options.serverClient.reflect=async item=>{assert.equal(item.deliveryMode,'backfill');return reflect(item)}
+ let result;for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production','--backfill',file],{productionOptions:f.options,output:v=>result=v}),0)
+ assert.equal(result.results.length,1);assert.match(f.getRaw(),/date: "2026-09-18"/);assert.match(f.getRaw(),/draft: true/);assert.equal(openDeliveryStore(f.root).read()[0].deliveryMode,'backfill');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)
+})
