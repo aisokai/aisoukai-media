@@ -36,3 +36,17 @@ test('legacy repair requires exact key, unclassified hold and no JSON in any rec
  for(const reason of ['precheck_related','precheck_ambiguous','precheck_unknown','precheck_request_rejected'])assert.equal(canRepairLegacyPrecheck({...record,reason},'same',topic,[]),false)
  assert.equal(canRepairLegacyPrecheck({...record,status:'clear'},'same',topic,[]),false)
 })
+
+test('only completed classified HTTP200 ambiguous admits draft-only; no other hold is weakened',async()=>{
+ const {precheckDraftDisposition}=await import('../scripts/lib/mwf-precheck.mjs')
+ assert.equal(precheckDraftDisposition({...classifyPrecheckResponse(200,response('ambiguous')),requestVersion:'json-context-v2'}),'draft_only')
+ assert.equal(precheckDraftDisposition(classifyPrecheckResponse(200,response('clear'))),'clear')
+ for(const result of [classifyPrecheckResponse(200,response('related')),classifyPrecheckResponse(400,response('ambiguous')),classifyPrecheckResponse(500,{}),{status:'hold',reason:'legacy_precheck_unclassified'},{status:'hold',reason:'precheck_ambiguous'},{status:'hold',reason:'precheck_ambiguous',httpStatus:200}, {status:'hold',reason:'duplicate_metadata'}])assert.equal(precheckDraftDisposition(result),'hold')
+})
+
+test('independent publication candidate reviewer still holds ambiguous even when provider is available',async()=>{
+ const {reviewCandidate,comparisonSet}=await import('../scripts/lib/mwf-inventory.mjs'),{issueTopicAdoption}=await import('../src/lib/tieredPublication.mjs')
+ const topic={id:'synthetic',title:'Synthetic',status:'approved'},secret='synthetic-independent',adoption=issueTopicAdoption(topic,secret);let calls=0
+ const result=await reviewCandidate({topic,set:comparisonSet([]),adoption,secret,request:async()=>{calls++;return{ok:true,json:async()=>({id:'independent-review',choices:[{finish_reason:'stop',message:{content:'{"decision":"ambiguous"}'}}]})}}})
+ assert.equal(calls,1);assert.equal(result.status,'hold');assert.equal(result.reason,'ambiguous');assert.equal(result.receipt,undefined)
+})

@@ -1,4 +1,4 @@
-import {classifyPrecheckResponse,projectPrecheckCache,PRECHECK_REQUEST_VERSION,buildPrecheckRequest,canRepairLegacyPrecheck} from './mwf-precheck.mjs'
+import {precheckDraftDisposition,classifyPrecheckResponse,projectPrecheckCache,PRECHECK_REQUEST_VERSION,buildPrecheckRequest,canRepairLegacyPrecheck} from './mwf-precheck.mjs'
 import {serializeMwfArticle} from '../../src/lib/mwfArticleSerialization.mjs'
 // Mac runtime: generation, unreviewed sync and notification only. No admin key,
 // approval signing or publication privilege is loaded or exercised here.
@@ -71,11 +71,11 @@ export function createProductionRuntime({recoveryTopic,env=process.env,readText=
   const data=localComparisons();if(data.hash!==comparisonHash)return{status:'hold',reason:'comparison_evidence_changed'};if(data.entries.some(e=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{status:'hold',reason:'comparison_metadata_incomplete'}
   if(data.entries.some(e=>e.metadata.source_topic_id===topic.id||e.metadata.title.normalize('NFKC').toLowerCase().replace(/\s/g,'')===String(topic.title_candidate??topic.title).normalize('NFKC').toLowerCase().replace(/\s/g,'')))return{status:'hold',reason:'duplicate_metadata'}
   const legacyKey=inventoryHash(`${topicContentVersion(topic)}:${comparisonHash}`),key=inventoryHash(`${PRECHECK_REQUEST_VERSION}:${legacyKey}`)
-  const current=cached(key);if(current)return current
-  const old=cached(legacyKey);if(old&&!canRepairLegacyPrecheck(old,legacyKey,topic,data.entries))return projectPrecheckCache(old)
+  const current=cached(key);if(current)return{...current,requestVersion:PRECHECK_REQUEST_VERSION}
+  const old=cached(legacyKey);if(old&&!canRepairLegacyPrecheck(old,legacyKey,topic,data.entries))return{...projectPrecheckCache(old),requestVersion:'legacy'}
   if(!env.OPENAI_API_KEY)return{status:'hold',reason:'generation_configuration_missing'}
   remember({key,status:'hold',reason:'precheck_unknown'})
-  try{const response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(buildPrecheckRequest(topic,data.entries))});let result;try{result=await response.json()}catch{}const answer={key,...classifyPrecheckResponse(response.status,result)};remember(answer);return answer}catch{return{status:'hold',reason:'precheck_unknown'}}
+  try{const response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'},body:JSON.stringify(buildPrecheckRequest(topic,data.entries))});let result;try{result=await response.json()}catch{}const answer={key,requestVersion:PRECHECK_REQUEST_VERSION,...classifyPrecheckResponse(response.status,result)};remember(answer);return answer}catch{return{status:'hold',reason:'precheck_unknown'}}
  }
  const select=async({items,slot})=>{
   const evidence=inventory().data,existing=items.find(i=>recoveryTopic?i.topicId===recoveryTopic:i.slot===slot);if(existing)return{topicId:existing.topicId,topic:existing.topic}
@@ -85,14 +85,14 @@ export function createProductionRuntime({recoveryTopic,env=process.env,readText=
    try{github('GET',`contents/data/topic-adoptions/${topic.id}.json?ref=main`)}catch{holds.push({topicId:topic.id,reason:'topic_adoption_unproven'});continue}
    const version=topicContentVersion(topic),prepared=await server().prepare({slot,topicId:topic.id,topicVersion:version})
    if(prepared.status!=='ready'||prepared.topicVersion!==version){holds.push({topicId:topic.id,reason:prepared.reason??'server_prepare_pending'});continue}
-   const checked=await precheck(topic,prepared.comparisonHash);if(checked.status!=='clear'){holds.push({topicId:topic.id,reason:checked.reason});continue}
-   return{topicId:topic.id,topic:{...topic,serverTopicVersion:version},holds}
+   const checked=await precheck(topic,prepared.comparisonHash),disposition=precheckDraftDisposition(checked);if(disposition==='hold'){holds.push({topicId:topic.id,reason:checked.reason});continue}
+   return{topicId:topic.id,topic:{...topic,serverTopicVersion:version,...(disposition==='draft_only'?{metadataReviewReason:'metadata_review_required'}:{})},holds}
   }return{holdOnly:true,holds}
  }
  async function approvedImage(){try{const file=github('GET','contents/data/image-library.json?ref=main'),library=JSON.parse(Buffer.from(file.content,'base64').toString('utf8'));const image=library.images?.find(i=>['approved','verified'].includes(i.license_status)&&i.license_source&&i.license_note&&!/TODO|要確認|assumed/i.test(i.license_note)&&i.alt&&/^\/images\/[A-Za-z0-9_./-]+$/.test(i.path)&&!i.path.includes('..')&&i.usage_status!=='inactive');return image?{image:image.path,image_alt:image.alt}:{image:''}}catch{return{image:''}}}
  const generate=async({slot,topic,idempotencyKey})=>{
   if(!topic||isProtectedEditorialInput(topic)||!env.OPENAI_API_KEY)return{status:'not-generated'}
-  const prepared=await server().prepare({slot,topicId:topic.id,topicVersion:topicContentVersion(topic)});if(prepared.status!=='ready'||prepared.topicVersion!==topicContentVersion(topic)||(await precheck(topic,prepared.comparisonHash)).status!=='clear')return{status:'not-generated'}
+  const prepared=await server().prepare({slot,topicId:topic.id,topicVersion:topicContentVersion(topic)});if(prepared.status!=='ready'||prepared.topicVersion!==topicContentVersion(topic)||precheckDraftDisposition(await precheck(topic,prepared.comparisonHash))==='hold')return{status:'not-generated'}
   const title=String(topic.title_candidate??topic.title??'').trim(),category=String(topic.category??'その他');if(!title)return{status:'not-generated'}
   try{const prompt=buildArticlePrompt({title,category,keyword:topic.target_keyword??topic.keyword??'',intent:topic.patient_intent??'',medicalRisk:topic.medical_risk??'medium',topic:topic.topic??title}),response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json','X-Client-Request-Id':idempotencyKey},body:JSON.stringify({model:'gpt-5-nano',max_completion_tokens:4000,reasoning_effort:'minimal',messages:[{role:'user',content:prompt}]})});if(!response.ok)return{status:[400,401,403,404,429].includes(response.status)?'not-generated':'unknown'};const result=await response.json(),body=result.choices?.[0]?.message?.content;if(!body||result.choices[0].finish_reason!=='stop')return{status:'unknown'}
    const selectedImage=await approvedImage()

@@ -33,3 +33,10 @@ export function canRepairLegacyPrecheck(record,legacyKey,topic,entries){
   return request.response_format.type==='json_object'&&request.messages.every(m=>typeof m.content==='string'&&!/json/i.test(m.content))
  }catch{return false}
 }
+
+// Draft eligibility is separate from independent publication review.
+export function precheckDraftDisposition(result){
+ if(result?.status==='clear')return'clear'
+ if(result?.status==='hold'&&result.reason==='precheck_ambiguous'&&result.httpStatus===200&&result.requestVersion===PRECHECK_REQUEST_VERSION)return'draft_only'
+ return'hold'
+}

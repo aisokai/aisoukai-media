@@ -117,3 +117,30 @@ test('proven invalid legacy request is repaired once under new key without chang
  assert.equal(calls,1);assert.equal(result.candidateHolds[0].reason,outcome==='related'?'precheck_related':'precheck_unknown');assert.ok(readFileSync(path,'utf8').startsWith(raw));assert.equal(openDeliveryStore(f.root).read().length,0)
  }
 })
+
+test('cached ambiguous creates one unreviewed draft and review request after exact server reflection without rechecking provider',async()=>{
+ const {writeFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs'),{PRECHECK_REQUEST_VERSION}=await import('../scripts/lib/mwf-precheck.mjs')
+ const f=fixture(),legacyKey=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),key=inventoryHash(`${PRECHECK_REQUEST_VERSION}:${legacyKey}`)
+ writeFileSync(join(f.root,'mac-draft-prechecks.jsonl'),JSON.stringify({key,status:'hold',reason:'precheck_ambiguous',httpStatus:200,errorCode:'unknown'})+'\n')
+ let result
+ for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0)
+ assert.equal(result.items.length,1);assert.equal(result.items[0].state,'notified');assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.match(f.getRaw(),/auto_approved: false/);assert.doesNotMatch(f.getRaw(),/tiered_review_proof/)
+ const item=openDeliveryStore(f.root).read()[0];assert.equal(item.topic.metadataReviewReason,'metadata_review_required');assert.equal(item.serverPublished,false);assert.equal(item.deliveredBlob,item.blob)
+ assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,1);assert.equal(f.calls.filter(c=>c.url.includes('telegram')).length,1);assert.match(f.calls.at(-1).options.body,/未審査記事/)
+})
+test('related, rejected and unknown prechecks never generate',async()=>{
+ for(const kind of ['related','http','unknown']){
+ const f=fixture();let calls=0,result
+ f.options.fetchImpl=async()=>{calls++;return{status:kind==='http'?400:200,ok:kind!=='http',json:async()=>kind==='related'?{choices:[{finish_reason:'stop',message:{content:'{"decision":"related"}'}}]}:{}}}
+ await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(calls,1);assert.equal(result.items.length,0);assert.equal(f.getRaw(),undefined);assert.equal(f.git.some(c=>c.args[0]==='push'),false)
+ }
+})
+
+test('ambiguous reason in legacy key does not acquire current request provenance or draft eligibility',async()=>{
+ const {writeFileSync,readFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs')
+ const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'precheck_ambiguous',httpStatus:200,requestVersion:'json-context-v2'})+'\n'
+ writeFileSync(path,raw);let result
+ await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
+ assert.equal(result.items.length,0);assert.equal(result.candidateHolds[0].reason,'precheck_ambiguous');assert.equal(f.calls.length,0);assert.equal(readFileSync(path,'utf8'),raw)
+})
