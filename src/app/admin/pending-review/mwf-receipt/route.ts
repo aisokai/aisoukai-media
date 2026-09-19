@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { readDeployedPostFile } from '@/lib/deployedPostFile.mjs'
 import { requireAdmin } from '@/lib/adminAuth'
 import { getPendingReviewPostsForAdminWithSource } from '@/lib/posts'
 import { readGitHubFile } from '@/lib/githubContents'
@@ -12,5 +11,5 @@ export const GET = createMwfReceiptHandler({
   authenticate: requireAdmin,
   readAdminSource: getPendingReviewPostsForAdminWithSource,
   readFile: readGitHubFile,
-  readDeployedFile: (path: string) => readFile(join(process.cwd(), path), 'utf8'),
+  readDeployedFile: async (path: string) => (await readDeployedPostFile(path)).toString('utf8'),
 })

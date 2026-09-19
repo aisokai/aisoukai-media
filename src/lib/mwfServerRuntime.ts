@@ -1,8 +1,7 @@
 import {isPreservedUnreviewedDraft} from '../../scripts/lib/mwf-restoration.mjs'
 import {approvedComparisonUpdates} from '../../scripts/lib/mwf-human-comparisons.mjs'
 import {serializeMwfArticle} from './mwfArticleSerialization.mjs'
-import {readFile} from 'node:fs/promises'
-import {join} from 'node:path'
+import {readDeployedPostFile} from './deployedPostFile.mjs'
 import matter from 'gray-matter'
 import {readGitHubFile,readGitHubBytes,readGitHubDirectory,readGitHubBranchHead,commitGitHubFiles} from './githubContents'
 import {createServerAuthority,MWF_INVENTORY_ANCHOR,serverHash,decodeBoundArticle} from './mwfServerAuthority.mjs'
@@ -130,7 +129,7 @@ export function createMwfServerRuntime(){
   reflect:async(request:ServerRequest,result:{status:string;artifactBlob?:string},ref:string)=>{
    if(request.operation==='restore-reflect'){
     const checked=await validate(request,ref);if(!checked.ok||checked.kind!=='restore')return{reflection:'pending'}
-    const deployed=await readFile(join(process.cwd(),request.artifactPath!))
+    const deployed=await readDeployedPostFile(request.artifactPath!)
     if(serverHash(deployed)!==request.artifactBlob||!isPreservedUnreviewedDraft(deployed,request.artifactPath))return{reflection:'pending'}
     return{authenticated:true,source:'production-restore',path:request.artifactPath,originBlob:request.artifactBlob,blob:request.artifactBlob,artifactVersion:request.artifactBlob,reviewable:true,published:false,sourceRevision:ref}
    }
@@ -144,7 +143,7 @@ export function createMwfServerRuntime(){
    const topic=request.operation==='minor-review'?undefined:parseCsv(await text('data/article-topics.sample.csv',ref)).find((t:Record<string,string>)=>t.id===request.topicId)
    const state=getDmpArticleState({data:parsed.data,content:parsed.content,verificationSecret:secret,publicationContext:{path:request.artifactPath,topic},today:new Date(Date.now()+9*3600000).toISOString().slice(0,10)})
    if(isProtectedEditorialInput(parsed.data,parsed.content)||parsed.data.archived||parsed.data.rejection_reason)return{}
-   const deployed=await readFile(join(process.cwd(),request.artifactPath!));if(serverHash(deployed)!==serverHash(raw))return{reflection:'pending'}
+   const deployed=await readDeployedPostFile(request.artifactPath!);if(serverHash(deployed)!==serverHash(raw))return{reflection:'pending'}
    if(!state.publishable){
     if(serverHash(raw)!==request.artifactBlob||parsed.data.draft!==true||parsed.data.reviewed!==false||parsed.data.auto_approved!==false)return{reflection:'pending'}
     // Render only this hash-validated new draft through the admin's own mapper.
