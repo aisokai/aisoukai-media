@@ -2838,6 +2838,146 @@
       "license_source": "院内提供",
       "license_note": "先生が_inboxへ投入した画像（assumed_approved運用）",
       "note": "歯科模型に装着された固定式口蓋拡大装置"
+    },
+    {
+      "id": "whitening-home-office-comparison",
+      "path": "/images/library/preventive/whitening-home-office-comparison.png",
+      "category": "preventive",
+      "tags": [
+        "ホワイトニング",
+        "ホームホワイトニング",
+        "オフィスホワイトニング"
+      ],
+      "alt": "自宅用ホワイトニングトレーと歯科医院での施術を左右に示した生成イメージ",
+      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+      "license_status": "pending_review",
+      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "content_sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+      "git_blob": "2a46446398939351c99e92f51c01d2138930ed94",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "preventive/whitening-home-office-comparison.png",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "draft_use_authorization": {
+        "topic_id": "topic_95d698adee249438",
+        "content_sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+        "evidence": "teacher_20260920_apply_saved_blog_images_and_reuse_shortage_routine"
+      },
+      "topic_assignment": {
+        "topic_id": "topic_95d698adee249438",
+        "title": "ホームホワイトニングとオフィスホワイトニング何がどう違うの?",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-application-20260920.md",
+        "article_path": "content/posts/2026-08-01-canonical-746f7069635f39356436393861646565323439343338.md"
+      }
+    },
+    {
+      "id": "whitening-treatment-planning",
+      "path": "/images/library/preventive/whitening-treatment-planning.png",
+      "category": "preventive",
+      "tags": [
+        "ホワイトニング",
+        "回数",
+        "治療計画"
+      ],
+      "alt": "カレンダーとシェードガイドを使い、ホワイトニングの計画を相談する生成イメージ",
+      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+      "license_status": "pending_review",
+      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "content_sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+      "git_blob": "b65c998402f92aeff5021fdceae2e90a0d9809ab",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "preventive/whitening-treatment-planning.png",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "draft_use_authorization": {
+        "topic_id": "topic_97c2646daf2490c0",
+        "content_sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+        "evidence": "teacher_20260920_apply_saved_blog_images_and_reuse_shortage_routine"
+      },
+      "topic_assignment": {
+        "topic_id": "topic_97c2646daf2490c0",
+        "title": "【何回通えば白くなる?】ホワイトニングの回数",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-application-20260920.md",
+        "article_path": "content/posts/2026-08-01-canonical-746f7069635f39376332363436646166323439306330.md"
+      }
+    },
+    {
+      "id": "gingival-recession-comparison",
+      "path": "/images/library/periodontal/gingival-recession-comparison.png",
+      "category": "periodontal",
+      "tags": [
+        "歯肉退縮",
+        "歯ぐき",
+        "歯根露出"
+      ],
+      "alt": "歯肉の位置と歯根の露出の違いを左右に示した歯肉退縮の模式図",
+      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+      "license_status": "pending_review",
+      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "content_sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+      "git_blob": "60dbc9d61f5dbf2e50efc46bc1b5605b9fbe4c8d",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "periodontal/gingival-recession-comparison.png",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "draft_use_authorization": {
+        "topic_id": "MONTHLY-202609TOPIC019",
+        "content_sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+        "evidence": "teacher_20260920_apply_saved_blog_images_and_reuse_shortage_routine"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC019",
+        "title": "歯ぐきが下がった気がするときに考えられる原因",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-application-20260920.md",
+        "article_path": "content/posts/2026-09-14-mwf-dc9cb641217214c197f4d5ea0036cb1507f44a028229779fc21fd6515e859687.md"
+      }
+    },
+    {
+      "id": "primary-tooth-caries-progression",
+      "path": "/images/library/pediatric/primary-tooth-caries-progression.png",
+      "category": "pediatric",
+      "tags": [
+        "乳歯",
+        "虫歯",
+        "進行"
+      ],
+      "alt": "虫歯が歯の表面から内部へ進む様子を三段階で示した説明用の模式図",
+      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+      "license_status": "pending_review",
+      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "content_sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+      "git_blob": "961cff46ccbd3f61dee5fb13bb453fe8c12672fd",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "pediatric/primary-tooth-caries-progression.png",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "draft_use_authorization": {
+        "topic_id": "MONTHLY-202609TOPIC020",
+        "content_sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+        "evidence": "teacher_20260920_apply_saved_blog_images_and_reuse_shortage_routine"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC020",
+        "title": "乳歯の虫歯は放置してもいい？受診が必要な理由",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-application-20260920.md",
+        "article_path": "content/posts/2026-09-16-mwf-65d2546f7886459bf227361374bf323d3b9f22b32e8b1d1d736d79ad7bc3c19d.md"
+      }
     }
   ]
 }

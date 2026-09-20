@@ -1,3 +1,4 @@
+import {selectMwfImage,imageShortage,imageShortageNotice} from './mwf-images.mjs'
 import {restorePreservedDraft,syncPreservedDraft} from './mwf-restoration.mjs'
 import {approvedComparisonUpdates} from './mwf-human-comparisons.mjs'
 import {precheckDraftDisposition,classifyPrecheckResponse,projectPrecheckCache,PRECHECK_REQUEST_VERSION,buildPrecheckRequest,canRepairLegacyPrecheck} from './mwf-precheck.mjs'
@@ -47,7 +48,7 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
  if(identity.status!==0||identity.stdout.trim()!==env.MWF_RUNNER_VERSION||clean.status!==0||clean.stdout.trim())throw Error('runner_version_mismatch')
  const request=(url,options)=>fetchImpl(url,{...options,redirect:'error',signal:AbortSignal.timeout(url.includes('openai.com')?180000:300000)})
  function github(method,path,body){
-  if(!['GET','POST','PATCH'].includes(method)||!(/^(?:contents\/(?:data\/[A-Za-z0-9_./-]+|content\/posts(?:\/\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]+\.md)?)(?:\?ref=(?:main|[a-f0-9]{40}))?|git\/(?:ref\/heads\/main|refs\/heads\/main|commits(?:\/[a-f0-9]{40})?|trees|blobs))$/.test(path))||path.includes('..'))throw Error('github_scope_rejected')
+  if(!['GET','POST','PATCH'].includes(method)||!(/^(?:contents\/(?:data\/[A-Za-z0-9_./-]+|content\/posts(?:\/\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]+\.md)?)(?:\?ref=(?:main|[a-f0-9]{40}))?|git\/(?:ref\/heads\/main|refs\/heads\/main|commits(?:\/[a-f0-9]{40})?|trees(?:\/[a-f0-9]{40}\?recursive=1)?|blobs))$/.test(path))||path.includes('..'))throw Error('github_scope_rejected')
   const result=spawnImpl('/opt/homebrew/bin/gh',['api','--hostname','github.com','--method',method,`repos/aisokai/aisoukai-media/${path}`,...(body?['--input','-']:[])],{env:native,input:body?JSON.stringify(body):undefined,encoding:'utf8',timeout:30000,maxBuffer:16*1024*1024,stdio:['pipe','pipe','pipe']})
   if(result.status!==0||result.error){const missing=/HTTP 404/.test(result.stderr??'');throw Object.assign(Error('github_operation_failed'),{code:missing?'NOT_FOUND':'FAILED'})}
   try{return JSON.parse(result.stdout)}catch{throw Error('github_response_invalid')}
@@ -95,19 +96,31 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
    return{topicId:topic.id,topic:{...topic,serverTopicVersion:version,...(disposition==='draft_only'?{metadataReviewReason:'metadata_review_required'}:{})},holds}
   }return{holdOnly:true,holds}
  }
- async function approvedImage(){try{const file=github('GET','contents/data/image-library.json?ref=main'),library=JSON.parse(Buffer.from(file.content,'base64').toString('utf8'));const image=library.images?.find(i=>['approved','verified'].includes(i.license_status)&&i.license_source&&i.license_note&&!/TODO|要確認|assumed/i.test(i.license_note)&&i.alt&&/^\/images\/[A-Za-z0-9_./-]+$/.test(i.path)&&!i.path.includes('..')&&i.usage_status!=='inactive');return image?{image:image.path,image_alt:image.alt}:{image:''}}catch{return{image:''}}}
+ async function approvedImage(topic){try{
+  const revision=github('GET','git/ref/heads/main').object.sha
+  if(!/^[a-f0-9]{40}$/.test(revision))return imageShortage('image_inventory_unavailable')
+  const file=github('GET',`contents/data/image-library.json?ref=${revision}`)
+  if(file.encoding!=='base64')return imageShortage('invalid_image_library_or_topic')
+  const library=JSON.parse(Buffer.from(file.content,'base64').toString('utf8'))
+  // Avoid tree retrieval when there is no vetted mapping for this topic.
+  if(!library.images?.some(i=>i?.topic_assignment?.topic_id===topic.id))return imageShortage()
+  const tree=github('GET',`git/trees/${revision}?recursive=1`)
+  return selectMwfImage(library,topic,tree)
+ }catch{return imageShortage('image_inventory_unavailable')}}
+
  const generate=async({slot,topic,idempotencyKey})=>{
   if(!topic||isProtectedEditorialInput(topic)||!env.OPENAI_API_KEY)return{status:'not-generated'}
   const prepared=await server().prepare({slot,publicationMode:backfill?'draft-only':undefined,topicId:topic.id,topicVersion:topicContentVersion(topic)});if(prepared.status!=='ready'||prepared.topicVersion!==topicContentVersion(topic)||precheckDraftDisposition(await precheck(topic,prepared.comparisonHash))==='hold')return{status:'not-generated'}
   const title=String(topic.title_candidate??topic.title??'').trim(),category=String(topic.category??'その他');if(!title)return{status:'not-generated'}
   try{const prompt=buildArticlePrompt({title,category,keyword:topic.target_keyword??topic.keyword??'',intent:topic.patient_intent??'',medicalRisk:topic.medical_risk??'medium',topic:topic.topic??title}),response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json','X-Client-Request-Id':idempotencyKey},body:JSON.stringify({model:'gpt-5-nano',max_completion_tokens:4000,reasoning_effort:'minimal',messages:[{role:'user',content:prompt}]})});if(!response.ok)return{status:[400,401,403,404,429].includes(response.status)?'not-generated':'unknown'};const result=await response.json(),body=result.choices?.[0]?.message?.content;if(!body||result.choices[0].finish_reason!=='stop')return{status:'unknown'}
-   const selectedImage=await approvedImage()
+   const selectedImage=await approvedImage(topic)
    const raw=serializeMwfArticle(body+'\n',{title,date:slot.slice(0,10),category,tags:[],author:'藍想会メディア編集部',excerpt:`${title}について、受診目安と注意点を整理します。`,...selectedImage,draft:true,reviewed:false,auto_approved:false,publication_status:'draft',medical_risk:topic.medical_risk??'medium',generation_run_id:typeof result.id==='string'?`openai:${result.id}`:'',source_topic_id:topic.id,source_topic_version:topicContentVersion(topic)})
    if(validatePostArtifact(`${slot.slice(0,10)}-synthetic.md`,raw,{imageExists:()=>true}).errors.length)return{status:'unknown'};return{status:'generated',raw}
   }catch{return{status:'unknown'}}
  }
  const git=({directory,args,input})=>{const result=spawnImpl('/usr/bin/git',args.map(v=>v==='delivery-origin'?ORIGIN:v),{cwd:directory,env:gitEnv,input,encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});return{ok:result.status===0&&!result.error,output:result.stdout??''}}
- const notify=async({path,contentVersion,artifactVersion,published})=>{if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'};try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text:`${published?'本番側の独立審査済み記事の公開反映を確認しました。':'未審査記事を管理画面で確認できます。'}\n${path}\n${artifactVersion?'保存原本SHA256':'内容版'}: ${artifactVersion??contentVersion}\nhttps://aisoukai-media.vercel.app/admin/pending-review`,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}}
+ function shortageNotice(id,published){if(published||!/^[a-f0-9]{64}$/.test(id??''))return '';try{return imageShortageNotice(readOpaqueRegular(join(root,'artifacts',`${id}.md`)).toString('utf8'))}catch{return ''}}
+ const notify=async({idempotencyKey,path,contentVersion,artifactVersion,published})=>{if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'};try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text:`${published?'本番側の独立審査済み記事の公開反映を確認しました。':'未審査記事を管理画面で確認できます。'}\n${path}\n${artifactVersion?'保存原本SHA256':'内容版'}: ${artifactVersion??contentVersion}${shortageNotice(idempotencyKey,published)}\nhttps://aisoukai-media.vercel.app/admin/pending-review`,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}}
  async function checkRuntime(){
   const local={runnerVersion:env.MWF_RUNNER_VERSION,generatorAvailable:Boolean(env.OPENAI_API_KEY),notificationAvailable:Boolean(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID)}
   try{const response=await authenticateRequest('https://aisoukai-media.vercel.app/api/mwf',{method:'GET'});if(!response.ok||response.redirected||response.url!=='https://aisoukai-media.vercel.app/api/mwf')throw Error('unavailable');const result=await response.json();if(result.status!=='server-authority'||typeof result.aiReviewerAvailable!=='boolean'||!Number.isSafeInteger(result.adoptionCount)||result.adoptionCount<0||result.inventoryAnchor!==inventoryAnchor)throw Error('invalid');return{...local,status:'ready',serverReviewerAvailable:result.aiReviewerAvailable,adoptionCount:result.adoptionCount,inventoryAnchor:result.inventoryAnchor}}catch{return{...local,status:'server-unavailable'}}

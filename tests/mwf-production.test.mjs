@@ -166,3 +166,29 @@ test('backfill CLI pins planned date and topic version and passes draft-only thr
  let result;for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production','--backfill',file],{productionOptions:f.options,output:v=>result=v}),0)
  assert.equal(result.results.length,1);assert.match(f.getRaw(),/date: "2026-09-18"/);assert.match(f.getRaw(),/draft: true/);assert.equal(openDeliveryStore(f.root).read()[0].deliveryMode,'backfill');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)
 })
+
+test('runtime persists missing image status and reports shortage on existing review request', async()=>{
+ const f=fixture()
+ await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}})
+ assert.match(f.getRaw(),/image: ""/)
+ assert.match(f.getRaw(),/image_selection_status: "missing"/)
+ assert.match(f.calls.find(c=>c.url.includes('telegram')).options.body,/画像不足/)
+ assert.equal(f.calls.filter(c=>c.url.includes('telegram')).length,1)
+})
+test('runtime pins image mapping and file metadata to one revision and selects only exact topic',async()=>{
+ const f=fixture(),spawn=f.options.spawnImpl,revision='a'.repeat(40),imagePath='/images/library/general/synthetic.png'
+ const asset={path:imagePath,alt:'Synthetic exact image',license_status:'pending_review',content_sha256:'b'.repeat(64),git_blob:'c'.repeat(40),topic_assignment:{topic_id:'topic',title:'Synthetic',status:'visually_matched',evidence:'synthetic_visual_check'},draft_use_authorization:{topic_id:'topic',content_sha256:'b'.repeat(64),evidence:'synthetic_permission'}}
+ let treeCalls=0
+ f.options.spawnImpl=(command,args,options)=>{
+  const endpoint=args[5]??''
+  if(endpoint.includes('contents/data/image-library.json')){assert.ok(endpoint.endsWith(`ref=${revision}`));return{status:0,stdout:JSON.stringify({encoding:'base64',content:Buffer.from(JSON.stringify({images:[asset]})).toString('base64')})}}
+  if(endpoint.includes('git/trees/')){assert.ok(endpoint.endsWith(`${revision}?recursive=1`));treeCalls++;return{status:0,stdout:JSON.stringify({truncated:false,tree:[{path:`public${imagePath}`,type:'blob',mode:'100644',sha:asset.git_blob}]})}}
+  return spawn(command,args,options)
+ }
+ await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}})
+ assert.match(f.getRaw(),/image: "\/images\/library\/general\/synthetic.png"/)
+ assert.match(f.getRaw(),/image_selection_status: "assigned_pending_review"/)
+ assert.match(f.getRaw(),/reviewed: false/)
+ assert.doesNotMatch(f.calls.find(c=>c.url.includes('telegram')).options.body,/画像不足/)
+ assert.equal(treeCalls,1)
+})
