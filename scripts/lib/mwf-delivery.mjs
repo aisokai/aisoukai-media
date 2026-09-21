@@ -47,6 +47,16 @@ export function openDeliveryStore(root) {
       }
       return Object.values(items)
     },
+    intakeNotice(slot, notice) {
+      deliveryId(slot, 'intake-notice')
+      const path=join(root,'intake-notifications.jsonl')
+      if(notice!==undefined){append(path,{slot,status:notice,updatedAt:new Date().toISOString()});return notice}
+      if(!existsSync(path))return null
+      const raw=readFileSync(path,'utf8');if(raw&&!raw.endsWith('\n'))throw Error('intake_notice_journal_incomplete')
+      const records=raw.split('\n').filter(Boolean).map(line=>JSON.parse(line))
+      if(records.some(record=>!['sending','sent','not-sent','unknown'].includes(record.status)))throw Error('intake_notice_journal_invalid')
+      return records.filter(record=>record.slot===slot).at(-1)?.status??null
+    },
     save(item) { append(journal, { ...item, updatedAt: new Date().toISOString() }) },
     artifact(id, raw, reviewed = false) {
       if (!ID.test(id)) throw new Error('invalid_id')
@@ -161,7 +171,19 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         save({ state: item.state === 'sending' ? 'notification-unknown' : item.state === 'generating' ? 'generation-unknown' : item.stage === 'sync' ? 'sync-failed' : 'pending-reflection' })
       }
     }
+    let intakeNotification
+    if(intakeError&&slot&&!backfill&&adapters.notifyIntake&&store.intakeNotice){
+      // The exclusive run lock and durable pre-send state prevent repeat sends,
+      // including a timeout or process death after Telegram may have accepted it.
+      const previous=store.intakeNotice(slot)
+      if(previous)intakeNotification=previous==='sending'?'unknown':previous
+      else{
+        store.intakeNotice(slot,'sending')
+        try{const notice=await adapters.notifyIntake({slot,reason:intakeError,heldCount:candidateHolds.length});intakeNotification=['sent','not-sent'].includes(notice?.status)?notice.status:'unknown'}catch{intakeNotification='unknown'}
+        store.intakeNotice(slot,intakeNotification)
+      }
+    }
     const status = deliveryStatus(store,new Date(),onlyTopic)
-    return { ...status, intakeError, candidateHolds, ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
+    return { ...status, intakeError, candidateHolds, ...(intakeNotification?{intakeNotification}:{}), ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
   } finally { release() }
 }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 type GitHubConfig = {
   token: string
   repo: string
@@ -184,4 +185,32 @@ export async function readGitHubBytes(path: string, { ref }: { ref?: string } = 
     { headers: githubHeaders(token) }, 'GitHub read artifact bytes')
   if (json.encoding !== 'base64') throw new Error('GitHub artifact encoding unsupported')
   return { bytes: Buffer.from(json.content, 'base64'), sha: json.sha }
+}
+
+// Opaque historical bytes identified by authenticated inventory/claim metadata.
+// No article decoding and no unbounded repository path or arbitrary destination.
+export async function readGitHubBlobBytes(sha: string): Promise<Buffer> {
+  if (!/^[a-f0-9]{40}$/.test(sha)) throw new Error('invalid_git_blob')
+  const { token, repo } = getGitHubConfig()
+  const json = await readJson<{ content: string; sha: string; encoding: string }>(
+    `https://api.github.com/repos/${repo}/git/blobs/${sha}`,
+    { headers: githubHeaders(token) }, 'GitHub read comparison baseline')
+  if (json.encoding !== 'base64' || json.sha !== sha) throw new Error('invalid_git_blob_response')
+  return Buffer.from(json.content, 'base64')
+}
+
+// Search only this known article's bounded history at the pinned branch head.
+// A signed Human receipt, not commit metadata, authenticates the returned bytes.
+export async function readGitHubApprovedBaselineBytes(path: string, rawVersion: string, ref: string): Promise<Buffer> {
+  if (!/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(path) || !/^[a-f0-9]{64}$/.test(rawVersion) || !/^[a-f0-9]{40}$/.test(ref)) throw new Error('invalid_approved_baseline_request')
+  const { token, repo } = getGitHubConfig()
+  const history = await readJson<{ sha: string }[]>(
+    `https://api.github.com/repos/${repo}/commits?path=${encodeURIComponent(path)}&sha=${ref}&per_page=20`,
+    { headers: githubHeaders(token) }, 'GitHub read bounded article history')
+  if (!Array.isArray(history) || history.length > 20 || history.some(item => !/^[a-f0-9]{40}$/.test(item.sha))) throw new Error('invalid_approved_baseline_history')
+  for (const item of history) {
+    const { bytes } = await readGitHubBytes(path, { ref: item.sha })
+    if (createHash('sha256').update(bytes).digest('hex') === rawVersion) return bytes
+  }
+  throw new Error('approved_baseline_not_found')
 }

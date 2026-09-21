@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os'
 import {createProductionRuntime,createGithubServerTransport} from '../scripts/lib/mwf-production.mjs'
 import {runMwfCli} from '../scripts/ops-mwf.mjs'
 import {openDeliveryStore} from '../scripts/lib/mwf-delivery.mjs'
+import {comparisonProjection} from '../scripts/lib/mwf-human-comparisons.mjs'
 import {inventoryHash,comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
 function fixture(){
  const root=mkdtempSync(join(tmpdir(),'mwf-mac-server-')),inventoryRaw=JSON.stringify({unsigned:true,payload:{schema:2,entries:[],quarantine:[],usedTopicIds:[]}}),calls=[],git=[],topic={id:'topic',title:'Synthetic',category:'その他',status:'approved'}
@@ -28,10 +29,10 @@ function fixture(){
  return{root,options,calls,git,getRaw:()=>raw,setAdopted:v=>adopted=v,setReady:v=>serverReady=v,setPublished:v=>published=v,topic}
 }
 test('Mac without admin/GitHub secret generates only unreviewed draft, syncs using native helper and notifies exact server pending reflection',async()=>{const f=fixture();let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0);assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.doesNotMatch(f.getRaw(),/tiered_review_proof/);assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2);assert.equal(f.git.find(c=>c.args[0]==='push').options.env.GIT_CONFIG_VALUE_0,'!/opt/homebrew/bin/gh auth git-credential');assert.equal(result.items[0].state,'notified');await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)})
-test('missing adoption holds without mailbox writes/provider calls; stale server ready prevents generation',async()=>{const f=fixture();f.setAdopted(false);let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),1);assert.equal(result.candidateHolds[0].reason,'topic_adoption_unproven');assert.equal(f.calls.length,0);assert.equal(f.git.some(c=>c.args[0]==='push'),false);f.setAdopted(true);f.setReady(false);await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(f.calls.length,0)})
+test('missing adoption sends one intake alert without generation; stale server ready prevents generation',async()=>{const f=fixture();f.setAdopted(false);let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),1);assert.equal(result.candidateHolds[0].reason,'topic_adoption_unproven');assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0);assert.equal(f.git.some(c=>c.args[0]==='push'),false);f.setAdopted(true);f.setReady(false);await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0)})
 test('server-verified published bytes can differ from original draft but must bind its origin hash',async()=>{const f=fixture();f.setPublished(true);assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}}),0);const item=openDeliveryStore(f.root).read()[0];assert.equal(item.deliveredBlob,'e'.repeat(64));assert.equal(item.serverPublished,true);assert.match(f.calls.at(-1).options.body,/公開反映/)})
 test('saved sync retry continues with broken new intake and no regeneration',async()=>{const f=fixture(),spawn=f.options.spawnImpl;f.options.spawnImpl=(c,a,o)=>a[0]==='push'?{status:1,stdout:''}:spawn(c,a,o);await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(openDeliveryStore(f.root).read()[0].state,'sync-failed');f.options.spawnImpl=spawn;f.options.readText=()=>{throw Error('broken inventory')};delete f.options.env.OPENAI_API_KEY;await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(openDeliveryStore(f.root).read()[0].state,'notified');assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)})
-test('protected candidate is rejected before any generation transport',async()=>{const f=fixture(),runtime=createProductionRuntime(f.options);const result=await runtime.adapters.generate({slot:runtime.slot,topic:{...f.topic,sensitive_data:'true'},idempotencyKey:'synthetic'});assert.equal(result.status,'not-generated');assert.equal(f.calls.length,0)})
+test('protected candidate is rejected before any generation transport',async()=>{const f=fixture(),runtime=createProductionRuntime(f.options);const result=await runtime.adapters.generate({slot:runtime.slot,topic:{...f.topic,sensitive_data:'true'},idempotencyKey:'synthetic'});assert.equal(result.status,'not-generated');assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0)})
 
 
 test('server transport uses only existing native GitHub auth at the fixed origin and never forwards failure details',async()=>{
@@ -53,12 +54,12 @@ test('native comparison rejects unknown historical listing without fetching arti
  const f=fixture(),spawn=f.options.spawnImpl;let bodyReads=0
  f.options.spawnImpl=(command,args,options)=>{const endpoint=args[5]??'';if(endpoint.includes('/content/posts?'))return{status:0,stdout:JSON.stringify([{type:'file',path:'content/posts/2026-08-01-unknown.md',sha:'e'.repeat(40)}])};if(endpoint.includes('/content/posts/')){bodyReads++;throw Error('historical_body_read_forbidden')}return spawn(command,args,options)}
  await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}})
- assert.equal(bodyReads,0);assert.equal(f.calls.length,0)
+ assert.equal(bodyReads,0);assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0)
 })
 
 test('explicit Tuesday recovery uses true elapsed Monday slot, filters one topic, default Tuesday stays retry only',async()=>{
  const f=fixture();f.options.now=()=>new Date('2026-09-15T03:00:00Z');let result
- await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(f.calls.length,0)
+ await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0)
  await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
  assert.equal(result.items.length,1);assert.equal(result.items[0].topicId,'topic');assert.equal(result.items[0].slot,'2026-09-14T08:30:00+09:00');assert.equal(result.items[0].state,'notified')
  f.options.now=()=>new Date('2026-09-17T03:00:00Z');await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
@@ -68,12 +69,12 @@ test('recovery cannot select another topic or execute unrelated queued work',asy
  const f=fixture(),store=openDeliveryStore(f.root)
  store.save({id:'d'.repeat(64),slot:'2026-09-11T08:30:00+09:00',topicId:'other',state:'selected',stage:'generation'})
  let result;await runMwfCli(['--production','--recover-topic','missing'],{productionOptions:f.options,output:v=>result=v})
- assert.equal(result.items.length,0);assert.equal(result.lastSuccessAt,null);assert.equal(f.calls.length,0);assert.equal(store.read()[0].state,'selected')
+ assert.equal(result.items.length,0);assert.equal(result.lastSuccessAt,null);assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0);assert.equal(store.read()[0].state,'selected')
 })
 test('occupied recovery slot fails before selection or paid work',async()=>{
  const f=fixture(),store=openDeliveryStore(f.root);store.save({id:'d'.repeat(64),slot:'2026-09-14T08:30:00+09:00',topicId:'other',state:'selected',stage:'generation'})
  let result;await runMwfCli(['--production','--recover-topic','topic'],{productionOptions:f.options,output:v=>result=v})
- assert.equal(result.intakeError,'slot_or_topic_already_reserved');assert.equal(f.calls.length,0);assert.equal(store.read().length,1)
+ assert.equal(result.intakeError,'slot_or_topic_already_reserved');assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0);assert.equal(store.read().length,1)
 })
 test('metadata runtime check only GETs authenticated fixed diagnostics and emits allowlisted metadata',async()=>{
  const f=fixture(),spawn=f.options.spawnImpl
@@ -95,7 +96,7 @@ test('targeted later-day recovery resumes saved artifact and its original slot w
 
 test('precheck provider rejection remains classified on replay without another call',async()=>{
  const f=fixture();let calls=0,result
- f.options.fetchImpl=async()=>{calls++;return{ok:false,status:400,json:async()=>({error:{code:'unsupported_value',message:'DO_NOT_EMIT'}})}}
+ f.options.fetchImpl=async(url)=>{if(url.includes('telegram'))return{ok:true,json:async()=>({ok:true,result:{message_id:1}})};calls++;return{ok:false,status:400,json:async()=>({error:{code:'unsupported_value',message:'DO_NOT_EMIT'}})}}
  for(let i=0;i<2;i++){await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v});assert.equal(result.candidateHolds[0].reason,'precheck_request_rejected');assert.doesNotMatch(JSON.stringify(result),/DO_NOT_EMIT/)}
  assert.equal(calls,1)
 })
@@ -104,7 +105,7 @@ test('known cached unknown is retained without cache mutation or provider call',
  const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'precheck_unknown'})+'\n'
  writeFileSync(path,raw);let result
  await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
- assert.equal(result.candidateHolds[0].reason,'precheck_unknown');assert.equal(f.calls.length,0);assert.equal(readFileSync(path,'utf8'),raw)
+ assert.equal(result.candidateHolds[0].reason,'precheck_unknown');assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0);assert.equal(readFileSync(path,'utf8'),raw)
 })
 
 test('proven invalid legacy request is repaired once under new key without changing old record',async()=>{
@@ -112,7 +113,7 @@ test('proven invalid legacy request is repaired once under new key without chang
  for(const outcome of ['related','timeout']){
  const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'metadata_precheck'})+'\n'
  writeFileSync(path,raw);let calls=0,result
- f.options.fetchImpl=async(url,options)=>{calls++;assert.ok(JSON.parse(options.body).messages.some(m=>/json/i.test(m.content)));if(outcome==='timeout')throw Error('synthetic timeout');return{status:200,ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{"decision":"related"}'}}]})}}
+ f.options.fetchImpl=async(url,options)=>{if(url.includes('telegram'))return{ok:true,json:async()=>({ok:true,result:{message_id:1}})};calls++;assert.ok(JSON.parse(options.body).messages.some(m=>/json/i.test(m.content)));if(outcome==='timeout')throw Error('synthetic timeout');return{status:200,ok:true,json:async()=>({choices:[{finish_reason:'stop',message:{content:'{"decision":"related"}'}}]})}}
  for(let i=0;i<2;i++)await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
  assert.equal(calls,1);assert.equal(result.candidateHolds[0].reason,outcome==='related'?'precheck_related':'precheck_unknown');assert.ok(readFileSync(path,'utf8').startsWith(raw));assert.equal(openDeliveryStore(f.root).read().length,0)
  }
@@ -131,7 +132,7 @@ test('cached ambiguous creates one unreviewed draft and review request after exa
 test('related, rejected and unknown prechecks never generate',async()=>{
  for(const kind of ['related','http','unknown']){
  const f=fixture();let calls=0,result
- f.options.fetchImpl=async()=>{calls++;return{status:kind==='http'?400:200,ok:kind!=='http',json:async()=>kind==='related'?{choices:[{finish_reason:'stop',message:{content:'{"decision":"related"}'}}]}:{}}}
+ f.options.fetchImpl=async(url)=>{if(url.includes('telegram'))return{ok:true,json:async()=>({ok:true,result:{message_id:1}})};calls++;return{status:kind==='http'?400:200,ok:kind!=='http',json:async()=>kind==='related'?{choices:[{finish_reason:'stop',message:{content:'{"decision":"related"}'}}]}:{}}}
  await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
  assert.equal(calls,1);assert.equal(result.items.length,0);assert.equal(f.getRaw(),undefined);assert.equal(f.git.some(c=>c.args[0]==='push'),false)
  }
@@ -142,14 +143,14 @@ test('ambiguous reason in legacy key does not acquire current request provenance
  const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'precheck_ambiguous',httpStatus:200,requestVersion:'json-context-v2'})+'\n'
  writeFileSync(path,raw);let result
  await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v})
- assert.equal(result.items.length,0);assert.equal(result.candidateHolds[0].reason,'precheck_ambiguous');assert.equal(f.calls.length,0);assert.equal(readFileSync(path,'utf8'),raw)
+ assert.equal(result.items.length,0);assert.equal(result.candidateHolds[0].reason,'precheck_ambiguous');assert.equal(f.calls.filter(c=>!c.url.includes('telegram')).length,0);assert.equal(readFileSync(path,'utf8'),raw)
 })
 
 test('Mac selects next topic after Human approval using receipts and metadata only',async()=>{
  const {metadataEntry}=await import('../scripts/lib/mwf-inventory.mjs'),{signBlogEvidence}=await import('../src/lib/tieredPublication.mjs')
  const f=fixture(),spawn=f.options.spawnImpl,path='content/posts/2026-09-18-existing.md',old=Buffer.from('---\ntitle: Prior\nexcerpt: Prior excerpt\ncategory: その他\nreviewed: false\n---\nSynthetic body'),raw=Buffer.from(old.toString().replace('reviewed: false','reviewed: true')),entry=metadataEntry({path,raw:old,source:'canonical'}),approved=metadataEntry({path,raw,source:'canonical'})
  const inventoryRaw=JSON.stringify({payload:{schema:2,entries:[entry],quarantine:[],usedTopicIds:[]}}),receipt=signBlogEvidence('human-approved-baseline',{path,rawVersion:inventoryHash(raw),contentVersion:'a'.repeat(64),humanAction:'authenticated_admin_approve',reviewedBy:'Synthetic',reviewedAt:'2026-09-19T01:00:00Z'},'synthetic'),receiptPath=`data/mwf/human-approvals/${inventoryHash(raw)}.json`
- f.options.readText=()=>inventoryRaw;f.options.inventoryAnchor=inventoryHash(inventoryRaw);f.options.serverClient.prepare=async({topicVersion})=>({status:'ready',topicVersion,comparisonHash:comparisonSet([entry,approved].sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`))).hash})
+ f.options.readText=()=>inventoryRaw;f.options.inventoryAnchor=inventoryHash(inventoryRaw);f.options.serverClient.prepare=async({topicVersion})=>({status:'ready',topicVersion,comparisonHash:comparisonSet([entry,comparisonProjection({path,sha:approved.gitBlob},entry.metadata)].sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`))).hash})
  let bodyReads=0
  f.options.spawnImpl=(command,args,options)=>{const endpoint=args[5]??'';if(endpoint.includes('contents/content/posts?'))return{status:0,stdout:JSON.stringify([{type:'file',path,sha:approved.gitBlob}])};if(endpoint.includes('contents/content/posts/')){bodyReads++;throw Error('forbidden_body_read')};if(endpoint.includes('human-approvals?'))return{status:0,stdout:JSON.stringify([{type:'file',path:receiptPath}])};if(endpoint.includes(receiptPath))return{status:0,stdout:JSON.stringify({encoding:'base64',content:Buffer.from(JSON.stringify(receipt)).toString('base64')})};return spawn(command,args,options)}
  let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0);assert.equal(result.items[0].state,'notified');assert.equal(bodyReads,0)
@@ -191,4 +192,12 @@ test('runtime pins image mapping and file metadata to one revision and selects o
  assert.match(f.getRaw(),/reviewed: false/)
  assert.doesNotMatch(f.calls.find(c=>c.url.includes('telegram')).options.body,/画像不足/)
  assert.equal(treeCalls,1)
+})
+
+test('intake failure sends metadata only once per slot and never reports successful article delivery',async()=>{
+ const f=fixture();f.setReady(false);let result
+ for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value}),1)
+ const notices=f.calls.filter(c=>c.url.includes('telegram'));assert.equal(notices.length,1);assert.equal(result.intakeError,'candidate-holds');assert.equal(result.intakeNotification,'sent');assert.equal(result.lastSuccessAt,null);assert.equal(result.items.length,0)
+ const payload=JSON.parse(notices[0].options.body);assert.match(payload.text,/受付が停止/);assert.match(payload.text,/2026-09-14/);assert.doesNotMatch(payload.text,/Synthetic|synthetic-generator-key|topic_adoption_unproven/)
+ assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
 })

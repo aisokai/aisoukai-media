@@ -3,7 +3,7 @@ import {approvedComparisonUpdates} from '../../scripts/lib/mwf-human-comparisons
 import {serializeMwfArticle} from './mwfArticleSerialization.mjs'
 import {readDeployedPostFile} from './deployedPostFile.mjs'
 import matter from 'gray-matter'
-import {readGitHubFile,readGitHubBytes,readGitHubDirectory,readGitHubBranchHead,commitGitHubFiles} from './githubContents'
+import {readGitHubFile,readGitHubBytes,readGitHubBlobBytes,readGitHubApprovedBaselineBytes,readGitHubDirectory,readGitHubBranchHead,commitGitHubFiles} from './githubContents'
 import {createServerAuthority,MWF_INVENTORY_ANCHOR,serverHash,decodeBoundArticle} from './mwfServerAuthority.mjs'
 import {verifyBlogEvidence,signBlogEvidence,topicContentVersion,isProtectedEditorialInput} from './tieredPublication.mjs'
 import {getDmpArticleState} from './dmpArticleState.mjs'
@@ -47,7 +47,9 @@ export function createMwfServerRuntime(){
   entries.push(...await approvedComparisonUpdates({entries,files:relevant,
    listReceipts:async()=>{try{return await readGitHubDirectory('data/mwf/human-approvals',{ref})}catch(error){if((error as {code?:string}).code==='NOT_FOUND')return[];throw error}},
    readReceipt:(path:string)=>json(path,ref),verifyReceipt:(value:unknown)=>verifyBlogEvidence(value,'human-approved-baseline',secret),
-   readBytes:async(path:string)=>(await readGitHubBytes(path,{ref})).bytes}))
+   readBytes:async(path:string)=>(await readGitHubBytes(path,{ref})).bytes,
+   comparisonOnly:true,readKnownBytes:readGitHubBlobBytes,
+   readApprovedBytes:(proof:{path:string;rawVersion:string})=>readGitHubApprovedBaselineBytes(proof.path,proof.rawVersion,ref)}))
   return comparisonSet(entries.filter(e=>e.path!==exclude).sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))
  }
  async function validate(request:ServerRequest,ref:string){

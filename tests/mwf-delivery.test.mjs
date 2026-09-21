@@ -93,3 +93,18 @@ test('broken topic intake cannot starve already saved deliveries',async()=>{
   assert.equal(result.intakeError,'topic-intake-failed')
   assert.equal(f.store.read()[0].state,'notified');assert.equal(f.calls.generate,1)
 })
+
+test('intake alerts persist across restart, hold ambiguous sends, and preserve failed intake status',async()=>{
+ for(const outcome of ['sent','not-sent','unknown','throw']){
+  const root=mkdtempSync(join(tmpdir(),'mwf-intake-test-')),slot='2026-09-21T08:30:00+09:00';let calls=0
+  const adapters={notifyIntake:async()=>{calls++;if(outcome==='throw')throw Error('unknown');return{status:outcome}}}
+  for(let i=0;i<2;i++){
+   const result=await runDelivery({store:openDeliveryStore(root),slot,adapters,select:async()=>({holdOnly:true,holds:[{reason:'canonical_evidence_unavailable'}]})})
+   assert.equal(result.ok,false);assert.equal(result.items.length,0);assert.equal(result.lastSuccessAt,null);assert.equal(result.intakeNotification,outcome==='throw'?'unknown':outcome)
+  }
+  assert.equal(calls,1)
+ }
+ const root=mkdtempSync(join(tmpdir(),'mwf-intake-crash-')),store=openDeliveryStore(root),slot='2026-09-21T08:30:00+09:00',release=store.acquire();store.intakeNotice(slot,'sending');release()
+ const result=await runDelivery({store:openDeliveryStore(root),slot,adapters:{notifyIntake:async()=>{throw Error('must_not_send')}},select:async()=>({holdOnly:true})})
+ assert.equal(result.intakeNotification,'unknown');assert.equal(result.ok,false)
+})

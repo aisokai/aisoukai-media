@@ -1,0 +1,491 @@
+{
+  "schema_version": 1,
+  "prepared_at": "2026-09-22",
+  "repository_revision": "0670ad2e17b7f7ba723176a1d345c24389441401",
+  "scope": "復旧した14記事と仕上げ磨き1記事、9/23予定の採用済1テーマ。全サイト監査ではない。",
+  "generation_task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+  "counts": {
+    "existing_article_images": 11,
+    "adopted_topic_stock": 1,
+    "total_to_generate": 12,
+    "already_generated_excluded": 4
+  },
+  "execution_status": "list_only_not_generated",
+  "instructions": {
+    "save_only": true,
+    "article_assignment": false,
+    "approval": false,
+    "publication": false,
+    "no_overwrite": true,
+    "skip_already_saved_matching_request": true,
+    "on_uncertainty": "生成・保存に失敗した項目や適合不明の画像は不足として報告し、別画像で埋めない。",
+    "post_save": "全点の実画像、本文との対応、重複、利用条件を適用側が確認する。医療模式図の正確性を生成だけで保証しない。"
+  },
+  "items": [
+    {
+      "id": "IMG-20260922-01",
+      "title": "インプラントの概要と治療選択",
+      "topic_id": "topic_7d9bf46b54159198",
+      "article_path": "content/posts/2026-08-01-canonical-746f7069635f37643962663436623534313539313938.md",
+      "article_date": "2026-08-01",
+      "category": "implant",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/implant/implant-structure-overview-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "主題不一致の受付画像が付いていたため、概要に対応する専用素材が必要。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。白い背景に、インプラントの人工歯根と上部の人工歯が分かる単一の歯科模型を大きく配置する説明用の3D模式図。歯肉と周囲の骨は必要最小限の断面で示し、器具の挿入や手術を描かない。単一模型を中心に据えた落ち着いた構図。不適合防止：構造は保存後に歯科的整合性を確認する。インプラントが全員に適する、他治療より優れる、永久に使えるとの印象を加えない。治療選択全体を網羅した図とは扱わない。",
+      "avoid": "構造は保存後に歯科的整合性を確認する。インプラントが全員に適する、他治療より優れる、永久に使えるとの印象を加えない。治療選択全体を網羅した図とは扱わない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-02",
+      "title": "親知らずは抜くべき？相談の目安とレントゲンで見るポイント",
+      "topic_id": "TOPIC-20260511-022",
+      "article_path": "content/posts/2026-08-31-topic-20260511-022.md",
+      "article_date": "2026-08-31",
+      "category": "wisdom-tooth",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/wisdom-tooth/wisdom-tooth-decision-consultation-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "別の親知らず記事と抜歯済みの歯の画像が重複し、判断前の説明に不十分。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。歯科診察室で、日本人歯科医が成人の相談者へ口腔模型のいちばん奥の歯の位置を指して説明する場面。口腔模型と説明する手元を主役に、相談者は静かに聞いている。抜歯前の相談・検査を表す構図。不適合防止：抜けた歯、血液、手術器具、架空の診断用レントゲン画像は描かない。抜歯が必要との結論を先取りしない。画像だけでレントゲンの判断基準を説明しない。",
+      "avoid": "抜けた歯、血液、手術器具、架空の診断用レントゲン画像は描かない。抜歯が必要との結論を先取りしない。画像だけでレントゲンの判断基準を説明しない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-03",
+      "title": "親知らずが腫れたときはどうする？受診を急ぐ目安",
+      "topic_id": "TOPIC-20260511-023",
+      "article_path": "content/posts/2026-09-02-topic-20260511-023.md",
+      "article_date": "2026-09-02",
+      "category": "wisdom-tooth",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/wisdom-tooth/wisdom-tooth-swelling-contact-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "抜歯済みの歯の使い回しを解消し、腫れが気になる時の相談場面を専用化する。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。自宅の明るい部屋で、日本人の成人が片側の頬にそっと手を添え、スマートフォンで歯科医院へ連絡する場面。やや心配そうだが落ち着いた表情。頬に触れる姿と連絡する動作を中心に、斜め横から撮る。不適合防止：強い腫れの誇張、発熱計の数値、自己処置、患部を押す動作、緊急度を画像だけで判定できる表示は入れない。これは相談行動の補助場面で、原因の診断図ではない。",
+      "avoid": "強い腫れの誇張、発熱計の数値、自己処置、患部を押す動作、緊急度を画像だけで判定できる表示は入れない。これは相談行動の補助場面で、原因の診断図ではない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-04",
+      "title": "インプラントはどんな人が相談する？治療前に確認すること",
+      "topic_id": "TOPIC-20260511-024",
+      "article_path": "content/posts/2026-09-04-topic-20260511-024.md",
+      "article_date": "2026-09-04",
+      "category": "implant",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/implant/implant-before-treatment-interview-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "治療の流れ記事と同一の構造図だったため、治療前の確認に対応する独立した場面を用意する。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。歯科医院の相談デスクで、日本人の中高年の相談者と歯科医が向き合い、治療前の希望や気になる点を落ち着いて話し合う場面。机には無記入の質問用紙と小さなインプラント模型。模型よりも対話と確認の姿勢を主役にした横からの構図。不適合防止：適応条件を満たすと断定する表示、薬剤や検査結果、年齢制限、治療保証は描かない。模型を大きく主役にする概要画像と重複させない。",
+      "avoid": "適応条件を満たすと断定する表示、薬剤や検査結果、年齢制限、治療保証は描かない。模型を大きく主役にする概要画像と重複させない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-05",
+      "title": "インプラント治療の流れは？検査からメンテナンスまで",
+      "topic_id": "TOPIC-20260511-025",
+      "article_path": "content/posts/2026-09-07-topic-20260511-025.md",
+      "article_date": "2026-09-07",
+      "category": "implant",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/implant/implant-care-stages-vignettes-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "単一の構造図では流れが伝わらないため、異なる場面を示す専用画像が必要。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。インプラント治療に関連する四つの場面を余白のある一枚の横長イラストへまとめる。相談する場面、歯科医が鏡で非侵襲的に口内を確認する場面、インプラント模型で補綴の説明をする場面、歯科衛生士が模型で清掃を説明する場面。架空の日本人の医療者と相談者、柔らかい統一画調。不適合防止：番号、矢印、日数、期間、完了印は入れない。必ず四工程で終了する説明図ではなく、代表的な場面のイメージとする。実際の手術や器具操作を描かず、医学的順序・正確性は生成後に確認する。",
+      "avoid": "番号、矢印、日数、期間、完了印は入れない。必ず四工程で終了する説明図ではなく、代表的な場面のイメージとする。実際の手術や器具操作を描かず、医学的順序・正確性は生成後に確認する。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-06",
+      "title": "歯ぐきから血が出るときに確認したいポイント",
+      "topic_id": "MONTHLY-202610TOPIC003",
+      "article_path": "content/posts/2026-09-09-monthly-202610topic003.md",
+      "article_date": "2026-09-09",
+      "category": "periodontal",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/periodontal/gum-bleeding-self-observation-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "歯ぐきの出血の記事に知覚過敏の文字画像が付いていたため、症状の取り違えを解消する。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。明るい洗面台で、日本人の成人が手鏡を使って歯ぐきを確認する場面を、口元と手元中心に描く。手元の白い柔らかな歯ブラシには、ごく少量の淡い赤みが見える程度。大きな血液表現は避け、歯ぐきの様子に気づいて確認する状況を示す。不適合防止：歯ぐき退縮の比較図、知覚過敏の文字や氷、重度の出血、原因を歯周病に断定する表現は入れない。出血を放置してよい印象や強く磨く動作を避ける。",
+      "avoid": "歯ぐき退縮の比較図、知覚過敏の文字や氷、重度の出血、原因を歯周病に断定する表現は入れない。出血を放置してよい印象や強く磨く動作を避ける。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-07",
+      "title": "インプラントのメンテナンスはどれくらい必要？",
+      "topic_id": "MONTHLY-202609TOPIC015",
+      "article_path": "content/posts/2026-09-04-mwf-30a6d4534d470e478496d445cee8eea0c72e98e097d716f0bd00fd51f4f5e4c3.md",
+      "article_date": "2026-09-04",
+      "category": "implant",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/implant/implant-maintenance-tools-model-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "画像なし。既存候補を無条件に転用せず、メンテナンス用の専用構図を作る。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。歯科医院の清潔なケア用品トレーを少し上から撮った物撮り。小さなインプラント模型、柔らかな歯ブラシ、未使用の歯間清掃用品を並べる。インプラントの人工歯と日常の清掃用品との関係が伝わる構図。器具は模型へ挿入せず整然と置く。不適合防止：カレンダーの日付や通院回数、永久保証、強い薬剤、自己流の器具挿入は描かない。通院間隔は画像で決めない。概要の単一断面図、治療前の人物相談画像と構図を分ける。",
+      "avoid": "カレンダーの日付や通院回数、永久保証、強い薬剤、自己流の器具挿入は描かない。通院間隔は画像で決めない。概要の単一断面図、治療前の人物相談画像と構図を分ける。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-08",
+      "title": "急な歯の痛みで予約するときに伝えるとよいこと",
+      "topic_id": "MONTHLY-202609TOPIC016",
+      "article_path": "content/posts/2026-09-07-mwf-044def187745757ce9e17ecbb9020b7172997360715cb61b9a1cbd2e804f1c01.md",
+      "article_date": "2026-09-07",
+      "category": "general",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/general/urgent-dental-pain-phone-intake-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "画像なし。症状を予約時に伝える記事へ専用の受付場面を用意する。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。日本の歯科医院の受付担当者が電話で相談を受け、無記入に見えるメモ用紙へ要点を記録している場面。受付側の応対と記録する手元を中心にした構図。背後の院内は穏やかにぼかし、患者は画面に入れない。不適合防止：実際の予約台帳、氏名、連絡先、症状の文字、緊急受付の保証は描かない。自宅で頬を押さえて電話する親知らず画像と重複させない。",
+      "avoid": "実際の予約台帳、氏名、連絡先、症状の文字、緊急受付の保証は描かない。自宅で頬を押さえて電話する親知らず画像と重複させない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-09",
+      "title": "歯ブラシだけで足りる？デンタルフロスの使いどころ",
+      "topic_id": "MONTHLY-202609TOPIC017",
+      "article_path": "content/posts/2026-09-09-mwf-edccaa363284e2bec24e2563da22b8167fc57c8d37df0c0737a50116c86ca99d.md",
+      "article_date": "2026-09-09",
+      "category": "preventive",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/preventive/dental-floss-roll-and-toothbrush.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "本文はロール式フロスを扱う。既存フロスピックは道具が一致しないため代用しない。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。清潔で明るい洗面台の上に、無地の小さなロール式デンタルフロス容器と柔らかな毛先の歯ブラシを置いた自然な物撮り。容器から細い糸が少し引き出されており、ロール式と分かる。二つの道具を中央近くに配置する。不適合防止：ホルダー付き糸ようじ、歯間ブラシ、治療器具は入れない。人物、口内、手指の実演を入れず、誤った使用法を示さない。既存の追加画像依頼と同一の1点として扱い二重生成しない。",
+      "avoid": "ホルダー付き糸ようじ、歯間ブラシ、治療器具は入れない。人物、口内、手指の実演を入れず、誤った使用法を示さない。既存の追加画像依頼と同一の1点として扱い二重生成しない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-10",
+      "title": "歯医者が苦手な人が受診前にできる準備",
+      "topic_id": "MONTHLY-202609TOPIC008",
+      "article_path": "content/posts/2026-09-18-mwf-baf5a908dd680f864c9274e9475518ddf298243c902752030ed47f46c299723e.md",
+      "article_date": "2026-09-18",
+      "category": "general",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/general/dental-anxiety-previsit-notes-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "画像なし。既存候補の利用確認が終わっていないため、今回の専用生成対象とする。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。日本人の成人が自宅の静かな机で、受診前に不安や質問をノートへ整理している場面。少し離れた位置にヘッドホンとコップを置き、落ち着いて準備する雰囲気。文字は読めない無地のノート。上から斜めに見た手元と表情を中心にする。不適合防止：不安が完全に消える保証、薬剤、治療中の苦痛、診療結果は描かない。受付側の電話画像や歯科医とのインプラント相談画像と重複させない。",
+      "avoid": "不安が完全に消える保証、薬剤、治療中の苦痛、診療結果は描かない。受付側の電話画像や歯科医とのインプラント相談画像と重複させない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-11",
+      "title": "子どもの仕上げ磨きはいつまで必要？年齢ごとの目安",
+      "topic_id": "MONTHLY-202609TOPIC004",
+      "article_path": "content/posts/2026-09-18-mwf-26c9e558f26e01ec82c14cea442710b42e54df3bdba398b5da03190fc65eda3c.md",
+      "article_date": "2026-09-18",
+      "category": "pediatric",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/pediatric/parent-assisted-child-brushing-20260922.png",
+      "priority": "P1",
+      "kind": "existing_article",
+      "reason": "画像なし。既存候補の利用確認が終わっていないため、今回の専用生成対象とする。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。家庭の清潔なリビングで、日本人の保護者が膝に頭をのせた子どもの歯を、子ども用歯ブラシで優しく仕上げ磨きする場面。横から見た親子の姿を中央に配置し、子どもは落ち着いている。保護者の介助が明確に分かる自然な生活場面。不適合防止：大人だけの歯みがき、矯正器具、押さえつけ、強い力、終了年齢の数字は描かない。歯ブラシや手指・歯の形は保存後に確認する。特定の年齢で介助不要と示唆しない。",
+      "avoid": "大人だけの歯みがき、矯正器具、押さえつけ、強い力、終了年齢の数字は描かない。歯ブラシや手指・歯の形は保存後に確認する。特定の年齢で介助不要と示唆しない。",
+      "review_required": true,
+      "article_metadata_source": "20260919_image_audit_and_20260920_exact_finishing_brush_header",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    },
+    {
+      "id": "IMG-20260922-12",
+      "title": "インプラントと入れ歯の違いは？相談前の整理",
+      "topic_id": "MONTHLY-202609TOPIC023",
+      "article_path": null,
+      "article_date": null,
+      "planned_date": "2026-09-23",
+      "category": "implant",
+      "save_path": "/Users/caelus/projects/aisoukai-media/public/images/library/implant/implant-denture-consultation-comparison-20260922.png",
+      "priority": "P2",
+      "kind": "adopted_topic_stock",
+      "reason": "9/23予定の採用済テーマ。専用topic_assignmentは未登録。記事ファイルは未確定で、本文生成後に対応を確認する。",
+      "prompt": "歯科医院の一般向け健康情報ブログのための新規画像。横長16:9、PNG、横幅1600px以上。清潔で自然な光、白と淡い青を基調とし、主要被写体は中央寄りでカードの切り抜きにも耐える。人物を描く場合は架空の日本人で、特定の個人や実際の患者を再現しない。文字、数字、ラベル、ブランド名、ロゴ、透かし、個人情報、効果保証、誇張したビフォーアフターは入れない。既存画像の転用・編集や他項目との使い回しはしない。無地の相談用デスクに、インプラントの人工歯根が分かる歯科模型と、取り外し式の部分入れ歯の模型を左右同じ大きさ・同じ明るさで並べた説明用物撮り。人物、清掃用品、手術器具は入れず、二つの治療方法を相談前に見比べるための落ち着いた構図。優劣を付ける矢印・チェックマーク・値段・効果比較は入れない。模型の構造は生成後に歯科的整合性を確認する。",
+      "avoid": "どちらかを優れた治療と示さない。インプラントと入れ歯を同じ固定方式で描かない。実症例や治療結果の比較ではない。",
+      "review_required": true,
+      "article_metadata_source": "data/article-topics.sample.csv_and_topic_adoptions_path_presence",
+      "latest_article_body_rechecked": false,
+      "save_path_absent_at_preparation": true,
+      "output": {
+        "format": "png",
+        "aspect_ratio": "16:9",
+        "minimum_width_px": 1600,
+        "report_fields": [
+          "id",
+          "topic_id",
+          "absolute_path",
+          "width",
+          "height",
+          "sha256",
+          "generation_task_id"
+        ],
+        "overwrite": false
+      }
+    }
+  ],
+  "excluded_already_generated": [
+    {
+      "topic_id": "topic_95d698adee249438",
+      "title": "ホームホワイトニングとオフィスホワイトニング何がどう違うの?",
+      "article_path": "content/posts/2026-08-01-canonical-746f7069635f39356436393861646565323439343338.md",
+      "existing_path": "/Users/caelus/projects/aisoukai-media/public/images/library/preventive/whitening-home-office-comparison.png",
+      "sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+      "reason": "前回生成・保存済み。再生成除外。画像の存在は公開承認を意味しない。"
+    },
+    {
+      "topic_id": "topic_97c2646daf2490c0",
+      "title": "【何回通えば白くなる?】ホワイトニングの回数",
+      "article_path": "content/posts/2026-08-01-canonical-746f7069635f39376332363436646166323439306330.md",
+      "existing_path": "/Users/caelus/projects/aisoukai-media/public/images/library/preventive/whitening-treatment-planning.png",
+      "sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+      "reason": "前回生成・保存済み。再生成除外。画像の存在は公開承認を意味しない。"
+    },
+    {
+      "topic_id": "MONTHLY-202609TOPIC019",
+      "title": "歯ぐきが下がった気がするときに考えられる原因",
+      "article_path": "content/posts/2026-09-14-mwf-dc9cb641217214c197f4d5ea0036cb1507f44a028229779fc21fd6515e859687.md",
+      "existing_path": "/Users/caelus/projects/aisoukai-media/public/images/library/periodontal/gingival-recession-comparison.png",
+      "sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+      "reason": "前回生成・保存済み。再生成除外。画像の存在は公開承認を意味しない。"
+    },
+    {
+      "topic_id": "MONTHLY-202609TOPIC020",
+      "title": "乳歯の虫歯は放置してもいい？受診が必要な理由",
+      "article_path": "content/posts/2026-09-16-mwf-65d2546f7886459bf227361374bf323d3b9f22b32e8b1d1d736d79ad7bc3c19d.md",
+      "existing_path": "/Users/caelus/projects/aisoukai-media/public/images/library/pediatric/primary-tooth-caries-progression.png",
+      "sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+      "reason": "前回生成・保存済み。再生成除外。画像の存在は公開承認を意味しない。"
+    }
+  ],
+  "deferred_duplicates": [
+    {
+      "topic_id": "MONTHLY-202609TOPIC003",
+      "title": "歯ぐきから血が出るときに確認したいポイント",
+      "reason": "既存記事MONTHLY-202610TOPIC003と同題。IMG-20260922-06を生成するため追加依頼しない。別topicへ無断転用せず記事重複判定を先に行う。"
+    },
+    {
+      "topic_id": "MONTHLY-202610TOPIC004",
+      "title": "子どもの仕上げ磨きはいつまで必要？年齢ごとの目安",
+      "reason": "既存記事と同題。追加画像の依頼はしない。"
+    },
+    {
+      "topic_id": "MONTHLY-202610TOPIC014",
+      "title": "親知らずは抜くべき？相談の目安と判断材料",
+      "reason": "既存の抜歯判断記事に近いテーマ。記事の重複・差異を確認してから追加要否を決める。"
+    },
+    {
+      "topic_id": "MONTHLY-202610TOPIC015",
+      "title": "インプラントのメンテナンスはどれくらい必要？",
+      "reason": "既存記事と同題。追加画像の依頼はしない。"
+    },
+    {
+      "topic_id": "MONTHLY-202610TOPIC016",
+      "title": "急な歯の痛みで予約するときに伝えるとよいこと",
+      "reason": "既存記事と同題。追加画像の依頼はしない。"
+    }
+  ],
+  "evidence": {
+    "prior_audit": "/tmp/mwf-image-audit-20260919.md",
+    "image_library_entries": 163,
+    "latest_path_existence_verified": true,
+    "article_body_bulk_read": false,
+    "limitation": "構図は既存監査・指定記事の既知の内容とテーマを基に限定。今回、対象全記事の最新本文は再精読していない。既存候補が全く存在しないという判定ではなく、未確認候補・重複・誤割当を避ける専用生成依頼。"
+  }
+}
