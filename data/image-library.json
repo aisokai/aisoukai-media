@@ -2849,9 +2849,9 @@
         "オフィスホワイトニング"
       ],
       "alt": "自宅用ホワイトニングトレーと歯科医院での施術を左右に示した生成イメージ",
-      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
-      "license_status": "pending_review",
-      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_status": "verified",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
       "content_sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
       "git_blob": "2a46446398939351c99e92f51c01d2138930ed94",
       "generation_provenance": {
@@ -2859,7 +2859,10 @@
         "saved_file": "preventive/whitening-home-office-comparison.png",
         "width": 1672,
         "height": 941,
-        "format": "png"
+        "format": "png",
+        "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/01-home-office-whitening-japanese-v2.png",
+        "original_sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+        "original_verified_at": "2026-09-22"
       },
       "draft_use_authorization": {
         "topic_id": "topic_95d698adee249438",
@@ -2884,9 +2887,9 @@
         "治療計画"
       ],
       "alt": "カレンダーとシェードガイドを使い、ホワイトニングの計画を相談する生成イメージ",
-      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
-      "license_status": "pending_review",
-      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_status": "verified",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
       "content_sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
       "git_blob": "b65c998402f92aeff5021fdceae2e90a0d9809ab",
       "generation_provenance": {
@@ -2894,7 +2897,10 @@
         "saved_file": "preventive/whitening-treatment-planning.png",
         "width": 1672,
         "height": 941,
-        "format": "png"
+        "format": "png",
+        "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/02-whitening-planning-japanese-v2.png",
+        "original_sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+        "original_verified_at": "2026-09-22"
       },
       "draft_use_authorization": {
         "topic_id": "topic_97c2646daf2490c0",
@@ -2919,9 +2925,9 @@
         "歯根露出"
       ],
       "alt": "歯肉の位置と歯根の露出の違いを左右に示した歯肉退縮の模式図",
-      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
-      "license_status": "pending_review",
-      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_status": "verified",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
       "content_sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
       "git_blob": "60dbc9d61f5dbf2e50efc46bc1b5605b9fbe4c8d",
       "generation_provenance": {
@@ -2929,7 +2935,10 @@
         "saved_file": "periodontal/gingival-recession-comparison.png",
         "width": 1672,
         "height": 941,
-        "format": "png"
+        "format": "png",
+        "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/03-gingival-recession.png",
+        "original_sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+        "original_verified_at": "2026-09-22"
       },
       "draft_use_authorization": {
         "topic_id": "MONTHLY-202609TOPIC019",
@@ -2954,9 +2963,9 @@
         "進行"
       ],
       "alt": "虫歯が歯の表面から内部へ進む様子を三段階で示した説明用の模式図",
-      "license_source": "Teacher-provided AI-generated image; generation task 01a0b6ea-30d3-7433-a1cf-34fafc13050d",
-      "license_status": "pending_review",
-      "license_note": "先生が2026-09-20に保存済み画像の該当記事への適用を指示。下書きへの用途限定許可を記録。生成サービスの利用条件の独立確認や記事公開承認を意味しない。",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_status": "verified",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
       "content_sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
       "git_blob": "961cff46ccbd3f61dee5fb13bb453fe8c12672fd",
       "generation_provenance": {
@@ -2964,7 +2973,10 @@
         "saved_file": "pediatric/primary-tooth-caries-progression.png",
         "width": 1672,
         "height": 941,
-        "format": "png"
+        "format": "png",
+        "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/04-primary-tooth-caries.png",
+        "original_sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+        "original_verified_at": "2026-09-22"
       },
       "draft_use_authorization": {
         "topic_id": "MONTHLY-202609TOPIC020",
@@ -2977,6 +2989,426 @@
         "status": "visually_matched",
         "evidence": "docs/diagnostics/image-application-20260920.md",
         "article_path": "content/posts/2026-09-16-mwf-65d2546f7886459bf227361374bf323d3b9f22b32e8b1d1d736d79ad7bc3c19d.md"
+      }
+    },
+    {
+      "id": "implant-structure-overview-20260922",
+      "path": "/images/library/implant/implant-structure-overview-20260922.png",
+      "category": "implant",
+      "title": "インプラントの概要と治療選択",
+      "tags": [
+        "インプラントの概要と治療選択"
+      ],
+      "alt": "人工歯根と人工歯を示すインプラントの説明用生成模型",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "39a0dc66227c5417920e6befc4f01ed3dbc99aab9ba655163b6474a64bfc4116",
+      "git_blob": "a2064a1335f4055ae1cde14ccc817573d1f7a531",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "implant/implant-structure-overview-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-85d32292-bdc9-4aff-bda1-898177d586db.png",
+        "original_sha256": "39a0dc66227c5417920e6befc4f01ed3dbc99aab9ba655163b6474a64bfc4116",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "topic_7d9bf46b54159198",
+        "title": "インプラントの概要と治療選択",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-08-01-canonical-746f7069635f37643962663436623534313539313938.md"
+      }
+    },
+    {
+      "id": "wisdom-tooth-decision-consultation-20260922",
+      "path": "/images/library/wisdom-tooth/wisdom-tooth-decision-consultation-20260922.png",
+      "category": "wisdom-tooth",
+      "title": "親知らずは抜くべき？相談の目安とレントゲンで見るポイント",
+      "tags": [
+        "親知らずは抜くべき？相談の目安とレントゲンで見るポイント"
+      ],
+      "alt": "歯科医が口腔模型で奥歯の位置を説明し、相談者が話を聞く生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "64f864669f642072fcddce7d34cadd670c8576c6ce1a5c38fcf78fb249cb6a7f",
+      "git_blob": "81efcbdb83bb52c89e73e3734180eb175dabc1e3",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "wisdom-tooth/wisdom-tooth-decision-consultation-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-4c73241a-3e07-4a46-9442-8099998fbf07.png",
+        "original_sha256": "64f864669f642072fcddce7d34cadd670c8576c6ce1a5c38fcf78fb249cb6a7f",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "TOPIC-20260511-022",
+        "title": "親知らずは抜くべき？相談の目安とレントゲンで見るポイント",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-08-31-topic-20260511-022.md"
+      }
+    },
+    {
+      "id": "wisdom-tooth-swelling-contact-20260922",
+      "path": "/images/library/wisdom-tooth/wisdom-tooth-swelling-contact-20260922.png",
+      "category": "wisdom-tooth",
+      "title": "親知らずが腫れたときはどうする？受診を急ぐ目安",
+      "tags": [
+        "親知らずが腫れたときはどうする？受診を急ぐ目安"
+      ],
+      "alt": "頬にそっと手を添え、歯科医院へ電話で相談する生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "888c534dcfd47899a24f5d93abc1856821d8bbddfaf8228464fd27d38164ed17",
+      "git_blob": "88c0382e4b479258505c021929586f30bce01c9c",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "wisdom-tooth/wisdom-tooth-swelling-contact-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-6d25bd08-467c-45e9-9cf7-2a265404946c.png",
+        "original_sha256": "888c534dcfd47899a24f5d93abc1856821d8bbddfaf8228464fd27d38164ed17",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "TOPIC-20260511-023",
+        "title": "親知らずが腫れたときはどうする？受診を急ぐ目安",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-02-topic-20260511-023.md"
+      }
+    },
+    {
+      "id": "implant-before-treatment-interview-20260922",
+      "path": "/images/library/implant/implant-before-treatment-interview-20260922.png",
+      "category": "implant",
+      "title": "インプラントはどんな人が相談する？治療前に確認すること",
+      "tags": [
+        "インプラントはどんな人が相談する？治療前に確認すること"
+      ],
+      "alt": "相談用紙とインプラント模型を前に、治療前の確認事項を話し合う生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "f0ad72d78113d6fa520f13ac8291efe5614140a31c8649486ee4900b2aed6e01",
+      "git_blob": "1112a8763ecaf14086907454622ff4792908dd4b",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "implant/implant-before-treatment-interview-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-7f58a068-4e85-47b1-97fe-f0a25b8118d5.png",
+        "original_sha256": "f0ad72d78113d6fa520f13ac8291efe5614140a31c8649486ee4900b2aed6e01",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "TOPIC-20260511-024",
+        "title": "インプラントはどんな人が相談する？治療前に確認すること",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-04-topic-20260511-024.md"
+      }
+    },
+    {
+      "id": "implant-care-stages-vignettes-20260922",
+      "path": "/images/library/implant/implant-care-stages-vignettes-20260922.png",
+      "category": "implant",
+      "title": "インプラント治療の流れは？検査からメンテナンスまで",
+      "tags": [
+        "インプラント治療の流れは？検査からメンテナンスまで"
+      ],
+      "alt": "相談、診察、模型での説明、清掃指導を描いた四つの代表的な場面の生成イラスト",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "3db72cd1e19479de678a90fb56b92aa58da565962f60103debdd9913250b3fd2",
+      "git_blob": "ca8f6104ca6cf2881eb11a5e0cfcf0fc2402fab1",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "implant/implant-care-stages-vignettes-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-f8e6b000-0f74-4535-9197-db1a2345da70.png",
+        "original_sha256": "3db72cd1e19479de678a90fb56b92aa58da565962f60103debdd9913250b3fd2",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "TOPIC-20260511-025",
+        "title": "インプラント治療の流れは？検査からメンテナンスまで",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-07-topic-20260511-025.md"
+      }
+    },
+    {
+      "id": "gum-bleeding-self-observation-20260922",
+      "path": "/images/library/periodontal/gum-bleeding-self-observation-20260922.png",
+      "category": "periodontal",
+      "title": "歯ぐきから血が出るときに確認したいポイント",
+      "tags": [
+        "歯ぐきから血が出るときに確認したいポイント"
+      ],
+      "alt": "手鏡と歯ブラシを持ち、歯ぐきの様子を確認する生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "c77c7af3e39779db4f3a55d13b01e95d474f8a056325b5f6457b7284c5dac8a9",
+      "git_blob": "e6ff8c8d109bfd6f3bd0abd3899a1d4c40fc5628",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "periodontal/gum-bleeding-self-observation-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-f46f4558-5059-4649-8d27-a194890dc824.png",
+        "original_sha256": "c77c7af3e39779db4f3a55d13b01e95d474f8a056325b5f6457b7284c5dac8a9",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC003",
+        "title": "歯ぐきから血が出るときに確認したいポイント",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-09-monthly-202610topic003.md"
+      }
+    },
+    {
+      "id": "implant-maintenance-tools-model-20260922",
+      "path": "/images/library/implant/implant-maintenance-tools-model-20260922.png",
+      "category": "implant",
+      "title": "インプラントのメンテナンスはどれくらい必要？",
+      "tags": [
+        "インプラントのメンテナンスはどれくらい必要？"
+      ],
+      "alt": "インプラント模型と歯ブラシ、歯間清掃用品を並べた生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "90f22055e2bb994d85fcc7715e8cd438e6295d173146f093647a3cc14dce96a6",
+      "git_blob": "92bb61271912cb5d12357f1608bb2305f3120fd7",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "implant/implant-maintenance-tools-model-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-22c86b76-3f5b-47ec-a365-5b9a3bd487a0.png",
+        "original_sha256": "90f22055e2bb994d85fcc7715e8cd438e6295d173146f093647a3cc14dce96a6",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC015",
+        "title": "インプラントのメンテナンスはどれくらい必要？",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-04-mwf-30a6d4534d470e478496d445cee8eea0c72e98e097d716f0bd00fd51f4f5e4c3.md"
+      }
+    },
+    {
+      "id": "urgent-dental-pain-phone-intake-20260922",
+      "path": "/images/library/general/urgent-dental-pain-phone-intake-20260922.png",
+      "category": "general",
+      "title": "急な歯の痛みで予約するときに伝えるとよいこと",
+      "tags": [
+        "急な歯の痛みで予約するときに伝えるとよいこと"
+      ],
+      "alt": "電話を受けながらメモを取る歯科医院の受付担当者の生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "b5ac411b95eba2c7a7c3857d7b485f63b0413d7595f5aa5e11a1ba371a23da6b",
+      "git_blob": "5af100a2513daaa3d8fec5776487c9a2172950ce",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "general/urgent-dental-pain-phone-intake-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-618928a5-d885-4456-80c6-ffe5b9f2c713.png",
+        "original_sha256": "b5ac411b95eba2c7a7c3857d7b485f63b0413d7595f5aa5e11a1ba371a23da6b",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC016",
+        "title": "急な歯の痛みで予約するときに伝えるとよいこと",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-07-mwf-044def187745757ce9e17ecbb9020b7172997360715cb61b9a1cbd2e804f1c01.md"
+      }
+    },
+    {
+      "id": "dental-floss-roll-and-toothbrush",
+      "path": "/images/library/preventive/dental-floss-roll-and-toothbrush.png",
+      "category": "preventive",
+      "title": "歯ブラシだけで足りる？デンタルフロスの使いどころ",
+      "tags": [
+        "歯ブラシだけで足りる？デンタルフロスの使いどころ"
+      ],
+      "alt": "ロール式デンタルフロスの容器と歯ブラシを並べた生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "57c6e514d17f1efa21d68024f67cb6c3d59ffdb56fd1412723b437f162e92db5",
+      "git_blob": "a9fe331d156aeb1388b98e044aad085fdf1baf45",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "preventive/dental-floss-roll-and-toothbrush.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-691e3c32-f726-4199-a636-70dfded1bcd1.png",
+        "original_sha256": "57c6e514d17f1efa21d68024f67cb6c3d59ffdb56fd1412723b437f162e92db5",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC017",
+        "title": "歯ブラシだけで足りる？デンタルフロスの使いどころ",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-09-mwf-edccaa363284e2bec24e2563da22b8167fc57c8d37df0c0737a50116c86ca99d.md"
+      }
+    },
+    {
+      "id": "dental-anxiety-previsit-notes-20260922",
+      "path": "/images/library/general/dental-anxiety-previsit-notes-20260922.png",
+      "category": "general",
+      "title": "歯医者が苦手な人が受診前にできる準備",
+      "tags": [
+        "歯医者が苦手な人が受診前にできる準備"
+      ],
+      "alt": "受診前に不安や質問をノートへ整理する生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "972cb7e12749624e07b2ab96aeafba7df5f9c795cafbf2c5e605854f659126e4",
+      "git_blob": "1fc3c6d2df3aa7e727b56bd80d7e2ca889a9dd9c",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "general/dental-anxiety-previsit-notes-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-ac3251a7-13e4-40db-97a1-699b62eef13a.png",
+        "original_sha256": "972cb7e12749624e07b2ab96aeafba7df5f9c795cafbf2c5e605854f659126e4",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC008",
+        "title": "歯医者が苦手な人が受診前にできる準備",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-18-mwf-baf5a908dd680f864c9274e9475518ddf298243c902752030ed47f46c299723e.md"
+      }
+    },
+    {
+      "id": "parent-assisted-child-brushing-20260922",
+      "path": "/images/library/pediatric/parent-assisted-child-brushing-20260922.png",
+      "category": "pediatric",
+      "title": "子どもの仕上げ磨きはいつまで必要？年齢ごとの目安",
+      "tags": [
+        "子どもの仕上げ磨きはいつまで必要？年齢ごとの目安"
+      ],
+      "alt": "保護者が膝に頭をのせた子どもの仕上げ磨きをする生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "8f3c5d4f3665d7e0b13088c549eb7b46d7b9dcfd7ed601b6c15fb63c19ebbcba",
+      "git_blob": "c5584c437f3a3e29b4d964923938269131b185e5",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "pediatric/parent-assisted-child-brushing-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-3bbec948-7a9c-4685-b71b-0101ef8ad5c3.png",
+        "original_sha256": "8f3c5d4f3665d7e0b13088c549eb7b46d7b9dcfd7ed601b6c15fb63c19ebbcba",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC004",
+        "title": "子どもの仕上げ磨きはいつまで必要？年齢ごとの目安",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": "content/posts/2026-09-18-mwf-26c9e558f26e01ec82c14cea442710b42e54df3bdba398b5da03190fc65eda3c.md"
+      }
+    },
+    {
+      "id": "implant-denture-consultation-comparison-20260922",
+      "path": "/images/library/implant/implant-denture-consultation-comparison-20260922.png",
+      "category": "implant",
+      "title": "インプラントと入れ歯の違いは？相談前の整理",
+      "tags": [
+        "インプラントと入れ歯の違いは？相談前の整理"
+      ],
+      "alt": "インプラント模型と取り外し式部分入れ歯の模型を並べた生成イメージ",
+      "width": 1672,
+      "height": 941,
+      "format": "png",
+      "content_sha256": "09708088a6df97b066653237e0741ee93abb56a097f4689455509925e022255c",
+      "git_blob": "a0c8686fde8f677c14dc2fb9c145db025b3f280f",
+      "license_status": "verified",
+      "license_source": "https://openai.com/policies/row-terms-of-use/",
+      "license_note": "生成タスク 01a0b6ea-30d3-7433-a1cf-34fafc13050d の出力。2026-09-22 に保存画像と生成原本のSHA-256一致を確認。ManagerがOpenAI利用条件ContentのOutput ownershipと適切性評価要件を確認。架空人物・文字やロゴなしの目視範囲で第三者素材の混入を認めず、先生が対象記事への適用と公開を明示指示。第三者権利の非侵害や医学的正確性を絶対保証せず、記事の最終Human reviewは別途必要。",
+      "generation_provenance": {
+        "task_id": "01a0b6ea-30d3-7433-a1cf-34fafc13050d",
+        "saved_file": "implant/implant-denture-consultation-comparison-20260922.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-e6668a77-6918-4aae-a37c-09379a6e83dc.png",
+        "original_sha256": "09708088a6df97b066653237e0741ee93abb56a097f4689455509925e022255c",
+        "original_verified_at": "2026-09-22",
+        "width": 1672,
+        "height": 941,
+        "format": "png"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC023",
+        "title": "インプラントと入れ歯の違いは？相談前の整理",
+        "status": "stock_pending_article_review",
+        "evidence": "docs/diagnostics/image-publication-20260922.md",
+        "article_path": null
       }
     }
   ]

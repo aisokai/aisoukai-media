@@ -1,0 +1,626 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-09-22",
+  "base_commit": "c72b75107b5f28b7e1b782e342722921bf8b87c6",
+  "scope": "復旧対象15記事と別の予定topic023用備蓄画像1点。サイト全記事の精読を意味しない。",
+  "teacher_evidence": "teacher_20260922_explicit_apply_images_and_publish_content_confirmed",
+  "teacher_instruction": "では次は記事への適用をして、もう公開までしてください。内容は確認していますので。",
+  "human_approval_recorded_locally": false,
+  "published": false,
+  "articles": [
+    {
+      "path": "content/posts/2026-08-01-canonical-746f7069635f37643962663436623534313539313938.md",
+      "topic_id": "topic_7d9bf46b54159198",
+      "title": "インプラントの概要と治療選択",
+      "before_raw_sha256": "dd3d9844a947514a8ff2fff7703de6fe58e7fe6751a27d390185306f1f82feb7",
+      "candidate_raw_sha256": "902f2c9cf2cc6f0fd1194c5e9070fc61544623385701cf6b7668b24d95286c2e",
+      "before_body_sha256": "8166c9fff04331c13aa4395ba6ecc98cac030a178bc77067dccb88ed6da845e4",
+      "candidate_body_sha256": "8166c9fff04331c13aa4395ba6ecc98cac030a178bc77067dccb88ed6da845e4",
+      "body_bytes": 5521,
+      "image": "/images/library/implant/implant-structure-overview-20260922.png",
+      "image_sha256": "39a0dc66227c5417920e6befc4f01ed3dbc99aab9ba655163b6474a64bfc4116",
+      "image_git_blob": "a2064a1335f4055ae1cde14ccc817573d1f7a531",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "2b67380ac187dd281b636930b002fb616830cf588f32efdb4873f345c7551dff",
+      "candidate_reviewed_fingerprint": "399dd50c1991a56d5675064783b9e677df6c91f71a31a3f0fe5cc26d2c57e874",
+      "date": "2026-08-01",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-08-31-topic-20260511-022.md",
+      "topic_id": "TOPIC-20260511-022",
+      "title": "親知らずは抜くべき？相談の目安とレントゲンで見るポイント",
+      "before_raw_sha256": "d4529820d978962c27659520d8325a39b3894725d6bdb177a7c39eef2fdc281e",
+      "candidate_raw_sha256": "90dcf7ed814c482de34a4b1c841cf3fe3a723e504071b813fcf7f52b9f2c4c2d",
+      "before_body_sha256": "a6835f3e64101582a5de9a62fb1f01c8f41ce19ef276dba35de8f212cf5ed624",
+      "candidate_body_sha256": "a6835f3e64101582a5de9a62fb1f01c8f41ce19ef276dba35de8f212cf5ed624",
+      "body_bytes": 3783,
+      "image": "/images/library/wisdom-tooth/wisdom-tooth-decision-consultation-20260922.png",
+      "image_sha256": "64f864669f642072fcddce7d34cadd670c8576c6ce1a5c38fcf78fb249cb6a7f",
+      "image_git_blob": "81efcbdb83bb52c89e73e3734180eb175dabc1e3",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "a1e57e28e76d9b6eea011f0ee8ef2d1fa197ecfbcf085c1818ebcb7fd56f5c53",
+      "candidate_reviewed_fingerprint": "16b26b78409cea602419b3f30558825cf9d74c3b36b309ad57a03337bcc84338",
+      "date": "2026-08-31",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "wording_review_required",
+      "content_findings": [
+        {
+          "excerpt": "歯の衛在（前方の歯の移動やスペースの不足）",
+          "reason": "意味の不明な用語を含む抜歯理由。位置の誤字と断定できず、本文は維持。",
+          "proposed_wording_not_applied": "抜歯の要否は、親知らずの位置や周囲の歯への影響を検査して判断します。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-09-02-topic-20260511-023.md",
+      "topic_id": "TOPIC-20260511-023",
+      "title": "親知らずが腫れたときはどうする？受診を急ぐ目安",
+      "before_raw_sha256": "e2ec53fb55ccb7039cdfdb4c65be1049dc6b43ae4ef6339c3aa096f9ccf3b94d",
+      "candidate_raw_sha256": "5bb5294e5ed361129eb09dbb4288335c2277d73b51ee8f161713a501a50fea6d",
+      "before_body_sha256": "469e8d1904ff693af192b855278a1aa0b23523dc5d012e6aa1a017eb2f5e618e",
+      "candidate_body_sha256": "469e8d1904ff693af192b855278a1aa0b23523dc5d012e6aa1a017eb2f5e618e",
+      "body_bytes": 3774,
+      "image": "/images/library/wisdom-tooth/wisdom-tooth-swelling-contact-20260922.png",
+      "image_sha256": "888c534dcfd47899a24f5d93abc1856821d8bbddfaf8228464fd27d38164ed17",
+      "image_git_blob": "88c0382e4b479258505c021929586f30bce01c9c",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "d35940c3e2331cb4a8014fab8fc6cf406f0e7408a3b181bf61407e3b44cbf28a",
+      "candidate_reviewed_fingerprint": "65b485abc8e808474f00ef261da68a0e316b7f67bfea33d356184ada42aca37e",
+      "date": "2026-09-02",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-09-04-topic-20260511-024.md",
+      "topic_id": "TOPIC-20260511-024",
+      "title": "インプラントはどんな人が相談する？治療前に確認すること",
+      "before_raw_sha256": "238a2689d91c2786180cac0a2ba816c6f3308184821d866380df540878bb1282",
+      "candidate_raw_sha256": "0161fd165c78eafd4c50429c5a00795feb44bd796bf731e9601b2be0c859e289",
+      "before_body_sha256": "50d43f3b6f828baeb70818f0cdcd52bafc688eb07ef72f7b825d6a60e10443e6",
+      "candidate_body_sha256": "50d43f3b6f828baeb70818f0cdcd52bafc688eb07ef72f7b825d6a60e10443e6",
+      "body_bytes": 4741,
+      "image": "/images/library/implant/implant-before-treatment-interview-20260922.png",
+      "image_sha256": "f0ad72d78113d6fa520f13ac8291efe5614140a31c8649486ee4900b2aed6e01",
+      "image_git_blob": "1112a8763ecaf14086907454622ff4792908dd4b",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "dbdf5b1b515b270fc295a21c4e06c14a48477aaa434fde32fd9fbb357f73e926",
+      "candidate_reviewed_fingerprint": "549f3323b26753a24819014f67a01b09903341366df296bc2db487c1ef050fce",
+      "date": "2026-09-04",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "年に1回程度／3〜6ヶ月ごと",
+          "reason": "同じ記事内でメンテナンス間隔の説明が一致せず、対象条件の区別も不明。",
+          "proposed_wording_not_applied": "メンテナンスの間隔は、お口の状態に応じて歯科医師と相談して決めます。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-09-07-topic-20260511-025.md",
+      "topic_id": "TOPIC-20260511-025",
+      "title": "インプラント治療の流れは？検査からメンテナンスまで",
+      "before_raw_sha256": "8e20a75b356fcb098be94390d9c505ec2be1f6cfde01e8fe75202aa09b4f8c2c",
+      "candidate_raw_sha256": "34a777d870a314cc339380b1825daf756cee247b96e200de58933d2441a67991",
+      "before_body_sha256": "b989ff6287626826e46804f4bbedb6ce9af80ec454a3633c7217f0eb2e1a5ed7",
+      "candidate_body_sha256": "b989ff6287626826e46804f4bbedb6ce9af80ec454a3633c7217f0eb2e1a5ed7",
+      "body_bytes": 4729,
+      "image": "/images/library/implant/implant-care-stages-vignettes-20260922.png",
+      "image_sha256": "3db72cd1e19479de678a90fb56b92aa58da565962f60103debdd9913250b3fd2",
+      "image_git_blob": "ca8f6104ca6cf2881eb11a5e0cfcf0fc2402fab1",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "fb0b8ec763c4392df0390a10f4cfe03d794bfd67978a8fdbcc91b0e6f1e6cd14",
+      "candidate_reviewed_fingerprint": "9c029b2e5b55f66e12b87022e4b9d26208aacb7060ff9d04be1238b16864785a",
+      "date": "2026-09-07",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "連結する薬剤や接続部品（アバットメント）／指圧洗浄",
+          "reason": "接続部品を薬剤と併記し、清掃方法に意味不明の語がある。",
+          "proposed_wording_not_applied": "人工歯を取り付けるための接続部品（アバットメント）を装着します。清掃方法は歯科医院で確認しましょう。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-09-09-monthly-202610topic003.md",
+      "topic_id": "MONTHLY-202610TOPIC003",
+      "title": "歯ぐきから血が出るときに確認したいポイント",
+      "before_raw_sha256": "1d319a97f7f1b37249d8083b37f8f9f3e514d32a5ba248f486081e344bfb6268",
+      "candidate_raw_sha256": "fd7e174f7b3dd6b21a8c239642dae0b76915e81583fd397c9f47516daf25b771",
+      "before_body_sha256": "c1447f2eb6ec648b3d822522ffae7eaaa73cd7b8c15fcafeecb397675a2cd7ab",
+      "candidate_body_sha256": "c1447f2eb6ec648b3d822522ffae7eaaa73cd7b8c15fcafeecb397675a2cd7ab",
+      "body_bytes": 3882,
+      "image": "/images/library/periodontal/gum-bleeding-self-observation-20260922.png",
+      "image_sha256": "c77c7af3e39779db4f3a55d13b01e95d474f8a056325b5f6457b7284c5dac8a9",
+      "image_git_blob": "e6ff8c8d109bfd6f3bd0abd3899a1d4c40fc5628",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "acc52e35b69cba4653705cfcb9ba5e83357fbe72549781b8078dbc4e911e388a",
+      "candidate_reviewed_fingerprint": "9519725b5e2a5f435869492c6fefa99338637d00b2c598bec3d4cac47c203f31",
+      "date": "2026-09-09",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "歯と歯の間のポケット",
+          "reason": "歯周ポケットの位置を歯間と説明している。",
+          "proposed_wording_not_applied": "歯と歯ぐきの境目の溝（歯周ポケット）が深くなることがあります。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-09-04-mwf-30a6d4534d470e478496d445cee8eea0c72e98e097d716f0bd00fd51f4f5e4c3.md",
+      "topic_id": "MONTHLY-202609TOPIC015",
+      "title": "インプラントのメンテナンスはどれくらい必要？",
+      "before_raw_sha256": "667b0d0efb60608409da48d7b6d70978d9191ec2a6c0ead48a401211be24eab7",
+      "candidate_raw_sha256": "f71b746addd0ee229d34feee8dd17f02c2f47e70f7bbb97ca81614f99245c682",
+      "before_body_sha256": "f7533978d66a3d291b8223958c7b6b2457c9c8fe8f9c82d56b671833f340128f",
+      "candidate_body_sha256": "f7533978d66a3d291b8223958c7b6b2457c9c8fe8f9c82d56b671833f340128f",
+      "body_bytes": 3655,
+      "image": "/images/library/implant/implant-maintenance-tools-model-20260922.png",
+      "image_sha256": "90f22055e2bb994d85fcc7715e8cd438e6295d173146f093647a3cc14dce96a6",
+      "image_git_blob": "92bb61271912cb5d12357f1608bb2305f3120fd7",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "b9881791b07f6abc439c7e527de5c3f8e15318aff771652fbe0c0a50b5342fc4",
+      "candidate_reviewed_fingerprint": "ceca147ab9ddedf5ba00c8f9d8d95ca0c448705b2fdc56b142eda5d4bbbe2c86",
+      "date": "2026-09-04",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-09-07-mwf-044def187745757ce9e17ecbb9020b7172997360715cb61b9a1cbd2e804f1c01.md",
+      "topic_id": "MONTHLY-202609TOPIC016",
+      "title": "急な歯の痛みで予約するときに伝えるとよいこと",
+      "before_raw_sha256": "54815ddd310392670d8fbd62a039c791e1f9450ba83a36f15d57d7ca93f89a65",
+      "candidate_raw_sha256": "a16ff5cae2af6b7def263919ddf138e9c3ace188ef6d34edc828dab6405d0fdf",
+      "before_body_sha256": "2d802fc22cf6ec3703afbda10ef4f5eddcfda0cdab18c50c110cefd7871f4f45",
+      "candidate_body_sha256": "2d802fc22cf6ec3703afbda10ef4f5eddcfda0cdab18c50c110cefd7871f4f45",
+      "body_bytes": 3896,
+      "image": "/images/library/general/urgent-dental-pain-phone-intake-20260922.png",
+      "image_sha256": "b5ac411b95eba2c7a7c3857d7b485f63b0413d7595f5aa5e11a1ba371a23da6b",
+      "image_git_blob": "5af100a2513daaa3d8fec5776487c9a2172950ce",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "d83b340d8a34a7e5ea805fbbab63d754bd70fb30b3c2ba12b012ae9b406d3f4a",
+      "candidate_reviewed_fingerprint": "ceeb0b7993d229b3aed5f97b255cc948ab4976a9d7d92f5368701eb1ca1f80bf",
+      "date": "2026-09-07",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "冷温刺激の影響を確かめ、痛みが和らぐ方を試してみましょう",
+          "reason": "痛む歯への温冷刺激を試す指示がある。",
+          "proposed_wording_not_applied": "痛みを誘発する刺激を避け、受診までの対応は歯科医院へ相談しましょう。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-09-09-mwf-edccaa363284e2bec24e2563da22b8167fc57c8d37df0c0737a50116c86ca99d.md",
+      "topic_id": "MONTHLY-202609TOPIC017",
+      "title": "歯ブラシだけで足りる？デンタルフロスの使いどころ",
+      "before_raw_sha256": "26dcfbc32ca663ce3ce5f7d5334b6ab0f20710bed2db1802e510e90a550b4331",
+      "candidate_raw_sha256": "b36cc88aa7a19c678b6c2d238e785f1425481f4ab22a7761e8c7d3e3371f1d0d",
+      "before_body_sha256": "7959e95696bb79e51ad4141b7acc68e5a42238a6a38e14bc2733bb01443d6b41",
+      "candidate_body_sha256": "7959e95696bb79e51ad4141b7acc68e5a42238a6a38e14bc2733bb01443d6b41",
+      "body_bytes": 3846,
+      "image": "/images/library/preventive/dental-floss-roll-and-toothbrush.png",
+      "image_sha256": "57c6e514d17f1efa21d68024f67cb6c3d59ffdb56fd1412723b437f162e92db5",
+      "image_git_blob": "a9fe331d156aeb1388b98e044aad085fdf1baf45",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "6a2566cf016c691219e1ead43172b2f5b4150b1bd8bdba064f2158bc739a2c4a",
+      "candidate_reviewed_fingerprint": "fb2aeddbc6da56d8ec3f4e136bc21ceb0bbb297d17a00f3d0952a8773505eefb",
+      "date": "2026-09-09",
+      "prior_review_evidence": {
+        "reviewed_at": "2026-09-18",
+        "reviewed_by": "三谷",
+        "reviewed_content_hash": "6a2566cf016c691219e1ead43172b2f5b4150b1bd8bdba064f2158bc739a2c4a"
+      },
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-09-18-mwf-baf5a908dd680f864c9274e9475518ddf298243c902752030ed47f46c299723e.md",
+      "topic_id": "MONTHLY-202609TOPIC008",
+      "title": "歯医者が苦手な人が受診前にできる準備",
+      "before_raw_sha256": "1b507f846686ca1737e3ce0c89d2afacdc0c3b14dcf73e7b675e4f327b35f241",
+      "candidate_raw_sha256": "14ee8944cc24a622a1bc8c35c7e6b0e9565d05bfd319cb3c8a51036dc68326ba",
+      "before_body_sha256": "ed6af914c14af0ab0c3a085c05e11360dd8cda3274568b34341f0a3e401074ed",
+      "candidate_body_sha256": "ed6af914c14af0ab0c3a085c05e11360dd8cda3274568b34341f0a3e401074ed",
+      "body_bytes": 3657,
+      "image": "/images/library/general/dental-anxiety-previsit-notes-20260922.png",
+      "image_sha256": "972cb7e12749624e07b2ab96aeafba7df5f9c795cafbf2c5e605854f659126e4",
+      "image_git_blob": "1fc3c6d2df3aa7e727b56bd80d7e2ca889a9dd9c",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "89c7ffcf4dea071239493d5024d8ed0c51207250e5b9fed80e1b104f337a5a3f",
+      "candidate_reviewed_fingerprint": "2dc2dd48f852f1bb021f24056fb6006afbc0899083033e43d4aedb00781425be",
+      "date": "2026-09-18",
+      "prior_review_evidence": {
+        "reviewed_at": "2026-09-18",
+        "reviewed_by": "三谷",
+        "reviewed_content_hash": "89c7ffcf4dea071239493d5024d8ed0c51207250e5b9fed80e1b104f337a5a3f"
+      },
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-09-18-mwf-26c9e558f26e01ec82c14cea442710b42e54df3bdba398b5da03190fc65eda3c.md",
+      "topic_id": "MONTHLY-202609TOPIC004",
+      "title": "子どもの仕上げ磨きはいつまで必要？年齢ごとの目安",
+      "before_raw_sha256": "40508260dca879864d4df4f2bb0bc4f1ff11c74848844e0ae8224511f0897033",
+      "candidate_raw_sha256": "920652012f773414ec9c3f9e121d8486237dcf5850c4d3b11eb89f7a66e3cf12",
+      "before_body_sha256": "9ed9bb1b183aff319468e4fc311f51adf2afc5e5240b01c63be4567f6fc873db",
+      "candidate_body_sha256": "9ed9bb1b183aff319468e4fc311f51adf2afc5e5240b01c63be4567f6fc873db",
+      "body_bytes": 3928,
+      "image": "/images/library/pediatric/parent-assisted-child-brushing-20260922.png",
+      "image_sha256": "8f3c5d4f3665d7e0b13088c549eb7b46d7b9dcfd7ed601b6c15fb63c19ebbcba",
+      "image_git_blob": "c5584c437f3a3e29b4d964923938269131b185e5",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "86a9c57dba588a50b9202557ef97a9fa40acd05daf1c0bbeedccac118c11e657",
+      "candidate_reviewed_fingerprint": "f1e35dac274cd04fa86e6694decdbba893f362ad1c5d19c09c38fe11ef271318",
+      "date": "2026-09-18",
+      "prior_review_evidence": {
+        "reviewed_at": "2026-09-18",
+        "reviewed_by": "三谷",
+        "reviewed_content_hash": "86a9c57dba588a50b9202557ef97a9fa40acd05daf1c0bbeedccac118c11e657"
+      },
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "5〜7割程度の圧力",
+          "reason": "力の基準が不明で、仕上げ磨きの実施方法を誤解させる。年齢説明も再確認対象。",
+          "proposed_wording_not_applied": "毛先が大きく広がらない程度の軽い力で磨き、具体的な当て方を歯科医院で確認しましょう。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-08-01-canonical-746f7069635f39356436393861646565323439343338.md",
+      "topic_id": "topic_95d698adee249438",
+      "title": "ホームホワイトニングとオフィスホワイトニング何がどう違うの?",
+      "before_raw_sha256": "735f73f0ceb3fdc2a39bf23f7320f4e6ffd7de64857d528f88a4e7a06de6c4bc",
+      "candidate_raw_sha256": "735f73f0ceb3fdc2a39bf23f7320f4e6ffd7de64857d528f88a4e7a06de6c4bc",
+      "before_body_sha256": "7f0cd1a9143d31c04007d27185d8563d4d4f92ce7a606b7ed885fd116adca983",
+      "candidate_body_sha256": "7f0cd1a9143d31c04007d27185d8563d4d4f92ce7a606b7ed885fd116adca983",
+      "body_bytes": 1547,
+      "image": "/images/library/preventive/whitening-home-office-comparison.png",
+      "image_sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+      "image_git_blob": "2a46446398939351c99e92f51c01d2138930ed94",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "482f0509e6d3485b826024b3099c2cfab12f7b65a58a123143c8721eca9c59ef",
+      "candidate_reviewed_fingerprint": "482f0509e6d3485b826024b3099c2cfab12f7b65a58a123143c8721eca9c59ef",
+      "date": "2026-08-01",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "ホームは自宅で行える／オフィスとは違い歯科医院での治療",
+          "reason": "ホームホワイトニングを自宅・医院での施術の両方として説明する内部矛盾。",
+          "proposed_wording_not_applied": "ホームホワイトニングは歯科医院で作ったトレーを使って自宅で行い、オフィスホワイトニングは歯科医院で施術を受けます。"
+        }
+      ]
+    },
+    {
+      "path": "content/posts/2026-08-01-canonical-746f7069635f39376332363436646166323439306330.md",
+      "topic_id": "topic_97c2646daf2490c0",
+      "title": "【何回通えば白くなる?】ホワイトニングの回数",
+      "before_raw_sha256": "fa1bd056545c67d08f493c5b6a50ae92e84657fb4b1ad30b5fdb1659b365c14f",
+      "candidate_raw_sha256": "fa1bd056545c67d08f493c5b6a50ae92e84657fb4b1ad30b5fdb1659b365c14f",
+      "before_body_sha256": "54963428ad5015e4c47e147abaa1a96691047eab736b7a6c2d780e21eeaab371",
+      "candidate_body_sha256": "54963428ad5015e4c47e147abaa1a96691047eab736b7a6c2d780e21eeaab371",
+      "body_bytes": 1764,
+      "image": "/images/library/preventive/whitening-treatment-planning.png",
+      "image_sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+      "image_git_blob": "b65c998402f92aeff5021fdceae2e90a0d9809ab",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "8d0ea73d2ebe0a75283d03a36c31f349f7fed149bf1964c8a04126f7c8afa1ad",
+      "candidate_reviewed_fingerprint": "8d0ea73d2ebe0a75283d03a36c31f349f7fed149bf1964c8a04126f7c8afa1ad",
+      "date": "2026-08-01",
+      "prior_review_evidence": {},
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-09-14-mwf-dc9cb641217214c197f4d5ea0036cb1507f44a028229779fc21fd6515e859687.md",
+      "topic_id": "MONTHLY-202609TOPIC019",
+      "title": "歯ぐきが下がった気がするときに考えられる原因",
+      "before_raw_sha256": "88408160cb9508984a865cef887a533abb6dfe8df12c5260ab48802dc8933668",
+      "candidate_raw_sha256": "88408160cb9508984a865cef887a533abb6dfe8df12c5260ab48802dc8933668",
+      "before_body_sha256": "5963b304f16884f332a5311f5c131e55c04f1427d952edfc0d27ccc3519ae872",
+      "candidate_body_sha256": "5963b304f16884f332a5311f5c131e55c04f1427d952edfc0d27ccc3519ae872",
+      "body_bytes": 3998,
+      "image": "/images/library/periodontal/gingival-recession-comparison.png",
+      "image_sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+      "image_git_blob": "60dbc9d61f5dbf2e50efc46bc1b5605b9fbe4c8d",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "2dadeead75caaa570326a156cfa081337b4624c60b9acec2a8e83ab1217532e0",
+      "candidate_reviewed_fingerprint": "2dadeead75caaa570326a156cfa081337b4624c60b9acec2a8e83ab1217532e0",
+      "date": "2026-09-14",
+      "prior_review_evidence": {
+        "reviewed_at": "2026-09-18",
+        "reviewed_by": "三谷",
+        "reviewed_content_hash": "31a33079923c5e1b84fd506eb1cd2419ff29d66991707931a8a053b0f39f73f6"
+      },
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "candidate_pending_independent_and_authenticated_human_review",
+      "content_findings": []
+    },
+    {
+      "path": "content/posts/2026-09-16-mwf-65d2546f7886459bf227361374bf323d3b9f22b32e8b1d1d736d79ad7bc3c19d.md",
+      "topic_id": "MONTHLY-202609TOPIC020",
+      "title": "乳歯の虫歯は放置してもいい？受診が必要な理由",
+      "before_raw_sha256": "fbdacc6d5c953c8101f31554847d2698daacf8ca1aa05442ae3cfae05746a28c",
+      "candidate_raw_sha256": "fbdacc6d5c953c8101f31554847d2698daacf8ca1aa05442ae3cfae05746a28c",
+      "before_body_sha256": "975c03815639e6d769d234c3d949b14022e8092621f0700029cacf06840d09f3",
+      "candidate_body_sha256": "975c03815639e6d769d234c3d949b14022e8092621f0700029cacf06840d09f3",
+      "body_bytes": 4072,
+      "image": "/images/library/pediatric/primary-tooth-caries-progression.png",
+      "image_sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+      "image_git_blob": "961cff46ccbd3f61dee5fb13bb453fe8c12672fd",
+      "image_alignment": "PASS",
+      "human_approval": "pending_authenticated_admin",
+      "body_unchanged": true,
+      "before_reviewed_fingerprint": "ed6a3f9c8591cc278f9261cfe91ffb86f64b96bbe3ee98f3f860065209bdde45",
+      "candidate_reviewed_fingerprint": "ed6a3f9c8591cc278f9261cfe91ffb86f64b96bbe3ee98f3f860065209bdde45",
+      "date": "2026-09-16",
+      "prior_review_evidence": {
+        "reviewed_at": "2026-09-18",
+        "reviewed_by": "三谷",
+        "reviewed_content_hash": "d3ec20f5255353109dabcf9c3740d3a619fd175f6f447699e1e3035f08efcf6a"
+      },
+      "validation": {
+        "errors": [],
+        "warnings": []
+      },
+      "publication_disposition": "publication_hold",
+      "content_findings": [
+        {
+          "excerpt": "虫歯の兆候が軽度でも、10〜12か月程度の頻度で受診",
+          "reason": "虫歯の兆候がある子どもの受診を長期間待ってよいと受け取れる。",
+          "proposed_wording_not_applied": "虫歯が疑われる変化に気づいたら、痛みがなくても歯科医院へ相談しましょう。定期受診の間隔はお口の状態に応じて決めます。"
+        }
+      ]
+    }
+  ],
+  "images": [
+    {
+      "image": "/images/library/implant/implant-structure-overview-20260922.png",
+      "sha256": "39a0dc66227c5417920e6befc4f01ed3dbc99aab9ba655163b6474a64bfc4116",
+      "git_blob": "a2064a1335f4055ae1cde14ccc817573d1f7a531",
+      "original_sha256": "39a0dc66227c5417920e6befc4f01ed3dbc99aab9ba655163b6474a64bfc4116",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-85d32292-bdc9-4aff-bda1-898177d586db.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-08-01-canonical-746f7069635f37643962663436623534313539313938.md"
+    },
+    {
+      "image": "/images/library/wisdom-tooth/wisdom-tooth-decision-consultation-20260922.png",
+      "sha256": "64f864669f642072fcddce7d34cadd670c8576c6ce1a5c38fcf78fb249cb6a7f",
+      "git_blob": "81efcbdb83bb52c89e73e3734180eb175dabc1e3",
+      "original_sha256": "64f864669f642072fcddce7d34cadd670c8576c6ce1a5c38fcf78fb249cb6a7f",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-4c73241a-3e07-4a46-9442-8099998fbf07.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-08-31-topic-20260511-022.md"
+    },
+    {
+      "image": "/images/library/wisdom-tooth/wisdom-tooth-swelling-contact-20260922.png",
+      "sha256": "888c534dcfd47899a24f5d93abc1856821d8bbddfaf8228464fd27d38164ed17",
+      "git_blob": "88c0382e4b479258505c021929586f30bce01c9c",
+      "original_sha256": "888c534dcfd47899a24f5d93abc1856821d8bbddfaf8228464fd27d38164ed17",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-6d25bd08-467c-45e9-9cf7-2a265404946c.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-02-topic-20260511-023.md"
+    },
+    {
+      "image": "/images/library/implant/implant-before-treatment-interview-20260922.png",
+      "sha256": "f0ad72d78113d6fa520f13ac8291efe5614140a31c8649486ee4900b2aed6e01",
+      "git_blob": "1112a8763ecaf14086907454622ff4792908dd4b",
+      "original_sha256": "f0ad72d78113d6fa520f13ac8291efe5614140a31c8649486ee4900b2aed6e01",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-7f58a068-4e85-47b1-97fe-f0a25b8118d5.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-04-topic-20260511-024.md"
+    },
+    {
+      "image": "/images/library/implant/implant-care-stages-vignettes-20260922.png",
+      "sha256": "3db72cd1e19479de678a90fb56b92aa58da565962f60103debdd9913250b3fd2",
+      "git_blob": "ca8f6104ca6cf2881eb11a5e0cfcf0fc2402fab1",
+      "original_sha256": "3db72cd1e19479de678a90fb56b92aa58da565962f60103debdd9913250b3fd2",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-f8e6b000-0f74-4535-9197-db1a2345da70.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-07-topic-20260511-025.md"
+    },
+    {
+      "image": "/images/library/periodontal/gum-bleeding-self-observation-20260922.png",
+      "sha256": "c77c7af3e39779db4f3a55d13b01e95d474f8a056325b5f6457b7284c5dac8a9",
+      "git_blob": "e6ff8c8d109bfd6f3bd0abd3899a1d4c40fc5628",
+      "original_sha256": "c77c7af3e39779db4f3a55d13b01e95d474f8a056325b5f6457b7284c5dac8a9",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-f46f4558-5059-4649-8d27-a194890dc824.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-09-monthly-202610topic003.md"
+    },
+    {
+      "image": "/images/library/implant/implant-maintenance-tools-model-20260922.png",
+      "sha256": "90f22055e2bb994d85fcc7715e8cd438e6295d173146f093647a3cc14dce96a6",
+      "git_blob": "92bb61271912cb5d12357f1608bb2305f3120fd7",
+      "original_sha256": "90f22055e2bb994d85fcc7715e8cd438e6295d173146f093647a3cc14dce96a6",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-22c86b76-3f5b-47ec-a365-5b9a3bd487a0.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-04-mwf-30a6d4534d470e478496d445cee8eea0c72e98e097d716f0bd00fd51f4f5e4c3.md"
+    },
+    {
+      "image": "/images/library/general/urgent-dental-pain-phone-intake-20260922.png",
+      "sha256": "b5ac411b95eba2c7a7c3857d7b485f63b0413d7595f5aa5e11a1ba371a23da6b",
+      "git_blob": "5af100a2513daaa3d8fec5776487c9a2172950ce",
+      "original_sha256": "b5ac411b95eba2c7a7c3857d7b485f63b0413d7595f5aa5e11a1ba371a23da6b",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-618928a5-d885-4456-80c6-ffe5b9f2c713.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-07-mwf-044def187745757ce9e17ecbb9020b7172997360715cb61b9a1cbd2e804f1c01.md"
+    },
+    {
+      "image": "/images/library/preventive/dental-floss-roll-and-toothbrush.png",
+      "sha256": "57c6e514d17f1efa21d68024f67cb6c3d59ffdb56fd1412723b437f162e92db5",
+      "git_blob": "a9fe331d156aeb1388b98e044aad085fdf1baf45",
+      "original_sha256": "57c6e514d17f1efa21d68024f67cb6c3d59ffdb56fd1412723b437f162e92db5",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-691e3c32-f726-4199-a636-70dfded1bcd1.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-09-mwf-edccaa363284e2bec24e2563da22b8167fc57c8d37df0c0737a50116c86ca99d.md"
+    },
+    {
+      "image": "/images/library/general/dental-anxiety-previsit-notes-20260922.png",
+      "sha256": "972cb7e12749624e07b2ab96aeafba7df5f9c795cafbf2c5e605854f659126e4",
+      "git_blob": "1fc3c6d2df3aa7e727b56bd80d7e2ca889a9dd9c",
+      "original_sha256": "972cb7e12749624e07b2ab96aeafba7df5f9c795cafbf2c5e605854f659126e4",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-ac3251a7-13e4-40db-97a1-699b62eef13a.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-18-mwf-baf5a908dd680f864c9274e9475518ddf298243c902752030ed47f46c299723e.md"
+    },
+    {
+      "image": "/images/library/pediatric/parent-assisted-child-brushing-20260922.png",
+      "sha256": "8f3c5d4f3665d7e0b13088c549eb7b46d7b9dcfd7ed601b6c15fb63c19ebbcba",
+      "git_blob": "c5584c437f3a3e29b4d964923938269131b185e5",
+      "original_sha256": "8f3c5d4f3665d7e0b13088c549eb7b46d7b9dcfd7ed601b6c15fb63c19ebbcba",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-3bbec948-7a9c-4685-b71b-0101ef8ad5c3.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-18-mwf-26c9e558f26e01ec82c14cea442710b42e54df3bdba398b5da03190fc65eda3c.md"
+    },
+    {
+      "image": "/images/library/implant/implant-denture-consultation-comparison-20260922.png",
+      "sha256": "09708088a6df97b066653237e0741ee93abb56a097f4689455509925e022255c",
+      "git_blob": "a0c8686fde8f677c14dc2fb9c145db025b3f280f",
+      "original_sha256": "09708088a6df97b066653237e0741ee93abb56a097f4689455509925e022255c",
+      "original_file": "/Users/caelus/.codex/generated_images/01a0b6ea-30d3-7433-a1cf-34fafc13050d/exec-e6668a77-6918-4aae-a37c-09379a6e83dc.png",
+      "visual_check": "PASS",
+      "article_path": null
+    },
+    {
+      "image": "/images/library/preventive/whitening-home-office-comparison.png",
+      "sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+      "git_blob": "2a46446398939351c99e92f51c01d2138930ed94",
+      "original_sha256": "fb8d31fa5f0d0e94db0011b071f70497893c930447ffa4cfee1ff5b3d89330ff",
+      "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/01-home-office-whitening-japanese-v2.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-08-01-canonical-746f7069635f39356436393861646565323439343338.md"
+    },
+    {
+      "image": "/images/library/preventive/whitening-treatment-planning.png",
+      "sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+      "git_blob": "b65c998402f92aeff5021fdceae2e90a0d9809ab",
+      "original_sha256": "7866573c07b2e9e18c7c61634fa06bc110f563f7ce9d885d923b54dcb657c3de",
+      "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/02-whitening-planning-japanese-v2.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-08-01-canonical-746f7069635f39376332363436646166323439306330.md"
+    },
+    {
+      "image": "/images/library/periodontal/gingival-recession-comparison.png",
+      "sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+      "git_blob": "60dbc9d61f5dbf2e50efc46bc1b5605b9fbe4c8d",
+      "original_sha256": "206cc66c72d2fc48925332fc41253b629994de8d496db46762638c541d7269b2",
+      "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/03-gingival-recession.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-14-mwf-dc9cb641217214c197f4d5ea0036cb1507f44a028229779fc21fd6515e859687.md"
+    },
+    {
+      "image": "/images/library/pediatric/primary-tooth-caries-progression.png",
+      "sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+      "git_blob": "961cff46ccbd3f61dee5fb13bb453fe8c12672fd",
+      "original_sha256": "000a4cd98fc1e58b39f92f8ccab3d9f89219321cb453604678049c54cbf1cc21",
+      "original_file": "/Users/caelus/projects/aisoukai-media/output/imagegen/20260919-review-candidates/04-primary-tooth-caries.png",
+      "visual_check": "PASS",
+      "article_path": "content/posts/2026-09-16-mwf-65d2546f7886459bf227361374bf323d3b9f22b32e8b1d1d736d79ad7bc3c19d.md"
+    }
+  ],
+  "validation_summary": {
+    "articles_passed": 15,
+    "body_preservation_passed": 15,
+    "metadata_preservation_passed": 15,
+    "image_selections_passed": 15,
+    "stock_without_article_not_selected": true
+  },
+  "publication_holds": 7,
+  "additional_wording_review": 1,
+  "image_application_passed": 15
+}
