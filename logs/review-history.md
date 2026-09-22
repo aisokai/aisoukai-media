@@ -707,3 +707,11 @@ slug: 2026-09-04-mwf-30a6d4534d470e478496d445cee8eea0c72e98e097d716f0bd00fd51f4f
 reviewed_by: 三谷
 date: 2026-09-04
 
+## 2026-09-23T08:46:38.612+09:00
+datetime: 2026-09-23T08:46:38.612+09:00
+action: approve
+slug: 2026-09-02-topic-20260511-023
+reviewed_by: 三谷
+date: 2026-09-02
+publish_at: 2026-09-02
+
