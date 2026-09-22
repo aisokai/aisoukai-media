@@ -677,3 +677,11 @@ reviewed_by: 三谷
 date: 2026-09-09
 publish_at: 2026-09-09
 
+## 2026-09-23T08:46:28.932+09:00
+datetime: 2026-09-23T08:46:28.932+09:00
+action: approve
+slug: 2026-09-07-topic-20260511-025
+reviewed_by: 三谷
+date: 2026-09-07
+publish_at: 2026-09-07
+
