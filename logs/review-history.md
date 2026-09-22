@@ -669,3 +669,11 @@ slug: 2026-09-09-mwf-edccaa363284e2bec24e2563da22b8167fc57c8d37df0c0737a50116c86
 reviewed_by: 三谷
 date: 2026-09-09
 
+## 2026-09-23T08:46:07.064+09:00
+datetime: 2026-09-23T08:46:07.064+09:00
+action: approve
+slug: 2026-09-09-monthly-202610topic003
+reviewed_by: 三谷
+date: 2026-09-09
+publish_at: 2026-09-09
+
