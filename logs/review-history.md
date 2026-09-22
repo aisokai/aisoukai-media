@@ -723,3 +723,11 @@ reviewed_by: 三谷
 date: 2026-08-31
 publish_at: 2026-08-31
 
+## 2026-09-23T08:46:44.387+09:00
+datetime: 2026-09-23T08:46:44.387+09:00
+action: approve
+slug: 2026-08-01-canonical-746f7069635f39376332363436646166323439306330
+reviewed_by: 三谷
+date: 2026-08-01
+publish_at: 2026-08-01
+
