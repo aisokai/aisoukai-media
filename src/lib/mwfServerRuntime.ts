@@ -15,6 +15,12 @@ import {createTieredReviewer} from '../../scripts/lib/mwf-tiered-review.mjs'
 
 type ServerRequest={schema?:number;publicationMode?:string;slot?:string;operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string;baselineBlob?:string;proposalPath?:string}
 const cache=new Map<string, Promise<ReturnType<typeof comparisonSet>>>()
+// Expose only fixed diagnostic codes, never exception text, paths or response bodies.
+const comparisonFailureCodes=new Set(['inventory_anchor_mismatch','inventory_evidence_incomplete','inventory_metadata_unverified','comparison_history_limit','history_path_invalid','history_signature_invalid','canonical_listing_incomplete','unsupported_canonical_entry','comparison_metadata_unavailable','approval_listing_invalid','approval_path_invalid','approval_evidence_invalid','approval_current_unproven','approval_metadata_ambiguous','comparison_git_blob_invalid','comparison_current_changed','comparison_approved_baseline_unavailable','comparison_approved_baseline_changed','comparison_baseline_unavailable','comparison_baseline_changed','comparison_unreviewed_change','approved_baseline_not_found','invalid_approved_baseline_history','invalid_git_blob_response'])
+export function safeComparisonFailure(error:unknown){
+ const message=error instanceof Error?error.message:''
+ return comparisonFailureCodes.has(message)?message:'canonical_evidence_unavailable'
+}
 export function createMwfServerRuntime(){
  const secret=process.env.ADMIN_REVIEW_COOKIE_SECRET
  if(!secret||!process.env.GITHUB_REVIEW_TOKEN||(process.env.GITHUB_REVIEW_REPO&&process.env.GITHUB_REVIEW_REPO!=='aisokai/aisoukai-media')||(process.env.GITHUB_REVIEW_BRANCH&&process.env.GITHUB_REVIEW_BRANCH!=='main'))throw Error('server_configuration_missing')
@@ -71,10 +77,10 @@ export function createMwfServerRuntime(){
     return{...minor,kind:'minor' as const,set,comparisonHash:set.hash}
    }
    const topic=parseCsv(await text('data/article-topics.sample.csv',ref)).find((t:Record<string,string>)=>t.id===request.topicId)
-   let adoption;try{adoption=await json(`data/topic-adoptions/${request.topicId}.json`,ref)}catch{/* Unknown adoption remains unproven; it never becomes publication authority. */}
+   let adoption,adoptionFailure='topic_adoption_unproven';try{adoption=await json(`data/topic-adoptions/${request.topicId}.json`,ref)}catch(error){adoptionFailure=(error as {code?:string}).code==='NOT_FOUND'?'topic_adoption_missing':'topic_adoption_unavailable'}
    const evidence=verifyBlogEvidence(adoption,'teacher-topic-adoption',secret)
    const publicationAllowed=Boolean(topic&&topic.status==='approved'&&topicContentVersion(topic)===request.topicVersion&&!isProtectedEditorialInput(topic)&&evidence?.topicId===request.topicId&&evidence.topicVersion===request.topicVersion)
-   if(request.operation==='prepare'&&!publicationAllowed)return{ok:false as const,reason:'topic_adoption_unproven'}
+   if(request.operation==='prepare'&&!publicationAllowed)return{ok:false as const,reason:adoptionFailure}
    if(request.schema===3&&(topic?.publish_date!==request.slot?.slice(0,10)||new Date(request.slot!).getTime()>Date.now()))return{ok:false as const,reason:'backfill_date_mismatch'}
    const set=await comparisons(ref,request.artifactPath)
    if(set.entries.some((e:{metadata:unknown})=>!e.metadata||isProtectedEditorialInput(e.metadata)))return{ok:false as const,reason:'comparison_metadata_incomplete'}
@@ -86,7 +92,7 @@ export function createMwfServerRuntime(){
     const parsed=matter(decoded);if(parsed.data.draft!==true||parsed.data.reviewed!==false||parsed.data.auto_approved!==false||isProtectedEditorialInput(parsed.data,parsed.content)||parsed.data.source_topic_id!==request.topicId||parsed.data.source_topic_version!==request.topicVersion)return{ok:false as const,reason:'unreviewed_draft_required'}
    }
    return{ok:true as const,kind:'normal' as const,topic,adoption,set,comparisonHash:set.hash,validatedBytes,publicationAllowed}
-  }catch{return{ok:false as const,reason:'canonical_evidence_unavailable'}}
+  }catch(error){return{ok:false as const,reason:safeComparisonFailure(error)}}
  }
  const provider=async(url:string,options:RequestInit&{reviewRequest?:boolean})=>{
   if(url==='https://api.openai.com/v1/chat/completions'){

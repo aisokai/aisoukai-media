@@ -89,6 +89,14 @@ export function deliveryStatus(store, now = new Date(), onlyTopic) {
     lastSuccessAt: items.filter(i => i.state === 'notified').map(i => i.notifiedAt).sort().at(-1) ?? null,
     items: items.map(({ id, slot, topicId, state, stage, updatedAt, contentVersion }) => ({ id, slot, topicId, state, stage, updatedAt, contentVersion })) }
 }
+export function summarizeIntakeHolds(holds){
+ const counts={adoptionMissing:0,adoptionUnverified:0,adoptionUnavailable:0,comparisons:0,dateInvalid:0,duplicate:0,precheck:0,other:0}
+ for(const {reason} of holds){
+  const group=reason==='topic_adoption_missing'?'adoptionMissing':reason==='topic_adoption_unproven'?'adoptionUnverified':reason==='topic_adoption_unavailable'?'adoptionUnavailable':reason==='topic_date_invalid'?'dateInvalid':reason==='duplicate_metadata'?'duplicate':typeof reason==='string'&&/^(?:canonical_evidence_|comparison_|approval_|approved_|inventory_|history_|canonical_listing_|unsupported_canonical_)/.test(reason)?'comparisons':typeof reason==='string'&&/^(?:precheck_|legacy_precheck_|generation_configuration_missing)/.test(reason)?'precheck':'other'
+  counts[group]++
+ }
+ return counts
+}
 export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic, backfill }) {
   const release = store.acquire()
   try {
@@ -97,13 +105,14 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
     if(onlyTopic&&!backfill){const existing=items.find(i=>i.topicId===onlyTopic);if(existing)slot=existing.slot}
     let intakeError = onlyTopic&&!backfill&&items.some(i=>i.deliveryMode!=='backfill'&&i.slot===slot&&i.topicId!==onlyTopic)?'slot_or_topic_already_reserved':null
     if(intakeError)retryOnly=true
-    let candidateHolds = []
+    let candidateHolds = [],deferredCount=0
     let topic
     if (!retryOnly && select) {
       try {
         const selection = await select({ items, slot })
         candidateHolds=selection?.holds??[]
-        if (!selection || selection.holdOnly) { retryOnly = true; intakeError = candidateHolds.length?'candidate-holds':'no-unused-topic' }
+        deferredCount=Number.isSafeInteger(selection?.deferredCount)&&selection.deferredCount>0?selection.deferredCount:0
+        if (!selection || selection.holdOnly) { retryOnly = true; intakeError = candidateHolds.length?'candidate-holds':deferredCount?'no-due-topic':'no-unused-topic' }
         else { topicId = selection.topicId; topic = selection.topic }
       } catch(error) { retryOnly = true; intakeError = ['candidate_configuration_missing','historical_inventory_evidence_missing','preserved_artifact_changed'].includes(error?.message)?error.message:'topic-intake-failed' }
     }
@@ -171,6 +180,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         save({ state: item.state === 'sending' ? 'notification-unknown' : item.state === 'generating' ? 'generation-unknown' : item.stage === 'sync' ? 'sync-failed' : 'pending-reflection' })
       }
     }
+    const holdCounts=summarizeIntakeHolds(candidateHolds)
     let intakeNotification
     if(intakeError&&slot&&!backfill&&adapters.notifyIntake&&store.intakeNotice){
       // The exclusive run lock and durable pre-send state prevent repeat sends,
@@ -179,11 +189,11 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
       if(previous)intakeNotification=previous==='sending'?'unknown':previous
       else{
         store.intakeNotice(slot,'sending')
-        try{const notice=await adapters.notifyIntake({slot,reason:intakeError,heldCount:candidateHolds.length});intakeNotification=['sent','not-sent'].includes(notice?.status)?notice.status:'unknown'}catch{intakeNotification='unknown'}
+        try{const notice=await adapters.notifyIntake({slot,reason:intakeError,heldCount:candidateHolds.length,holdCounts,deferredCount});intakeNotification=['sent','not-sent'].includes(notice?.status)?notice.status:'unknown'}catch{intakeNotification='unknown'}
         store.intakeNotice(slot,intakeNotification)
       }
     }
     const status = deliveryStatus(store,new Date(),onlyTopic)
-    return { ...status, intakeError, candidateHolds, ...(intakeNotification?{intakeNotification}:{}), ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
+    return { ...status, intakeError, candidateHolds, holdCounts, deferredCount, ...(intakeNotification?{intakeNotification}:{}), ok: !intakeError && status.items.length > 0 && status.items.every(i => i.state === 'notified') }
   } finally { release() }
 }

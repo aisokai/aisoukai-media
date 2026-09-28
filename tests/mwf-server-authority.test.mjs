@@ -75,3 +75,25 @@ test('backfill authority never invokes available reviewer and persists draft-onl
  const result=await createServerAuthority(f.options).wake(id)
  assert.equal(result.status,'draft-review-required');assert.equal(result.reason,'backfill_draft_only');assert.equal(result.published,false);assert.equal(f.paid(),0)
 })
+
+test('generated missing and assigned image markers pass the closed draft guard with no publication authority',async()=>{
+ const {serializeMwfArticle}=await import('../src/lib/mwfArticleSerialization.mjs')
+ const {imageShortage,selectMwfImage}=await import('../scripts/lib/mwf-images.mjs')
+ const {decodeBoundArticle}=await import('../src/lib/mwfServerAuthority.mjs')
+ const base={title:'Synthetic',excerpt:'Synthetic',category:'その他',generation_run_id:'openai:synthetic',source_topic_id:'synthetic',source_topic_version:'a'.repeat(64),draft:true,reviewed:false,auto_approved:false,publication_status:'draft'}
+ const asset={path:'/images/library/synthetic.png',alt:'Synthetic image',content_sha256:'b'.repeat(64),git_blob:'c'.repeat(40),license_status:'approved',license_source:'synthetic',license_note:'Synthetic licensed',topic_assignment:{topic_id:'synthetic',title:'Synthetic',status:'visually_matched',evidence:'Synthetic only'}}
+ const selected=selectMwfImage({images:[asset]},{id:'synthetic',title:'Synthetic'},{truncated:false,tree:[{path:'public'+asset.path,type:'blob',mode:'100644',sha:asset.git_blob}]})
+ assert.equal(selected.image_selection_status,'assigned_pending_review')
+ const shortages=['no_topic_assignment','invalid_image_library_or_topic','ambiguous_topic_assignment','unverified_topic_assignment','image_usage_unverified','duplicate_image_assignment','image_inventory_unavailable','image_file_missing_or_changed'].map(imageShortage)
+ for(const selection of [...shortages,selected]){
+  const raw=Buffer.from(serializeMwfArticle('Synthetic body',{...base,...selection}))
+  assert.equal(isClosedMwfDraftBytes(raw),true)
+  assert.equal(decodeBoundArticle(raw,serverHash(raw)),raw.toString())
+ }
+ for(const change of [{image_selection_status:'matched'},{image_selection_reason:'unknown'},{draft:false},{reviewed:true},{auto_approved:true},{publication_status:'published'},{image:'/images/library/forced.png'},{image_content_hash:'b'.repeat(64)}])assert.equal(isClosedMwfDraftBytes(Buffer.from(serializeMwfArticle('Synthetic',{...base,...imageShortage(),...change}))),false)
+ for(const change of [{image_content_hash:'invalid'},{image_alt:''},{image:'https://other.invalid/pic.png'},{image_selection_reason:'no_topic_assignment'}])assert.equal(isClosedMwfDraftBytes(Buffer.from(serializeMwfArticle('Synthetic',{...base,...selected,...change}))),false)
+ for(const key of ['image_selection_reason','image_selection_status','image_content_hash']){
+  const invalid={...base,...selected};delete invalid[key]
+  assert.equal(isClosedMwfDraftBytes(Buffer.from(serializeMwfArticle('Synthetic',invalid))),false)
+ }
+})

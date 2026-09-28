@@ -8,13 +8,12 @@ import { commitGitHubFiles, readGitHubFile, readGitHubBranchHead } from '@/lib/g
 import {
   getMonthlyTopicCandidates,
   getTopicCandidatePath,
-  type MonthlyTopicCandidateFile,
   saveMonthlyTopicCandidatesLocal,
   type TopicCandidateStatus,
   updateMonthlyTopicCandidateStatus,
 } from '@/lib/monthlyTopicCandidates'
 
-import { issueTopicAdoption } from '@/lib/tieredPublication.mjs'
+import { planSelectedTopicAdoptions, TOPIC_CSV_COLUMNS } from '@/lib/selectedTopicAdoptions.mjs'
 
 export type TopicCandidateActionResult = {
   ok: boolean
@@ -39,115 +38,17 @@ function validateStatus(status: string): asserts status is TopicCandidateStatus 
 }
 
 const TOPICS_PATH = 'data/article-topics.sample.csv'
-const CSV_COLUMNS = [
-  'id',
-  'discovered_at',
-  'source_type',
-  'source_url',
-  'topic',
-  'title_candidate',
-  'category',
-  'target_keyword',
-  'patient_intent',
-  'priority',
-  'medical_risk',
-  'status',
-  'publish_date',
-  'notes',
-] as const
-
-function csvEscape(value: unknown) {
-  const str = String(value ?? '')
-  return `"${str.replace(/"/g, '""')}"`
-}
-
-function todayJst() {
-  return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10)
-}
-
-function firstCsvCell(line: string) {
-  const trimmed = line.trim()
-  if (!trimmed) return ''
-  if (!trimmed.startsWith('"')) return trimmed.split(',')[0]?.trim() ?? ''
-
-  let cell = ''
-  for (let i = 1; i < trimmed.length; i += 1) {
-    const ch = trimmed[i]
-    if (ch === '"') {
-      if (trimmed[i + 1] === '"') {
-        cell += '"'
-        i += 1
-      } else {
-        break
-      }
-    } else {
-      cell += ch
-    }
-  }
-  return cell.trim()
-}
-
-function getExistingTopicIds(csv: string) {
-  return new Set(
-    csv
-      .split(/\r?\n/)
-      .slice(1)
-      .map(firstCsvCell)
-      .filter(Boolean),
-  )
-}
-
-async function loadTopicsCsv() {
+async function loadTopicsCsv(ref?: string) {
   if (process.env.GITHUB_REVIEW_TOKEN) {
-    return readGitHubFile(TOPICS_PATH).then((file) => file.content)
+    return readGitHubFile(TOPICS_PATH, { ref }).then((file) => file.content)
   }
 
   const localPath = path.join(process.cwd(), TOPICS_PATH)
-  if (!fs.existsSync(localPath)) return `${CSV_COLUMNS.join(',')}\n`
+  if (!fs.existsSync(localPath)) return `${TOPIC_CSV_COLUMNS.join(',')}\n`
   return fs.readFileSync(localPath, 'utf8')
 }
 
-function buildSelectedTopicCsvLines(file: MonthlyTopicCandidateFile, existingCsv: string) {
-  const selected = file.topics.filter((topic) => topic.status === 'selected')
-  if (selected.length === 0) throw new Error('今月採用のネタ候補がありません')
-  if (selected.length > file.targetPostCount) {
-    throw new Error(`今月採用が多すぎます: ${selected.length}/${file.targetPostCount}`)
-  }
-
-  const existingIds = getExistingTopicIds(existingCsv)
-  const discoveredAt = todayJst()
-  const lines: string[] = []
-  const adoptions: { path: string; content: string }[] = []
-
-  for (const topic of selected) {
-    const id = `MONTHLY-${topic.id.replace(/-/g, '').toUpperCase()}`
-    if (existingIds.has(id)) continue
-
-    const row = {
-      id,
-      discovered_at: discoveredAt,
-      source_type: topic.sourceType,
-      source_url: topic.sourceUrl ?? '',
-      topic: topic.title,
-      title_candidate: topic.title,
-      category: topic.category,
-      target_keyword: topic.targetKeyword,
-      patient_intent: topic.searchIntent,
-      priority: topic.priority,
-      medical_risk: topic.medicalRisk,
-      status: 'approved',
-      publish_date: topic.recommendedPublishDate,
-      notes: `月次ネタ候補 ${file.month} / MWF 月曜・水曜・金曜の週3投稿枠`,
-    } satisfies Record<(typeof CSV_COLUMNS)[number], string>
-
-    adoptions.push({ path: `data/topic-adoptions/${id}.json`, content: JSON.stringify(issueTopicAdoption(row), null, 2) + '\n' })
-    lines.push(CSV_COLUMNS.map((key) => csvEscape(row[key])).join(','))
-  }
-
-  return { selectedCount: selected.length, lines, adoptions }
-}
-
-async function loadCandidateFile(month: string) {
+async function loadCandidateFile(month: string, ref?: string) {
   const filePath = getTopicCandidatePath(month)
   if (!process.env.GITHUB_REVIEW_TOKEN) {
     const local = await getMonthlyTopicCandidates(month)
@@ -155,7 +56,7 @@ async function loadCandidateFile(month: string) {
     return { file: local, raw: JSON.stringify(local, null, 2), filePath }
   }
 
-  const githubFile = await readGitHubFile(filePath)
+  const githubFile = await readGitHubFile(filePath, { ref })
   return { file: JSON.parse(githubFile.content), raw: githubFile.content, filePath }
 }
 
@@ -205,32 +106,47 @@ export async function finalizeSelectedTopicCandidatesAction(month: string): Prom
     await requireAdmin()
 
     const expectedHeadSha = process.env.GITHUB_REVIEW_TOKEN ? await readGitHubBranchHead() : undefined
-    const { file } = await loadCandidateFile(month)
-    const currentCsv = await loadTopicsCsv()
-    const { selectedCount, lines, adoptions } = buildSelectedTopicCsvLines(file, currentCsv)
+    const { file } = await loadCandidateFile(month, expectedHeadSha)
+    if (file.month !== month) throw new Error('候補一覧の月が一致しません')
+    const currentCsv = await loadTopicsCsv(expectedHeadSha)
+    const { selectedCount, lines, adoptions } = await planSelectedTopicAdoptions(file, currentCsv, {
+      loadAdoption: async (adoptionPath: string) => {
+        if (!process.env.GITHUB_REVIEW_TOKEN) {
+          const localPath = path.join(process.cwd(), adoptionPath)
+          if (!fs.existsSync(localPath)) return null
+          return JSON.parse(fs.readFileSync(localPath, 'utf8'))
+        }
+        try {
+          return JSON.parse((await readGitHubFile(adoptionPath, { ref: expectedHeadSha })).content)
+        } catch (error) {
+          if ((error as { code?: string }).code === 'NOT_FOUND') return null
+          throw new Error('採用記録を取得できません。再度確認してください')
+        }
+      },
+    })
 
-    if (lines.length === 0) {
-      return { ok: true, message: `選択済み ${selectedCount} 件はすでに記事ネタCSVへ追加済みです` }
+    if (lines.length === 0 && adoptions.length === 0) {
+      return { ok: true, message: `選択済み ${selectedCount} 件の採用記録を確認しました。変更はありません` }
     }
 
     let nextCsv = currentCsv
     if (nextCsv && !nextCsv.endsWith('\n')) nextCsv += '\n'
-    nextCsv += `${lines.join('\n')}\n`
+    if (lines.length) nextCsv += `${lines.join('\n')}\n`
 
     if (!process.env.GITHUB_REVIEW_TOKEN) {
-      fs.writeFileSync(path.join(process.cwd(), TOPICS_PATH), nextCsv, 'utf8')
+      if (lines.length) fs.writeFileSync(path.join(process.cwd(), TOPICS_PATH), nextCsv, 'utf8')
       fs.mkdirSync(path.join(process.cwd(), 'data/topic-adoptions'), { recursive: true })
       for (const adoption of adoptions) fs.writeFileSync(path.join(process.cwd(), adoption.path), adoption.content, 'utf8')
       revalidatePath('/admin/topic-candidates')
-      return { ok: true, message: `確定しました。記事ネタCSVへ ${lines.length} 件追加しました` }
+      return { ok: true, message: `確定しました。CSV追加 ${lines.length} 件、採用記録の作成・更新 ${adoptions.length} 件` }
     }
 
     const commit = await commitGitHubFiles(`finalize topic candidates: ${month}`, [
-      { path: TOPICS_PATH, content: nextCsv }, ...adoptions,
+      ...(lines.length ? [{ path: TOPICS_PATH, content: nextCsv }] : []), ...adoptions,
     ], { expectedHeadSha })
 
     revalidatePath('/admin/topic-candidates')
-    return { ok: true, message: `確定しました。記事ネタCSVへ ${lines.length} 件追加しました。GitHub commit: ${commit.sha.slice(0, 7)}` }
+    return { ok: true, message: `確定しました。CSV追加 ${lines.length} 件、採用記録の作成・更新 ${adoptions.length} 件。GitHub commit: ${commit.sha.slice(0, 7)}` }
   } catch (error) {
     return { ok: false, message: sanitizeError(error) }
   }

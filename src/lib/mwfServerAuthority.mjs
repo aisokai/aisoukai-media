@@ -58,12 +58,27 @@ export function createServerAuthority({readHead,readJson,commit,validate,review,
 }
 
 export function isClosedMwfDraftBytes(raw){
- const allowed=new Set(['title','date','category','tags','author','excerpt','image','image_alt','draft','reviewed','auto_approved','publication_status','medical_risk','generation_run_id','source_topic_id','source_topic_version'])
- let offset=0,first=true;const seen=new Set()
+ const allowed=new Set(['title','date','category','tags','author','excerpt','image','image_alt','image_content_hash','image_selection_status','image_selection_reason','draft','reviewed','auto_approved','publication_status','medical_risk','generation_run_id','source_topic_id','source_topic_version'])
+ let offset=0,first=true;const seen=new Set(),imageFields={}
+ const markerFields=new Set(['image','image_alt','image_content_hash','image_selection_status','image_selection_reason','draft','reviewed','auto_approved','publication_status'])
+ const validImageSelection=()=>{
+  if(!['image_selection_status','image_selection_reason','image_content_hash'].some(k=>seen.has(k)))return true
+  if(imageFields.draft!==true||imageFields.reviewed!==false||imageFields.auto_approved!==false||imageFields.publication_status!=='draft')return false
+  if(imageFields.image_selection_status==='missing')return imageFields.image===''&&!seen.has('image_content_hash')&&['no_topic_assignment','invalid_image_library_or_topic','ambiguous_topic_assignment','unverified_topic_assignment','image_usage_unverified','duplicate_image_assignment','image_inventory_unavailable','image_file_missing_or_changed'].includes(imageFields.image_selection_reason)
+  return imageFields.image_selection_status==='assigned_pending_review'&&imageFields.image_selection_reason==='explicit_topic_assignment'&&typeof imageFields.image==='string'&&/^\/images\/library\/[A-Za-z0-9_/-]+\.(?:png|jpe?g|webp)$/.test(imageFields.image)&&!imageFields.image.includes('..')&&HASH.test(imageFields.image_content_hash??'')&&typeof imageFields.image_alt==='string'&&!!imageFields.image_alt.trim()
+ }
  while(offset<raw.length&&offset<65536){const end=raw.indexOf(10,offset),stop=end<0?raw.length:end;let line=raw.subarray(offset,stop);offset=stop+1;if(line.at(-1)===13)line=line.subarray(0,-1)
   if(first){first=false;if(!line.equals(Buffer.from('---')))return false;continue}
-  if(line.equals(Buffer.from('---')))return ['generation_run_id','source_topic_id','source_topic_version','draft','reviewed','auto_approved'].every(k=>seen.has(k))
+  if(line.equals(Buffer.from('---')))return ['generation_run_id','source_topic_id','source_topic_version','draft','reviewed','auto_approved'].every(k=>seen.has(k))&&validImageSelection()
   const colon=line.indexOf(58);if(colon<1||colon>32)return false;const key=line.subarray(0,colon).toString('ascii');if(!allowed.has(key)||seen.has(key))return false;seen.add(key)
+  if(markerFields.has(key)){
+   const value=line.subarray(colon+1);if(value.length>8192)return false
+   try{imageFields[key]=JSON.parse(value.toString('utf8'))}catch{
+    // Old closed artifacts use plain YAML strings. Only markers on newly
+    // generated, JSON-scalar artifacts require the strict image schema.
+    if(['image_selection_status','image_selection_reason','image_content_hash'].includes(key))return false
+   }
+  }
  }
  return false
 }

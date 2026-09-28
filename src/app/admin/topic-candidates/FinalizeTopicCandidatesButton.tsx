@@ -20,7 +20,7 @@ export default function FinalizeTopicCandidatesButton({
 
   const finalize = () => {
     const ok = window.confirm(
-      `${month} の今月採用 ${selectedCount} 件を記事ネタCSVへ追加します。記事本文はまだ生成されません。実行しますか？`,
+      `${month} の今月採用 ${selectedCount} 件を採用として確定します。CSVにある候補も現在の内容で採用を確認し、欠落・旧版の採用記録を作成・更新します。記事本文はまだ生成されません。実行しますか？`,
     )
     if (!ok) return
 
@@ -38,7 +38,7 @@ export default function FinalizeTopicCandidatesButton({
         <div>
           <p className="text-sm font-bold text-blue-950">採用候補を確定</p>
           <p className="mt-1 text-xs text-blue-800">
-            今月採用を記事ネタCSVへ追加します。下書き生成・公開はまだ行いません。
+            今月採用を確定し、CSV追加済みの候補も採用記録を確認・更新します。下書き生成・公開はまだ行いません。
           </p>
         </div>
         <button

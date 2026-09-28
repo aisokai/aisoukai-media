@@ -9,33 +9,75 @@ const fields=new Set(['title','excerpt','category','source_topic_id'])
 // Unknown/private fields and article body are never decoded or passed to a YAML parser.
 export function extractEditorialMetadata(raw) {
  raw=Buffer.from(raw);const data={};let offset=0,first=true,closed=false
- while(offset<raw.length&&offset<128*1024){const end=raw.indexOf(10,offset),stop=end<0?raw.length:end;let line=raw.subarray(offset,stop);offset=stop+1;if(line.at(-1)===13)line=line.subarray(0,-1)
-  if(first){first=false;if(!line.equals(Buffer.from('---')))return null;continue}
-  if(line.equals(Buffer.from('---'))){closed=true;break}
-  // Any unclosed quote on a physical header line is unsupported, including
-  // sequence scalars and quoted keys. Scan bytes only, never decode private text.
-  let physicalQuote=0;const physicalFlow=[]
-  for(let j=0;j<line.length;j++){const c=line[j];if(physicalQuote){if(physicalQuote===34&&c===92){j++;continue}if(c===physicalQuote){if(physicalQuote===39&&line[j+1]===39){j++;continue}physicalQuote=0}}else{if(c===35&&(j===0||line[j-1]===32))break;if(c===34||c===39)physicalQuote=c;else if(c===91||c===123)physicalFlow.push(c);else if(c===93||c===125){if(physicalFlow.pop()!==(c===93?91:123))return null}}}
-  if(physicalQuote||physicalFlow.length)return null
-  const colon=line.indexOf(58)
-  // Reject multiline quoted/flow values even on unknown keys, without decoding
-  // their values; otherwise embedded private lines could masquerade as keys.
-  if(colon>0){let start=colon+1;while(line[start]===32||line[start]===9)start++;const quote=line[start]
-    if(quote===34||quote===39){let closedQuote=false;for(let j=start+1;j<line.length;j++){if(quote===34&&line[j]===92){j++;continue}if(line[j]===quote){if(quote===39&&line[j+1]===39){j++;continue}closedQuote=true;break}}if(!closedQuote)return null}
-    else if(quote===91||quote===123){const stack=[];let quoted=0;for(let j=start;j<line.length;j++){const c=line[j];if(quoted){if(quoted===34&&c===92){j++;continue}if(c===quoted){if(quoted===39&&line[j+1]===39){j++;continue}quoted=0}continue}if(c===34||c===39){quoted=c;continue}if(c===91||c===123)stack.push(c);else if(c===93||c===125){if(stack.pop()!==(c===93?91:123))return null}}if(stack.length||quoted)return null}
-    else if([38,42,33].includes(quote))return null
+ // Structural state is byte-only. Opaque multiline values never become public
+ // keys, and quotation marks inside block scalar text have no YAML meaning.
+ let quote=0,flow=[],block=null
+ const scan=line=>{
+  for(let j=0;j<line.length;j++){
+   const c=line[j]
+   if(quote){if(quote===34&&c===92){j++;continue}if(c===quote){if(quote===39&&line[j+1]===39){j++;continue}quote=0}continue}
+   if(c===35&&(j===0||line[j-1]===32))break
+   if(c===34||c===39)quote=c
+   else if(c===91||c===123)flow.push(c)
+   else if(c===93||c===125){if(flow.pop()!==(c===93?91:123))return false}
   }
-  if(colon<1||colon>32)continue
-  const keyBytes=line.subarray(0,colon);if(![...keyBytes].every(c=>c>=97&&c<=122||c===95))continue
-  const key=keyBytes.toString('ascii')
-  if(['sensitive_data','contains_patient_data','contains_private_message','data_sensitivity'].includes(key))return null
-  if(!fields.has(key))continue
-  if(Object.hasOwn(data,key))return null
-  const value=line.subarray(colon+1).toString('utf8').trim();if(value.length>4000)return null
-  try{if(value.startsWith('"')){data[key]=JSON.parse(value);if(typeof data[key]!=='string')return null}else if(value.startsWith("'")){if(!/^'(?:[^']|'')*'$/.test(value))return null;data[key]=value.slice(1,-1).replace(/''/g,"'")}else{if(!value||/^[>|[\]{}&*!?%@`]/.test(value)||/\s#/.test(value))return null;data[key]=value}}
-  catch{return null}
+  return true
  }
- if(!closed||!data.title||!data.excerpt||!data.category||isProtectedEditorialInput(data))return null
+ while(offset<raw.length&&offset<128*1024){
+  const end=raw.indexOf(10,offset),stop=end<0?raw.length:end
+  if(stop>128*1024)return null
+  let line=raw.subarray(offset,stop);offset=stop+1;if(line.at(-1)===13)line=line.subarray(0,-1)
+  if(first){first=false;if(!line.equals(Buffer.from('---')))return null;continue}
+  let indent=0;while(line[indent]===32)indent++
+  if(line[indent]===9)return null
+  if(block){
+   if(indent===line.length)continue
+   if(indent>block.parent){if(block.minimum===null)block.minimum=indent;if(indent<block.minimum)return null;continue}
+   block=null
+  }
+  if(quote||flow.length){
+   // Continuations must stay indented. A root-level closing flow delimiter is
+   // allowed, but a fake top-level key inside a private value is never decoded.
+   if(!indent&&line.length&&line[0]!==93&&line[0]!==125)return null
+   if(!scan(line))return null
+   continue
+  }
+  if(line.equals(Buffer.from('---'))){closed=true;break}
+  if(!line.length||line[indent]===35)continue
+  const colon=line.indexOf(58)
+  let key=null
+  if(!indent){
+   if(colon<1)return null
+   const keyBytes=line.subarray(0,colon)
+   // Quoted/complex root keys are outside this constrained metadata format.
+   if(![...keyBytes].every(c=>c>=97&&c<=122||c===95))return null
+   if(colon<=32)key=keyBytes.toString('ascii')
+  }
+  if(['sensitive_data','contains_patient_data','contains_private_message','data_sensitivity'].includes(key))return null
+  if(fields.has(key)){
+   if(Object.hasOwn(data,key))return null
+   const value=line.subarray(colon+1).toString('utf8').trim();if(value.length>4000)return null
+   try{if(value.startsWith('"')){data[key]=JSON.parse(value);if(typeof data[key]!=='string')return null}else if(value.startsWith("'")){if(!/^'(?:[^']|'')*'$/.test(value))return null;data[key]=value.slice(1,-1).replace(/''/g,"'")}else{if(!value||/^[>|[\]{}&*!?%@`]/.test(value)||/\s#/.test(value))return null;data[key]=value}}
+   catch{return null}
+   if(!scan(line)||quote||flow.length)return null
+   continue
+  }
+  let scalar=indent
+  if(line[scalar]===45&&line[scalar+1]===32){scalar+=2;while(line[scalar]===32)scalar++}
+  else if(colon>=scalar){scalar=colon+1;while(line[scalar]===32)scalar++}
+  if([38,42,33].includes(line[scalar]))return null
+  if(line[scalar]===124||line[scalar]===62){
+   // Only inspect the short block indicator, never its following text.
+   let j=scalar+1,digit=null,chomp=false
+   while(j<line.length&&line[j]!==32&&line[j]!==35){const c=line[j++];if((c===43||c===45)&&!chomp)chomp=true;else if(c>=49&&c<=57&&digit===null)digit=c-48;else return null}
+   while(line[j]===32)j++
+   if(j<line.length&&line[j]!==35)return null
+   block={parent:indent,minimum:digit===null?null:indent+digit}
+   continue
+  }
+  if(!scan(line))return null
+ }
+ if(!closed||quote||flow.length||!data.title||!data.excerpt||!data.category||isProtectedEditorialInput(data))return null
  if(data.source_topic_id&&!/^[A-Za-z0-9_-]{1,100}$/.test(data.source_topic_id))return null
  return data
 }

@@ -26,3 +26,33 @@ test('opaque private/body bytes are never UTF8-decoded, including all continuati
  Buffer.prototype.toString=function(encoding,...args){if((encoding===undefined||/^utf-?8$/i.test(encoding))&&(this.includes(sentinel)||this.includes(body)))violations++;return original.call(this,encoding,...args)}
  try{for(const value of samples){extractEditorialMetadata(value);inventoryHash(value)}assert.equal(violations,0)}finally{Buffer.prototype.toString=original}
 })
+
+test('opaque multiline flow warnings and nested mappings preserve only public metadata',()=>{
+ for(const warning of [
+  'generation_warnings: ["Synthetic warning with\n  a continued quotation", "other"]',
+  'generation_warnings: [\n  {label: "Synthetic", values: ["one",\n    "two"]}\n]',
+  'generation_warnings:\n  - "Synthetic warning with\n    continued quotation"',
+ ]){
+  const value=Buffer.from(raw.toString().replace('private_request: "DO_NOT_EXPORT"',warning))
+  assert.deepEqual(extractEditorialMetadata(value),{title:'Old',excerpt:'Public summary',category:'その他'})
+ }
+})
+test('folded/literal opaque scalars ignore quotes, flow punctuation and key-like text',()=>{
+ for(const indicator of ['>-','|','|+','>2-']){
+  const value=Buffer.from(`---\ngeneration_warnings:\n  - ${indicator}\n    Synthetic "unclosed quotation [ {\n    title: PRIVATE_DECODE_SENTINEL\n    sensitive_data: PRIVATE_DECODE_SENTINEL\n    closing quotation" ] }\ntitle: Public\nexcerpt: Public\ncategory: その他\n---\nBODY_DECODE_SENTINEL`)
+  assert.deepEqual(extractEditorialMetadata(value),{title:'Public',excerpt:'Public',category:'その他'})
+ }
+})
+test('opaque continuations cannot turn fake root keys into public metadata or hide real protected keys',()=>{
+ for(const start of ['generation_warnings: ["Synthetic','generation_warnings: {value: "Synthetic','generation_warnings: "Synthetic']){
+  for(const key of ['title','sensitive_data'])assert.equal(extractEditorialMetadata(Buffer.from(`---\ntitle: Public\nexcerpt: Public\ncategory: その他\n${start}\n${key}: opaque\n  "]}\n---`)),null)
+ }
+ for(const field of ['sensitive_data','contains_patient_data','contains_private_message','data_sensitivity'])assert.equal(extractEditorialMetadata(Buffer.from(`---\ngeneration_warnings: >-\n  Opaque "unbalanced\n${field}: true\ntitle: Public\nexcerpt: Public\ncategory: その他\n---`)),null)
+ for(const malformed of ['generation_warnings: ["unfinished\n  still unfinished','generation_warnings: ["closed"\n  }','generation_warnings: ["closed"\n  ] extra [','generation_warnings: >--','generation_warnings: >-\n    text\n  invalid dedent'])assert.equal(extractEditorialMetadata(Buffer.from(`---\ntitle: Public\nexcerpt: Public\ncategory: その他\n${malformed}\n---`)),null)
+})
+test('successful opaque multiline metadata extraction does not UTF8-decode warning or body bytes',()=>{
+ const sentinel=Buffer.from('PRIVATE_DECODE_SENTINEL'),body=Buffer.from('BODY_DECODE_SENTINEL'),original=Buffer.prototype.toString;let violations=0
+ const fixtures=['generation_warnings: ["PRIVATE_DECODE_SENTINEL\n  continued"]','generation_warnings:\n  - >-\n    PRIVATE_DECODE_SENTINEL "\n    title: opaque\n    "']
+ Buffer.prototype.toString=function(encoding,...args){if((encoding===undefined||/^utf-?8$/i.test(encoding))&&(this.includes(sentinel)||this.includes(body)))violations++;return original.call(this,encoding,...args)}
+ try{for(const warning of fixtures)assert.equal(extractEditorialMetadata(Buffer.from(`---\n${warning}\ntitle: Public\nexcerpt: Public\ncategory: その他\n---\nBODY_DECODE_SENTINEL`)).title,'Public');assert.equal(violations,0)}finally{Buffer.prototype.toString=original}
+})
