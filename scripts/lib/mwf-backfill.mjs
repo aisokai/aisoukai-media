@@ -1,5 +1,5 @@
 import {createHash} from 'node:crypto'
-export const BACKFILL_TOPICS=Object.freeze({'MONTHLY-202609TOPIC015':'2026-09-04','MONTHLY-202609TOPIC016':'2026-09-07','MONTHLY-202609TOPIC017':'2026-09-09','MONTHLY-202609TOPIC019':'2026-09-14','MONTHLY-202609TOPIC020':'2026-09-16','MONTHLY-202609TOPIC008':'2026-09-18'})
+export const BACKFILL_TOPICS=Object.freeze({'MONTHLY-202609TOPIC003':'2026-09-07','MONTHLY-202609TOPIC023':'2026-09-23','MONTHLY-202609TOPIC015':'2026-09-04','MONTHLY-202609TOPIC016':'2026-09-07','MONTHLY-202609TOPIC017':'2026-09-09','MONTHLY-202609TOPIC019':'2026-09-14','MONTHLY-202609TOPIC020':'2026-09-16','MONTHLY-202609TOPIC008':'2026-09-18'})
 export const backfillId=(slot,topicId)=>createHash('sha256').update(`backfill:v1\0${slot}\0${topicId}`).digest('hex')
 export function validateBackfillManifest(value,now=new Date()){
  if(!value||Object.keys(value).sort().join(',')!=='canonicalRevision,items,publicationMode,schema'||value.schema!==1||value.publicationMode!=='draft-only'||!/^[a-f0-9]{40}$/.test(value.canonicalRevision)||!Array.isArray(value.items)||!value.items.length||value.items.length>6)throw Error('backfill_manifest_invalid')

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdtempSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {validateBackfillManifest,backfillId} from '../scripts/lib/mwf-backfill.mjs'
+import {validateBackfillManifest,backfillId,BACKFILL_TOPICS} from '../scripts/lib/mwf-backfill.mjs'
 import {runDelivery,openDeliveryStore} from '../scripts/lib/mwf-delivery.mjs'
 import {serverHash,validServerRequest,semanticRequestKey,MWF_INVENTORY_ANCHOR} from '../src/lib/mwfServerAuthority.mjs'
 const item={topicId:'MONTHLY-202609TOPIC008',plannedDate:'2026-09-18',topicVersion:'a'.repeat(64)},slot='2026-09-18T08:30:00+09:00'
@@ -12,6 +12,31 @@ test('closed manifest binds exact adopted topics and dates without allowing appr
  assert.equal(validateBackfillManifest(plan,new Date('2026-09-19')),plan)
  for(const altered of [{...plan,items:[item,item]},{...plan,publicationMode:'publish'},{...plan,items:[{...item,topicId:'MONTHLY-202609TOPIC004'}]},{...plan,items:[{...item,topicId:'MONTHLY-202609TOPIC023'}]},{...plan,items:[{...item,plannedDate:'2026-09-17'}]}])assert.throws(()=>validateBackfillManifest(altered,new Date('2026-09-19')))
  assert.throws(()=>validateBackfillManifest(plan,new Date('2026-09-17')))
+})
+test('recovery additions bind exact September dates and preserve manifest scope and six-item limit',()=>{
+ const additions=[{topicId:'MONTHLY-202609TOPIC003',plannedDate:'2026-09-07',topicVersion:'a'.repeat(64)},{topicId:'MONTHLY-202609TOPIC023',plannedDate:'2026-09-23',topicVersion:'c'.repeat(64)}]
+ const recovery={...plan,items:additions},now=new Date('2026-09-28T08:30:00+09:00')
+ assert.equal(Object.isFrozen(BACKFILL_TOPICS),true)
+ assert.equal(validateBackfillManifest(recovery,now),recovery)
+ for(const entry of additions){
+  const request={schema:3,publicationMode:'draft-only',operation:'prepare',slot:`${entry.plannedDate}T08:30:00+09:00`,topicId:entry.topicId,topicVersion:entry.topicVersion,artifactPath:null,artifactBlob:null,inventoryHash:MWF_INVENTORY_ANCHOR}
+  assert.equal(validServerRequest(request),true)
+  assert.equal(validServerRequest({...request,publicationMode:'publish'}),false)
+  assert.throws(()=>validateBackfillManifest({...plan,items:[{...entry,plannedDate:'2026-09-28'}]},now))
+  assert.throws(()=>validateBackfillManifest({...plan,items:[{...entry,topicVersion:'unsigned'}]},now))
+ }
+ const six=Object.entries(BACKFILL_TOPICS).slice(0,6).map(([topicId,plannedDate])=>({topicId,plannedDate,topicVersion:'a'.repeat(64)}))
+ assert.equal(validateBackfillManifest({...plan,items:six},now).items.length,6)
+ const seven=Object.entries(BACKFILL_TOPICS).slice(0,7).map(([topicId,plannedDate])=>({topicId,plannedDate,topicVersion:'a'.repeat(64)}))
+ for(const invalid of [
+  {...recovery,schema:2},
+  {...recovery,publicationMode:'publish'},
+  {...recovery,items:[additions[0],additions[0]]},
+  {...plan,items:seven},
+  {...plan,items:[{...additions[0],topicId:'MONTHLY-202609TOPIC004'}]},
+  {...plan,items:[{...additions[0],topicId:'MONTHLY-202610TOPIC003'}]},
+ ])assert.throws(()=>validateBackfillManifest(invalid,now))
+ assert.throws(()=>validateBackfillManifest({...plan,items:[additions[1]]},new Date('2026-09-23T08:29:59+09:00')))
 })
 test('backfill request has distinct prepare namespace and closed immutable draft-only article identity',()=>{
  const request={schema:3,publicationMode:'draft-only',operation:'prepare',slot,topicId:item.topicId,topicVersion:item.topicVersion,artifactPath:null,artifactBlob:null,inventoryHash:MWF_INVENTORY_ANCHOR}
