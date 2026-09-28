@@ -747,3 +747,10 @@ reviewed_by: 三谷
 date: 2026-08-01
 publish_at: 2026-08-01
 
+## 2026-09-28T19:11:47.860+09:00
+datetime: 2026-09-28T19:11:47.860+09:00
+action: approve
+slug: 2026-09-23-mwf-06399562381d485b05518cadbe8abb167d25dc0b9f51b46a12128638b9149130
+reviewed_by: 三谷
+date: 2026-09-23
+
