@@ -3403,12 +3403,56 @@
         "height": 941,
         "format": "png"
       },
-      "topic_assignment": {
+      "previous_topic_assignment": {
         "topic_id": "MONTHLY-202609TOPIC023",
         "title": "インプラントと入れ歯の違いは？相談前の整理",
         "status": "stock_pending_article_review",
         "evidence": "docs/diagnostics/image-publication-20260922.md",
-        "article_path": null
+        "article_path": null,
+        "superseded_by": "/images/library/implant/implant-denture-consultation-20260928.png",
+        "superseded_at": "2026-09-28"
+      }
+    },
+    {
+      "id": "implant-denture-consultation-20260928",
+      "path": "/images/library/implant/implant-denture-consultation-20260928.png",
+      "category": "implant",
+      "title": "インプラントと入れ歯の違いは？相談前の整理",
+      "tags": [
+        "インプラント",
+        "入れ歯",
+        "相談"
+      ],
+      "alt": "インプラントの説明用模型と取り外し式入れ歯の模型を並べた生成イメージ",
+      "width": 1536,
+      "height": 1024,
+      "format": "png",
+      "content_sha256": "43a9e95623e408320e14ac3275766860942dceb0476622c6d0eea0eae54a2ff7",
+      "git_blob": "c78d809bc5375e430dcc89a6f8c479912b2597e7",
+      "license_status": "pending_review",
+      "license_source": "OpenAI image generation",
+      "license_note": "2026-09-28 の先生指示に基づき本タスクで新規生成。下書きへの用途限定適用。利用条件の独立確認および記事の公開審査は未完了。",
+      "generation_provenance": {
+        "task_id": "01a0a345-a8f5-7ab2-8ca2-be650da39293",
+        "saved_file": "implant/implant-denture-consultation-20260928.png",
+        "original_file": "/Users/caelus/.codex/generated_images/01a0a345-a8f5-7ab2-8ca2-be650da39293/exec-856ed5b9-96d7-4a8e-8798-bd8d082ed794.png",
+        "original_sha256": "43a9e95623e408320e14ac3275766860942dceb0476622c6d0eea0eae54a2ff7",
+        "original_verified_at": "2026-09-28",
+        "width": 1536,
+        "height": 1024,
+        "format": "png"
+      },
+      "draft_use_authorization": {
+        "topic_id": "MONTHLY-202609TOPIC023",
+        "content_sha256": "43a9e95623e408320e14ac3275766860942dceb0476622c6d0eea0eae54a2ff7",
+        "evidence": "teacher_20260928_generate_and_apply_suitable_images_when_missing"
+      },
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202609TOPIC023",
+        "title": "インプラントと入れ歯の違いは？相談前の整理",
+        "status": "visually_matched",
+        "evidence": "docs/diagnostics/image-application-20260928.md",
+        "article_path": "content/posts/2026-09-23-mwf-06399562381d485b05518cadbe8abb167d25dc0b9f51b46a12128638b9149130.md"
       }
     }
   ]

@@ -48,5 +48,5 @@ export function imageShortageNotice(raw) {
   const end = raw.indexOf('\n---\n', 4)
   if (end < 0 || end > 128 * 1024) return ''
   return /^image_selection_status: "missing"$/m.test(raw.slice(4, end))
-    ? '\n画像不足：この記事に適合を確認できた画像がありません。画像は未設定です。別タスクで生成・保存し、内容確認後に適用してください。' : ''
+    ? '\n画像不足：この記事に適合を確認できた画像がありません。画像は未設定です。適合する画像を生成し、実物を確認して保存・適用する必要があります。' : ''
 }

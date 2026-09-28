@@ -65,6 +65,8 @@ test('missing marker survives serialization and produces a body-free notificatio
   const raw = serializeMwfArticle('Never include this body in the warning.', {title: 'Synthetic', ...selected})
   assert.match(raw, /image_selection_status: "missing"/)
   assert.match(imageShortageNotice(raw), /画像不足/)
+  assert.match(imageShortageNotice(raw), /適合する画像を生成し、実物を確認して保存・適用/)
+  assert.doesNotMatch(imageShortageNotice(raw), /別タスク|再承認/)
   assert.doesNotMatch(imageShortageNotice(raw), /Never include/)
   assert.equal(imageShortageNotice(serializeMwfArticle('image_selection_status: "missing"', {title: 'Synthetic'})), '')
 })
