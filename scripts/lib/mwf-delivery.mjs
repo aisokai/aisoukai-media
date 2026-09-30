@@ -1,3 +1,4 @@
+import {summarizeSlotArticles} from './mwf-intake-notice.mjs'
 import {backfillId} from './mwf-backfill.mjs'
 // Durable, article-scoped delivery. No credentials, network or publication here.
 import { createHash, randomUUID } from 'node:crypto'
@@ -189,7 +190,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
       if(previous)intakeNotification=previous==='sending'?'unknown':previous
       else{
         store.intakeNotice(slot,'sending')
-        try{const notice=await adapters.notifyIntake({slot,reason:intakeError,heldCount:candidateHolds.length,holdCounts,deferredCount});intakeNotification=['sent','not-sent'].includes(notice?.status)?notice.status:'unknown'}catch{intakeNotification='unknown'}
+        try{const notice=await adapters.notifyIntake({slot,reason:intakeError,heldCount:candidateHolds.length,holdCounts,deferredCount,candidateHolds,articleSummary:summarizeSlotArticles(store.read(),slot)});intakeNotification=['sent','not-sent'].includes(notice?.status)?notice.status:'unknown'}catch{intakeNotification='unknown'}
         store.intakeNotice(slot,intakeNotification)
       }
     }

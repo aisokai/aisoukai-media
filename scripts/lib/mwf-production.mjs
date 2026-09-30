@@ -1,3 +1,4 @@
+import {projectCandidateHold,formatIntakeNotice} from './mwf-intake-notice.mjs'
 import {selectMwfImage,imageShortage,imageShortageNotice} from './mwf-images.mjs'
 import {restorePreservedDraft,syncPreservedDraft} from './mwf-restoration.mjs'
 import {approvedComparisonUpdates} from './mwf-human-comparisons.mjs'
@@ -97,13 +98,13 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
   for(const row of rows){if(backfill&&row.id!==backfill.topicId)continue;if(recoveryTopic&&String(row.id??row.topic_id??'')!==recoveryTopic)continue;const topic={...row,id:String(row.id??row.topic_id??'')};if(!/^[A-Za-z0-9_-]{1,100}$/.test(topic.id)||used.has(topic.id)||topic.status!=='approved')continue
    if(backfill&&(topic.publish_date!==backfill.plannedDate||topicContentVersion(topic)!==backfill.topicVersion))throw Error('backfill_topic_changed')
    if(!backfill&&topic.publish_date){
-    if(!calendarDate(topic.publish_date)){holds.push({topicId:topic.id,reason:'topic_date_invalid'});continue}
+    if(!calendarDate(topic.publish_date)){holds.push(projectCandidateHold(topic,'topic_date_invalid'));continue}
     if(topic.publish_date>slotDay){deferredCount++;continue}
    }
-   try{github('GET',`contents/data/topic-adoptions/${topic.id}.json?ref=main`)}catch(error){holds.push({topicId:topic.id,reason:error.code==='NOT_FOUND'?'topic_adoption_missing':'topic_adoption_unavailable'});continue}
+   try{github('GET',`contents/data/topic-adoptions/${topic.id}.json?ref=main`)}catch(error){holds.push(projectCandidateHold(topic,error.code==='NOT_FOUND'?'topic_adoption_missing':'topic_adoption_unavailable'));continue}
    const version=topicContentVersion(topic),prepared=await server().prepare({slot,publicationMode:backfill?'draft-only':undefined,topicId:topic.id,topicVersion:version})
-   if(prepared.status!=='ready'||prepared.topicVersion!==version){holds.push({topicId:topic.id,reason:prepared.reason??'server_prepare_pending'});continue}
-   const checked=await precheck(topic,prepared.comparisonHash),disposition=precheckDraftDisposition(checked);if(disposition==='hold'){holds.push({topicId:topic.id,reason:checked.reason});continue}
+   if(prepared.status!=='ready'||prepared.topicVersion!==version){holds.push(projectCandidateHold(topic,prepared.reason??'server_prepare_pending'));continue}
+   const checked=await precheck(topic,prepared.comparisonHash),disposition=precheckDraftDisposition(checked);if(disposition==='hold'){holds.push(projectCandidateHold(topic,checked.reason));continue}
    return{topicId:topic.id,topic:{...topic,serverTopicVersion:version,...(disposition==='draft_only'?{metadataReviewReason:'metadata_review_required'}:{})},holds,deferredCount}
   }return{holdOnly:true,holds,deferredCount}
  }
@@ -132,13 +133,9 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
  const git=({directory,args,input})=>{const result=spawnImpl('/usr/bin/git',args.map(v=>v==='delivery-origin'?ORIGIN:v),{cwd:directory,env:gitEnv,input,encoding:'utf8',timeout:60000,maxBuffer:4*1024*1024});return{ok:result.status===0&&!result.error,output:result.stdout??''}}
  function shortageNotice(id,published){if(published||!/^[a-f0-9]{64}$/.test(id??''))return '';try{return imageShortageNotice(readOpaqueRegular(join(root,'artifacts',`${id}.md`)).toString('utf8'))}catch{return ''}}
  const notify=async({idempotencyKey,path,contentVersion,artifactVersion,published})=>{if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'};try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text:`${published?'本番側の独立審査済み記事の公開反映を確認しました。':'未審査記事を管理画面で確認できます。'}\n${path}\n${artifactVersion?'保存原本SHA256':'内容版'}: ${artifactVersion??contentVersion}${shortageNotice(idempotencyKey,published)}\nhttps://aisoukai-media.vercel.app/admin/pending-review`,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}}
- const notifyIntake=async({slot,reason,heldCount,holdCounts={},deferredCount=0})=>{
+ const notifyIntake=async({slot,reason,heldCount,candidateHolds=[],articleSummary={},deferredCount=0})=>{
   if(!/^\d{4}-\d{2}-\d{2}T08:30:00\+09:00$/.test(slot)||!Number.isSafeInteger(heldCount)||heldCount<0||!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'}
-  const labels={'candidate-holds':'記事候補の確認で停止','no-unused-topic':'対象の未使用テーマなし','no-due-topic':'対象日までの未使用テーマなし','slot_or_topic_already_reserved':'対象枠またはテーマの重複','historical_inventory_evidence_missing':'過去記事の照合情報を確認できません','preserved_artifact_changed':'保管記事の変更を検出','candidate_configuration_missing':'候補設定を確認できません','topic-intake-failed':'候補の取得・照合で停止'}
-  const guidance={adoptionMissing:'採用記録なし：採用画面でテーマの採用状態を確認してください',adoptionUnverified:'採用証跡の不一致：テーマと採用記録の版を確認してください',adoptionUnavailable:'採用記録の取得失敗：接続状態を確認してください',comparisons:'過去記事の照合失敗：比較データの解析・整合性を確認してください',dateInvalid:'予定日が不正：テーマの予定日を修正してください',duplicate:'既存記事との重複：別テーマの採用を検討してください',precheck:'事前確認で保留：確認結果を調査してください',other:'その他の保留：実行状態を確認してください'}
-  const details=Object.entries(guidance).filter(([key])=>Number.isSafeInteger(holdCounts[key])&&holdCounts[key]>0).map(([key,label])=>`${holdCounts[key]}件 — ${label}`).join('\n')
-  const deferred=Number.isSafeInteger(deferredCount)&&deferredCount>0?`\n将来予定のため対象外: ${deferredCount}件`:''
-  const text=`ブログ定期処理で新規記事の受付が停止しました。\n対象日: ${slot.slice(0,10)}（08:30）\n理由: ${labels[reason]??'受付処理の確認が必要です'}\n保留候補: ${heldCount}件${details?`\n${details}`:''}${deferred}\n新規記事の生成・配信完了通知ではありません。\nhttps://aisoukai-media.vercel.app/admin/pending-review`
+  const text=formatIntakeNotice({slot,reason,heldCount,candidateHolds,articleSummary,deferredCount})
   try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}
  }
  async function checkRuntime(){

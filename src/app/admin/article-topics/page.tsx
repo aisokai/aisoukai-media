@@ -17,6 +17,7 @@ export const dynamic = 'force-dynamic'
 
 type PageProps = {
   searchParams?: Promise<{
+    id?: string | string[]
     status?: string
     risk?: string
     category?: string
@@ -54,9 +55,13 @@ function sortArticleTopicsForAdmin(rows: ArticleTopicRow[], sort: string) {
 }
 
 export default async function ArticleTopicsPage({ searchParams }: PageProps) {
-  if (!(await isAdminAuthenticated())) redirect('/admin/login')
-
   const params = await searchParams
+  const idFilter = typeof params?.id === 'string' && /^[A-Za-z0-9_-]{1,100}$/.test(params.id) ? params.id : ''
+  const invalidId = params?.id !== undefined && !idFilter
+  if (!(await isAdminAuthenticated())) {
+    const returnTo = idFilter ? `/admin/article-topics?id=${encodeURIComponent(idFilter)}` : ''
+    redirect(returnTo ? `/admin/login?returnTo=${encodeURIComponent(returnTo)}` : '/admin/login')
+  }
   const statusFilter = params?.status ?? 'all'
   const riskFilter = params?.risk ?? 'all'
   const categoryFilter = params?.category ?? 'all'
@@ -68,6 +73,7 @@ export default async function ArticleTopicsPage({ searchParams }: PageProps) {
   const categories = [...new Set(rows.map((row) => row.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ja'))
   const visibleRows = sortArticleTopicsForAdmin(
     rows.filter((row) => {
+      if (invalidId || (idFilter && row.id !== idFilter)) return false
       if (statusFilter !== 'all' && row.status !== statusFilter) return false
       if (riskFilter !== 'all' && row.medicalRisk !== riskFilter) return false
       if (categoryFilter !== 'all' && row.category !== categoryFilter) return false
@@ -117,7 +123,14 @@ export default async function ArticleTopicsPage({ searchParams }: PageProps) {
         </p>
       )}
 
+      {(idFilter || invalidId) && (
+        <p className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          {invalidId ? 'テーマIDを確認できません。' : '通知のテーマに絞り込んでいます。'} <Link href="/admin/article-topics" className="font-semibold underline">絞り込みを解除</Link>
+        </p>
+      )}
+
       <form method="get" className="mt-6 grid gap-3 rounded-lg border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-6">
+        {(idFilter || invalidId) && <input type="hidden" name="id" value={idFilter} />}
         <FilterSelect label="状態" name="status" value={statusFilter}>
           <option value="all">すべて</option>
           <option value="approved">approved</option>

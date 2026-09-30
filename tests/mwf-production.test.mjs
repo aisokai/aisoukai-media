@@ -198,7 +198,7 @@ test('intake failure sends metadata only once per slot and never reports success
  const f=fixture();f.setReady(false);let result
  for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value}),1)
  const notices=f.calls.filter(c=>c.url.includes('telegram'));assert.equal(notices.length,1);assert.equal(result.intakeError,'candidate-holds');assert.equal(result.intakeNotification,'sent');assert.equal(result.lastSuccessAt,null);assert.equal(result.items.length,0)
- const payload=JSON.parse(notices[0].options.body);assert.match(payload.text,/受付が停止/);assert.match(payload.text,/2026-09-14/);assert.doesNotMatch(payload.text,/Synthetic|synthetic-generator-key|topic_adoption_unproven/)
+ const payload=JSON.parse(notices[0].options.body);assert.match(payload.text,/対象日分の新規記事は作成していません/);assert.match(payload.text,/2026-09-14/);assert.doesNotMatch(payload.text,/synthetic-generator-key|topic_adoption_unproven|受付が停止/)
  assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
 })
 
@@ -220,7 +220,7 @@ test('scheduled selection defers future dates before adoption lookup and exclude
  assert.deepEqual(f.adoptionReads,['today','past','unscheduled','today','past','unscheduled']);assert.deepEqual(f.prepared,f.adoptionReads)
  assert.equal(result.deferredCount,1);assert.equal(result.candidateHolds.length,3);assert.equal(result.holdCounts.comparisons,3)
  const notices=f.calls.filter(c=>c.url.includes('telegram'));assert.equal(notices.length,1);const text=JSON.parse(notices[0].options.body).text
- assert.match(text,/保留候補: 3件/);assert.match(text,/将来予定のため対象外: 1件/);assert.match(text,/過去記事の照合失敗/);assert.doesNotMatch(text,/SYNTHETIC_TITLE|comparison_current_changed|future|today/)
+ assert.match(text,/運用側で確認が必要/);assert.match(text,/予定日前のため待機：1件/);assert.match(text,/SYNTHETIC_TITLE/);assert.doesNotMatch(text,/comparison_current_changed|future/)
  assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
 })
 test('invalid calendar dates hold before lookup; leap day is accepted and future-only slots remain unsuccessful',async()=>{
@@ -237,5 +237,5 @@ test('missing adoption and temporary retrieval failure have different safe count
  assert.deepEqual(result.candidateHolds.map(h=>h.reason),['topic_adoption_missing','topic_adoption_unavailable','topic_adoption_unproven'])
  assert.equal(result.holdCounts.adoptionMissing,1);assert.equal(result.holdCounts.adoptionUnavailable,1);assert.equal(result.holdCounts.adoptionUnverified,1);assert.deepEqual(f.prepared,['unverified'])
  const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
- assert.match(text,/1件 — 採用記録なし/);assert.match(text,/1件 — 採用記録の取得失敗/);assert.match(text,/1件 — 採用証跡の不一致/);assert.doesNotMatch(text,/PRIVATE|SYNTHETIC|HTTP|topic_adoption/)
+ assert.match(text,/先生に確認をお願いしたいテーマ：2件/);assert.match(text,/採用済みであることを確認できません/);assert.match(text,/採用情報を取得できませんでした/);assert.match(text,/article-topics\?id=missing/);assert.doesNotMatch(text,/PRIVATE|HTTP|topic_adoption/)
 })

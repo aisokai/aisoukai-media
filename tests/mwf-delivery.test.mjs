@@ -108,3 +108,14 @@ test('intake alerts persist across restart, hold ambiguous sends, and preserve f
  const result=await runDelivery({store:openDeliveryStore(root),slot,adapters:{notifyIntake:async()=>{throw Error('must_not_send')}},select:async()=>({holdOnly:true})})
  assert.equal(result.intakeNotification,'unknown');assert.equal(result.ok,false)
 })
+
+test('intake notice receives current-slot article metadata without losing prior delivery state',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'mwf-notice-summary-')),store=openDeliveryStore(root),slot='2026-09-30T08:30:00+09:00'
+ store.save({id:'a'.repeat(64),slot,topicId:'current',state:'generation-unknown'})
+ store.save({id:'b'.repeat(64),slot:'2026-09-28T08:30:00+09:00',topicId:'old',state:'notified',generatedAt:'2026-09-28T00:00:00Z'})
+ const holds=[{topicId:'safe-topic',title:'合成テーマ',reason:'topic_adoption_missing'}];let notice
+ const result=await runDelivery({store,slot,select:async()=>({holdOnly:true,holds,deferredCount:11}),adapters:{notifyIntake:async value=>{notice=value;return{status:'sent'}}}})
+ assert.equal(result.ok,false);assert.deepEqual(notice.candidateHolds,holds)
+ assert.deepEqual(notice.articleSummary,{observed:true,tracked:1,created:0,uncertain:1,reviewable:0,pending:1})
+ assert.equal(notice.deferredCount,11);assert.equal(store.read().find(i=>i.topicId==='current').state,'generation-unknown')
+})
