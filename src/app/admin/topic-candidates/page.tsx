@@ -10,7 +10,7 @@ import {
   getMonthlyTopicCandidatesForAdmin,
 } from '@/lib/monthlyTopicCandidates'
 import FinalizeTopicCandidatesButton from './FinalizeTopicCandidatesButton'
-import TopicCandidateActionButtons from './TopicCandidateActionButtons'
+import TopicCandidateCard from './TopicCandidateCard'
 
 export const metadata: Metadata = {
   title: 'Topic Candidates | Admin',
@@ -38,22 +38,6 @@ type CandidateFilters = {
   duplicate: string
   priority: string
   sort: string
-}
-
-const STATUS_LABELS = {
-  pending: '未判断',
-  selected: '今月採用',
-  backup: '予備',
-  hold: '保留',
-  rejected: '却下',
-}
-
-const STATUS_STYLES = {
-  pending: 'bg-gray-100 text-gray-700',
-  selected: 'bg-blue-100 text-blue-800',
-  backup: 'bg-slate-100 text-slate-700',
-  hold: 'bg-amber-100 text-amber-800',
-  rejected: 'bg-red-100 text-red-700',
 }
 
 const RISK_STYLES = {
@@ -115,7 +99,7 @@ function sortTopicCandidatesForAdmin(topics: MonthlyTopicCandidate[], sort: stri
 export default async function TopicCandidatesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const month = normalizeMonth(params?.month) ?? getDefaultTopicCandidateMonth()
-  const statusFilter = normalizeFilter(params?.status, FILTER_VALUES.status, 'all')
+  const statusFilter = normalizeFilter(params?.status, FILTER_VALUES.status, 'pending')
   const riskFilter = normalizeFilter(params?.risk, FILTER_VALUES.risk, 'all')
   const duplicateFilter = normalizeFilter(params?.duplicate, FILTER_VALUES.duplicate, 'all')
   const priorityFilter = normalizeFilter(params?.priority, FILTER_VALUES.priority, 'all')
@@ -138,7 +122,7 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
   if (!file) {
     return (
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <h1 className="text-2xl font-bold text-gray-900">月次ネタ候補</h1>
+        <h1 className="text-2xl font-bold text-gray-900">月次ネタ候補（{month}）</h1>
         <MonthNavigation month={month} filters={filters} />
         <div className="mt-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
           <p>{month} のネタ候補はまだありません。</p>
@@ -165,7 +149,7 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">月次ネタ候補</h1>
+          <h1 className="text-2xl font-bold text-gray-900">月次ネタ候補（{month}）</h1>
           <p className="mt-2 text-sm text-gray-500">
             スマホでもPCでも月次ネタ候補を確認し、採用・予備・保留・却下を選べます。
           </p>
@@ -184,15 +168,17 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
         <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
           <p className="text-xs font-bold text-blue-700">今月採用</p>
           <p className="mt-1 text-2xl font-bold text-blue-900">{selectedProgress}</p>
-          <p className="sr-only">12 / 12 が月次目標です</p>
+          <p className="sr-only">{summary.targetPostCount}件が月次目標です</p>
         </div>
-        <SummaryTile label="候補" value={summary.candidateCount} />
+        <SummaryTile label="未判断の残り" value={summary.pendingCount} />
         <SummaryTile label="予備" value={summary.backupCount} />
         <SummaryTile label="保留" value={summary.holdCount} />
         <SummaryTile label="高リスク" value={summary.highRiskCount} tone="red" />
         <SummaryTile label="重複注意" value={summary.duplicateWarningCount} tone="amber" />
       </section>
 
+      <p className="mt-4 text-sm text-gray-600">判断済みの候補は状態の絞り込みで再確認・変更できます。保存しても採用の確定や記事作成は行いません。</p>
+      {file.previousMonthComparisonUnavailable && <p role="status" className="mt-3 text-sm text-amber-800">前月候補との照合ができませんでした。新しいテーマかどうかは未確認です。</p>}
       <section className="mt-4">
         <FinalizeTopicCandidatesButton
           month={file.month}
@@ -245,11 +231,8 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
 
       <section className="mt-8 grid gap-4 lg:grid-cols-2">
         {visibleTopics.map((topic) => (
-          <article key={topic.id} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <TopicCandidateCard key={`${file.month}:${statusFilter}:${topic.id}`} month={file.month} topic={topic}>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${STATUS_STYLES[topic.status]}`}>
-                {STATUS_LABELS[topic.status]}
-              </span>
               <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
                 {topic.category}
               </span>
@@ -267,7 +250,7 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
               推奨公開日: <span className="font-semibold">{topic.recommendedPublishDate}</span>
             </p>
 
-            <TopicCandidateActionButtons month={file.month} id={topic.id} />
+            {topic.previousMonthReuse && <p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">前月（{topic.previousMonthReuse}）にも同じテーマが提案されています。新規テーマではありません。</p>}
 
             <details className="mt-3 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
               <summary className="cursor-pointer font-bold text-gray-700">詳細を見る</summary>
@@ -281,7 +264,7 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
                 {topic.reviewerNote && <Detail label="判断メモ" value={topic.reviewerNote} />}
               </dl>
             </details>
-          </article>
+          </TopicCandidateCard>
         ))}
         {visibleTopics.length === 0 && (
           <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-500 lg:col-span-2">

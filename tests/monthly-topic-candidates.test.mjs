@@ -18,7 +18,7 @@ test('monthly topic candidate workflow files are wired', () => {
   assert.match(topicSource, /buildTopicCandidateSummary/)
   assert.match(pageSource, /スマホでもPCでも月次ネタ候補を確認/)
   assert.match(pageSource, /今月採用/)
-  assert.match(pageSource, /12\s*\/\s*12/)
+  assert.match(pageSource, /未判断の残り/)
   assert.match(actionsSource, /commitGitHubFiles/)
 })
 

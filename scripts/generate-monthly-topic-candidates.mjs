@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // 月次ネタ候補を24件生成する。記事本文は生成しない。
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, openSync, readSync, closeSync, lstatSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import matter from 'gray-matter'
+import {extractEditorialMetadata} from './lib/mwf-inventory.mjs'
+import {normalizeTopicTitle,selectFreshTopics,validateCandidateMonth} from './lib/monthly-topic-generation.mjs'
+import {isProtectedEditorialInput} from '../src/lib/tieredPublication.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
-const OUT_DIR = join(ROOT, 'data', 'monthly-topic-candidates')
-const POSTS_DIR = join(ROOT, 'content', 'posts')
 const candidateCount = 24
 const targetPostCount = 12
 
@@ -23,7 +23,7 @@ const CATEGORIES = [
   'その他',
 ]
 
-const TOPIC_BANK = [
+export const TOPIC_BANK = [
   ['予防歯科', '定期検診は何か月ごとが目安？通院間隔の考え方', '歯科定期検診 頻度', '定期検診の適切な受診ペースを知りたい', 'low'],
   ['虫歯治療', '冷たいものがしみるのは虫歯？受診が必要なサイン', '冷たいもの しみる 虫歯', 'しみる原因と受診目安を知りたい', 'medium'],
   ['歯周病治療', '歯ぐきから血が出るときに確認したいポイント', '歯ぐき 出血 歯周病', '出血の原因と受診目安を知りたい', 'medium'],
@@ -77,26 +77,56 @@ function mondayWednesdayFridayDates(month) {
   return dates
 }
 
-function existingTitles() {
-  if (!existsSync(POSTS_DIR)) return []
-  return readdirSync(POSTS_DIR)
-    .filter((file) => file.endsWith('.md'))
-    .map((file) => matter(readFileSync(join(POSTS_DIR, file), 'utf8')).data.title)
-    .filter(Boolean)
-    .map(String)
+// Read frontmatter only: article bodies are not needed for title comparison.
+function articleTitles(postsDir) {
+  if (!existsSync(postsDir)) return []
+  return readdirSync(postsDir).filter(name=>name.endsWith('.md')).map(name=>{
+    const path=join(postsDir,name)
+    if(!lstatSync(path).isFile()||lstatSync(path).isSymbolicLink())throw Error('article_metadata_unavailable')
+    const fd=openSync(path,'r'),byte=Buffer.alloc(1),bytes=[]
+    let lineStart=0,delimiters=0
+    try {
+      while(bytes.length<65536&&readSync(fd,byte,0,1,null)){
+        bytes.push(byte[0])
+        if(byte[0]===10){
+          const line=Buffer.from(bytes.slice(lineStart,bytes.length-1))
+          if(line.equals(Buffer.from('---'))||line.equals(Buffer.from('---\r')))delimiters++
+          else if(delimiters===0)throw Error('article_metadata_unavailable')
+          lineStart=bytes.length
+          if(delimiters===2)break
+        }
+      }
+    } finally {closeSync(fd)}
+    if(delimiters!==2)throw Error('article_metadata_unavailable')
+    const metadata=extractEditorialMetadata(Buffer.from(bytes))
+    if(!metadata)throw Error('article_title_unavailable')
+    return metadata.title
+  })
+}
+function historyTitles(outDir,month){
+  if(!existsSync(outDir))return []
+  return readdirSync(outDir).filter(name=>/^\d{4}-(0[1-9]|1[0-2])\.json$/.test(name)&&name.slice(0,7)<month).flatMap(name=>{
+    const path=join(outDir,name)
+    if(!lstatSync(path).isFile()||lstatSync(path).isSymbolicLink())throw Error('candidate_history_unavailable')
+    const file=JSON.parse(readFileSync(path,'utf8'))
+    if(file.month!==name.slice(0,7)||!Array.isArray(file.topics))throw Error('candidate_history_unavailable')
+    return file.topics.map(topic=>{
+      if(isProtectedEditorialInput(topic)||typeof topic.title!=='string'||!topic.title.trim())throw Error('candidate_history_unavailable')
+      return topic.title
+    })
+  })
 }
 
 function duplicateRisk(title, titles) {
   const tokens = title.split(/[、。・\s]+/).filter((token) => token.length >= 2)
-  if (titles.some((existing) => existing === title)) return 'high'
+  if (titles.some((existing) => normalizeTopicTitle(existing) === normalizeTopicTitle(title))) return 'high'
   if (titles.some((existing) => tokens.some((token) => existing.includes(token)))) return 'medium'
   return 'low'
 }
 
-function buildFile(month) {
+function buildFile(month, bank, titles) {
   const dates = mondayWednesdayFridayDates(month)
-  const titles = existingTitles()
-  const topics = TOPIC_BANK.slice(0, candidateCount).map(([category, title, keyword, intent, risk], index) => ({
+  const topics = bank.map(([category, title, keyword, intent, risk], index) => ({
     id: `${month}-topic-${String(index + 1).padStart(3, '0')}`,
     title,
     category: CATEGORIES.includes(category) ? category : 'その他',
@@ -124,29 +154,28 @@ function buildFile(month) {
   }
 }
 
-function main() {
-  const args = parseArgs(process.argv.slice(2))
-  const month = String(args.month ?? nextMonth()).trim()
-  const yes = args.yes === true
-  if (!/^\d{4}-\d{2}$/.test(month)) {
-    console.error('エラー: --month は YYYY-MM で指定してください')
-    process.exit(1)
+export function generateMonthlyCandidates({root=ROOT,month=nextMonth(),yes=false,log=console.log}={}) {
+  validateCandidateMonth(month)
+  const outDir=join(root,'data','monthly-topic-candidates'),outPath=join(outDir,`${month}.json`)
+  if(existsSync(outPath))throw Error('既存の月次候補があります。判断済みの状態を守るため上書きしません。')
+  const titles=articleTitles(join(root,'content','posts'))
+  const selection=selectFreshTopics(TOPIC_BANK,{historyTitles:historyTitles(outDir,month),articleTitles:titles,limit:candidateCount})
+  log(`月次ネタ候補: ${month}`)
+  log(`新しい候補: ${selection.topics.length}件 / 必要候補: ${candidateCount}件`)
+  if(selection.shortage){
+    log(`候補が${selection.shortage}件不足しています。過去の候補や記事を再利用せず、保存を見送りました。新しいテーマの追加が必要です。`)
+    return{saved:false,shortage:selection.shortage,candidateCount:selection.topics.length}
   }
-
-  const file = buildFile(month)
-  const outPath = join(OUT_DIR, `${month}.json`)
-  console.log(`月次ネタ候補: ${month}`)
-  console.log(`候補: ${file.topics.length}件 / 採用目標: ${file.targetPostCount}件 / 投稿曜日: MWF`)
-  console.log(`出力先: data/monthly-topic-candidates/${month}.json`)
-
-  if (!yes) {
-    console.log('DRY-RUNです。保存するには --yes を付けてください。')
-    return
-  }
-
-  mkdirSync(OUT_DIR, { recursive: true })
-  writeFileSync(outPath, `${JSON.stringify(file, null, 2)}\n`, 'utf8')
-  console.log('✅ 月次ネタ候補を保存しました')
+  const file=buildFile(month,selection.topics,titles)
+  if(!yes){log('DRY-RUNです。保存するには --yes を付けてください。');return{saved:false,shortage:0,candidateCount:file.topics.length}}
+  mkdirSync(outDir,{recursive:true})
+  writeFileSync(outPath,`${JSON.stringify(file,null,2)}\n`,{encoding:'utf8',flag:'wx'})
+  log('月次ネタ候補を保存しました')
+  return{saved:true,shortage:0,candidateCount:file.topics.length}
 }
-
-main()
+function main(){
+  const args=parseArgs(process.argv.slice(2))
+  try{const result=generateMonthlyCandidates({month:String(args.month??nextMonth()).trim(),yes:args.yes===true});if(result.shortage)process.exitCode=1}
+  catch{console.error('月次候補を保存できません。対象月・既存ファイル・比較用の履歴を確認してください。既存ファイルは上書きしません。');process.exitCode=1}
+}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main()

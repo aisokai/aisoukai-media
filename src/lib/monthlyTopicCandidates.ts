@@ -22,6 +22,7 @@ export type MonthlyTopicCandidate = {
   priority: PriorityLevel
   recommendedPublishDate: string
   status: TopicCandidateStatus
+  previousMonthReuse?: string
   reviewerNote?: string
 }
 
@@ -32,6 +33,7 @@ export type MonthlyTopicCandidateFile = {
   candidateCount: number
   cadence: 'MWF'
   notes: string
+  previousMonthComparisonUnavailable?: boolean
   topics: MonthlyTopicCandidate[]
 }
 
@@ -61,7 +63,7 @@ export function getDefaultTopicCandidateMonth(today = new Date()) {
 }
 
 export function validateMonth(month: string) {
-  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('month は YYYY-MM で指定してください')
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('month は YYYY-MM で指定してください')
 }
 
 export function buildTopicCandidateSummary(file: MonthlyTopicCandidateFile): TopicCandidateSummary {
@@ -87,7 +89,7 @@ export async function getMonthlyTopicCandidates(month: string): Promise<MonthlyT
   return JSON.parse(fs.readFileSync(localPath, 'utf8')) as MonthlyTopicCandidateFile
 }
 
-export async function getMonthlyTopicCandidatesForAdmin(month: string): Promise<MonthlyTopicCandidateFile | null> {
+async function loadMonthlyTopicCandidatesForAdmin(month: string): Promise<MonthlyTopicCandidateFile | null> {
   validateMonth(month)
   if (!process.env.GITHUB_REVIEW_TOKEN) return getMonthlyTopicCandidates(month)
 
@@ -95,8 +97,29 @@ export async function getMonthlyTopicCandidatesForAdmin(month: string): Promise<
     const file = await readGitHubFile(getTopicCandidatePath(month))
     return JSON.parse(file.content) as MonthlyTopicCandidateFile
   } catch (error) {
-    console.error('GitHub monthly topic candidate read failed; falling back to local file', error)
+    if ((error as { code?: string }).code === 'NOT_FOUND') return null
+    console.error('GitHub monthly topic candidate read failed; falling back to local file')
     return getMonthlyTopicCandidates(month)
+  }
+}
+
+const normalizeTitle = (title: string) => title.normalize('NFKC').toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '')
+export async function getMonthlyTopicCandidatesForAdmin(month: string): Promise<MonthlyTopicCandidateFile | null> {
+  const file = await loadMonthlyTopicCandidatesForAdmin(month)
+  if (!file) return null
+  const [year, number] = month.split('-').map(Number)
+  const previousMonth = number === 1 ? `${String(year - 1).padStart(4, '0')}-12` : `${year}-${String(number - 1).padStart(2, '0')}`
+  try {
+    let previous: MonthlyTopicCandidateFile | null
+    if (process.env.GITHUB_REVIEW_TOKEN) {
+      try { previous = JSON.parse((await readGitHubFile(getTopicCandidatePath(previousMonth))).content) }
+      catch (error) { if ((error as { code?: string }).code === 'NOT_FOUND') previous = null; else throw error }
+    } else previous = await getMonthlyTopicCandidates(previousMonth)
+    if (previous && (previous.month !== previousMonth || !Array.isArray(previous.topics))) throw new Error('invalid_previous_month')
+    const titles = new Set((previous?.topics ?? []).map(topic => normalizeTitle(topic.title)))
+    return { ...file, topics: file.topics.map(topic => ({ ...topic, previousMonthReuse: titles.has(normalizeTitle(topic.title)) ? previousMonth : undefined })) }
+  } catch {
+    return { ...file, previousMonthComparisonUnavailable: true }
   }
 }
 

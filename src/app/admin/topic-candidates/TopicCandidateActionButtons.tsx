@@ -15,9 +15,13 @@ const ACTIONS: Array<{ status: TopicCandidateStatus; label: string; className: s
 export default function TopicCandidateActionButtons({
   month,
   id,
+  currentStatus,
+  onSaved,
 }: {
   month: string
   id: string
+  currentStatus: TopicCandidateStatus
+  onSaved: (status: TopicCandidateStatus) => void
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -27,19 +31,18 @@ export default function TopicCandidateActionButtons({
   const updateStatus = (status: TopicCandidateStatus) => {
     startTransition(async () => {
       setMessage('')
-      const result = await updateTopicCandidateStatusAction({
-        month,
-        id,
-        status,
-        reviewerNote: note,
-      })
-      setMessage(result.message)
-      if (result.ok) router.refresh()
+      try {
+        const result = await updateTopicCandidateStatusAction({ month, id, status, reviewerNote: note })
+        if (result.ok) { onSaved(status); router.refresh() }
+        else setMessage(result.message)
+      } catch {
+        setMessage('保存結果を確認できませんでした。ページを再読込して状態を確認してください。')
+      }
     })
   }
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-3 space-y-2" aria-busy={isPending}>
       <input
         type="text"
         value={note}
@@ -48,11 +51,11 @@ export default function TopicCandidateActionButtons({
         className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm"
       />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {ACTIONS.map((action) => (
+        {[...ACTIONS, ...(currentStatus !== 'pending' ? [{status: 'pending' as const, label: '未判断に戻す', className: 'bg-gray-100 text-gray-800 hover:bg-gray-200'}] : [])].map((action) => (
           <button
             key={action.status}
             type="button"
-            disabled={isPending}
+            disabled={isPending || action.status === currentStatus}
             onClick={() => updateStatus(action.status)}
             className={`rounded-md px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-50 ${action.className}`}
           >
@@ -60,7 +63,7 @@ export default function TopicCandidateActionButtons({
           </button>
         ))}
       </div>
-      {message && <p className="text-xs text-gray-500">{message}</p>}
+      {message && <p role="alert" className="text-sm text-red-700">{message}</p>}
     </div>
   )
 }
