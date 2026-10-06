@@ -25,12 +25,13 @@ export function formatIntakeNotice({slot,reason,candidateHolds=[],heldCount=0,de
  const summary=articleSummary,created=count(summary.created),tracked=count(summary.tracked),uncertain=count(summary.uncertain)
  const result=summary.observed!==true?'対象日分の記事の作成状況を確認しています。':created?`対象日分の記事は${created}件作成済みです。${count(summary.pending)?'確認・反映・通知が済んでいない記事があります。':''}`:tracked||uncertain?'対象日分に処理中または結果確認中の記事があります。作成件数はまだ確定していません。':'対象日分の新規記事は作成していません。'
  const lines=[`ブログ記事の作成結果（${day}）`,result]
- const teacher=[],technical=[],duplicates=[]
+ const teacher=[],technical=[],duplicates=[],related=[]
  for(const hold of candidateHolds){
   const id=safeId(hold?.topicId),title=hold?.reason==='protected_topic'?'':safeTitle(hold?.title)
   const label=title?`「${title}」${id?`（${id}）`:''}`:id?`テーマ ${id}（タイトル非表示）`:'タイトル非表示のテーマ'
   if(['topic_adoption_missing','topic_adoption_unproven','topic_date_invalid'].includes(hold?.reason))teacher.push({label,id,reason:hold.reason})
-  else if(['duplicate_metadata','precheck_related'].includes(hold?.reason))duplicates.push(label)
+  else if(hold?.reason==='duplicate_metadata')duplicates.push(label)
+  else if(['metadata_related','precheck_related'].includes(hold?.reason))related.push(label)
   else technical.push({label,reason:technicalReasons.has(hold?.reason)?hold.reason:'other'})
  }
  if(teacher.length){
@@ -47,8 +48,10 @@ export function formatIntakeNotice({slot,reason,candidateHolds=[],heldCount=0,de
   if(technical.length>2)lines.push(`ほか${technical.length-2}件も運用側の確認対象です。`)
  }
  if(duplicates.length){lines.push('',`重複を避けて見送り：${duplicates.length}件（操作不要）`);lines.push(...duplicates.slice(0,2));if(duplicates.length>2)lines.push(`ほか${duplicates.length-2}件`)}
+ if(related.length){lines.push('',`内容が重なる可能性があるため確認待ち：${related.length}件（重複確定ではありません）`,'運用側で既存記事との違いを確認する必要があります。採用し直す操作は不要です。');lines.push(...related.slice(0,2));if(related.length>2)lines.push(`ほか${related.length-2}件`)}
  if(count(deferredCount))lines.push('',`予定日前のため待機：${count(deferredCount)}件（操作不要。予定日以降の対象になります）`)
  if(!teacher.length&&!technical.length&&['no-due-topic','no-unused-topic'].includes(reason))lines.push('今回、作成対象になる新しいテーマはありません。')
+ if(candidateHolds.length>0&&!teacher.length&&!technical.length&&duplicates.length+related.length===candidateHolds.length)lines.push('今回の候補から新規作成へ進めるテーマはありません。')
  if(count(summary.reviewable))lines.push('',`作成済みの記事を確認：${ADMIN}/pending-review`)
  // Fixed sections and item/title caps keep the complete message below Telegram's limit.
  return lines.join('\n').slice(0,3800)

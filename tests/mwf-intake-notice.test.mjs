@@ -37,7 +37,7 @@ test('technical faults, dates, related topics and old metadata each have distinc
  assert.match(text,/採用情報を取得できませんでした/)
  assert.match(text,/運用側で確認が必要/)
  assert.match(text,/日付を修正し「保存」/)
- assert.match(text,/重複を避けて見送り：1件/)
+ assert.match(text,/内容が重なる可能性があるため確認待ち：1件/);assert.doesNotMatch(text,/重複を避けて見送り/)
  assert.doesNotMatch(text,/pending-review/)
 })
 test('same-slot saved or uncertain work never becomes a zero-created claim; other days do not inflate today',()=>{
@@ -74,4 +74,15 @@ test('unauthenticated exact topic link retains safe returnTo and never loads row
  await assert.rejects(f.page({searchParams:Promise.resolve({id:'T0'})}),{message:'redirect:/admin/login?returnTo=%2Fadmin%2Farticle-topics%3Fid%3DT0'})
  await assert.rejects(f.page({searchParams:Promise.resolve({id:'https://evil.example'})}),{message:'redirect:/admin/login'})
  assert.equal(f.reads(),0)
+})
+
+test('exact duplicates and possible overlap have separate counts and no readoption CTA',()=>{
+ const candidateHolds=[{topicId:'exact',title:'完全一致',reason:'duplicate_metadata'},{topicId:'lexical',title:'語句が近い',reason:'metadata_related'},{topicId:'precheck',title:'既存確認で関連あり',reason:'precheck_related'}]
+ const text=formatIntakeNotice({slot,reason:'candidate-holds',candidateHolds,heldCount:3,articleSummary:empty})
+ assert.match(text,/重複を避けて見送り：1件/)
+ assert.match(text,/内容が重なる可能性があるため確認待ち：2件（重複確定ではありません）/)
+ assert.match(text,/新規作成へ進めるテーマはありません/)
+ assert.doesNotMatch(text,/article-topics|approved|先生に確認をお願い|採用済みであることを確認できません/)
+ const mixed=formatIntakeNotice({slot,reason:'candidate-holds',candidateHolds:[...candidateHolds,{topicId:'new',title:'新しいテーマ',reason:'topic_adoption_missing'}],articleSummary:empty})
+ assert.match(mixed,/article-topics\?id=new/);assert.doesNotMatch(mixed,/新規作成へ進めるテーマはありません/)
 })

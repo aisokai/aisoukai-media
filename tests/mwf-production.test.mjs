@@ -239,3 +239,48 @@ test('missing adoption and temporary retrieval failure have different safe count
  const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
  assert.match(text,/先生に確認をお願いしたいテーマ：2件/);assert.match(text,/採用済みであることを確認できません/);assert.match(text,/採用情報を取得できませんでした/);assert.match(text,/article-topics\?id=missing/);assert.doesNotMatch(text,/PRIVATE|HTTP|topic_adoption/)
 })
+
+function overlapFixture(candidates,titles,{unavailable=false}={}){
+ const f=fixture(),spawn=f.options.spawnImpl,adoptionReads=[],prepared=[],metadataReads=[]
+ const entries=titles.map((title,index)=>({path:`content/posts/2026-09-01-synthetic-${index}.md`,source:'canonical',blob:'b'.repeat(64),gitBlob:String(index+1).repeat(40),quarantine:false,metadata:{title,excerpt:'Synthetic excerpt',category:'その他'}}))
+ const inventoryRaw=JSON.stringify({payload:{schema:2,entries,quarantine:[],usedTopicIds:[]}})
+ f.options.readText=()=>inventoryRaw;f.options.inventoryAnchor=inventoryHash(inventoryRaw);f.options.now=()=>new Date('2026-10-06T23:30:00Z')
+ f.options.serverClient.prepare=async input=>{prepared.push(input);throw Error('unadopted must never prepare')}
+ f.options.spawnImpl=(command,args,options)=>{
+  const endpoint=args[5]??''
+  if(endpoint.includes('contents/content/posts/'))throw Error('article body read forbidden')
+  if(endpoint.includes('article-topics'))return{status:0,stdout:JSON.stringify({encoding:'base64',content:Buffer.from('id,title,category,status,publish_date\n'+candidates.map(([id,title,date='2026-10-07'])=>`${id},${title},その他,approved,${date}`).join('\n')+'\n').toString('base64')})}
+  if(endpoint.includes('contents/content/posts?')){metadataReads.push(endpoint);return unavailable?{status:1,stderr:'HTTP 503 PRIVATE_RAW_DETAIL'}:{status:0,stdout:JSON.stringify(entries.map(e=>({type:'file',path:e.path,sha:e.gitBlob})))}}
+  if(endpoint.includes('topic-adoptions/')){adoptionReads.push(endpoint);return{status:1,stderr:'HTTP 404'}}
+  return spawn(command,args,options)
+ }
+ return{...f,adoptionReads,metadataReads,prepared}
+}
+test('exact and potential overlap are checked once before adoption and distinct themes still require adoption',async()=>{
+ const existing=['インプラントのメンテナンスはどれくらい必要？','急な歯の痛みで予約するときに伝えるとよいこと','歯科定期検診は何ヶ月ごとが目安？受診間隔の考え方','親知らずは抜くべき？相談の目安とレントゲンで見るポイント']
+ const candidates=[['exact1',existing[0]],['exact2',existing[1]],['related1','歯科定期検診の頻度と通う目安'],['related2','親知らずは抜くべき？相談の目安と判断材料'],['distinct','歯科定期検診で確認すること｜むし歯・歯ぐき・噛み合わせのチェック'],['future',existing[0],'2026-10-09']]
+ const f=overlapFixture(candidates,existing);let result
+ assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value}),1)
+ assert.deepEqual(result.candidateHolds.map(h=>h.reason),['duplicate_metadata','duplicate_metadata','metadata_related','metadata_related','topic_adoption_missing'])
+ assert.equal(f.metadataReads.length,1);assert.equal(f.adoptionReads.length,1);assert.match(f.adoptionReads[0],/distinct.json/);assert.equal(result.deferredCount,1)
+ assert.equal(f.prepared.length,0);assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
+ const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
+ assert.match(text,/重複を避けて見送り：2件/);assert.match(text,/内容が重なる可能性があるため確認待ち：2件/)
+ assert.match(text,/article-topics\?id=distinct/);assert.doesNotMatch(text,/article-topics\?id=(exact|related)/)
+})
+test('future-only and existing-slot retries do not perform early comparison or adoption lookup',async()=>{
+ const f=overlapFixture([['future','Synthetic','2026-10-09']],['Synthetic']),runtime=createProductionRuntime(f.options)
+ const future=await runtime.select({items:[],slot:runtime.slot});assert.equal(future.deferredCount,1)
+ const existing={slot:runtime.slot,topicId:'saved',topic:{id:'saved'}}
+ assert.deepEqual(await runtime.select({items:[existing],slot:runtime.slot}),{topicId:'saved',topic:{id:'saved'}})
+ assert.equal(f.metadataReads.length,0);assert.equal(f.adoptionReads.length,0);assert.equal(f.calls.length,0)
+})
+test('unavailable comparison metadata is an operator hold before any adoption lookup or AI',async()=>{
+ const f=overlapFixture([['a','Synthetic A'],['b','Synthetic B']],[],{unavailable:true});let result
+ await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value})
+ assert.deepEqual(result.candidateHolds.map(h=>h.reason),['comparison_metadata_unavailable','comparison_metadata_unavailable'])
+ assert.equal(f.metadataReads.length,1);assert.equal(f.adoptionReads.length,0);assert.equal(f.prepared.length,0)
+ assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
+ const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
+ assert.match(text,/運用側で確認が必要/);assert.doesNotMatch(text,/PRIVATE_RAW_DETAIL|approved|採用済みであることを確認できません/)
+})

@@ -1,3 +1,4 @@
+import {metadataTopicOverlap} from './mwf-topic-overlap.mjs'
 import {projectCandidateHold,formatIntakeNotice} from './mwf-intake-notice.mjs'
 import {selectMwfImage,imageShortage,imageShortageNotice} from './mwf-images.mjs'
 import {restorePreservedDraft,syncPreservedDraft} from './mwf-restoration.mjs'
@@ -92,7 +93,7 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
  const select=async({items,slot})=>{
   const evidence=inventory().data,existing=items.find(i=>recoveryTopic?i.topicId===recoveryTopic:!['backfill','restore'].includes(i.deliveryMode)&&i.slot===slot);if(existing)return{topicId:existing.topicId,topic:existing.topic}
   const rows=await csv(),ids=rows.map(r=>String(r.id??r.topic_id??''));if(new Set(ids).size!==ids.length)throw Error('duplicate_topic_ids')
-  const used=new Set([...evidence.usedTopicIds,...items.map(i=>i.topicId)]),holds=[];let deferredCount=0
+  const used=new Set([...evidence.usedTopicIds,...items.map(i=>i.topicId)]),holds=[];let deferredCount=0,selectionComparisons
   const slotDay=typeof slot==='string'?slot.slice(0,10):null
   if(!backfill&&!calendarDate(slotDay))throw Error('candidate_configuration_missing')
   for(const row of rows){if(backfill&&row.id!==backfill.topicId)continue;if(recoveryTopic&&String(row.id??row.topic_id??'')!==recoveryTopic)continue;const topic={...row,id:String(row.id??row.topic_id??'')};if(!/^[A-Za-z0-9_-]{1,100}$/.test(topic.id)||used.has(topic.id)||topic.status!=='approved')continue
@@ -101,6 +102,13 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
     if(!calendarDate(topic.publish_date)){holds.push(projectCandidateHold(topic,'topic_date_invalid'));continue}
     if(topic.publish_date>slotDay){deferredCount++;continue}
    }
+   if(isProtectedEditorialInput(topic)){holds.push(projectCandidateHold(topic,'protected_topic'));continue}
+   // Check validated historical metadata before asking for adoption. One snapshot
+   // per selection; prepare/precheck still revalidates its hash before any AI call.
+   selectionComparisons??=localComparisons().then(data=>({data}),()=>({reason:'comparison_metadata_unavailable'}))
+   const snapshot=await selectionComparisons
+   const overlap=snapshot.reason?{reason:snapshot.reason}:metadataTopicOverlap(topic,snapshot.data.entries)
+   if(overlap.reason){holds.push(projectCandidateHold(topic,overlap.reason));continue}
    try{github('GET',`contents/data/topic-adoptions/${topic.id}.json?ref=main`)}catch(error){holds.push(projectCandidateHold(topic,error.code==='NOT_FOUND'?'topic_adoption_missing':'topic_adoption_unavailable'));continue}
    const version=topicContentVersion(topic),prepared=await server().prepare({slot,publicationMode:backfill?'draft-only':undefined,topicId:topic.id,topicVersion:version})
    if(prepared.status!=='ready'||prepared.topicVersion!==version){holds.push(projectCandidateHold(topic,prepared.reason??'server_prepare_pending'));continue}
