@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto'
 import {createAutoImages} from './mwf-auto-images.mjs'
+import {openDeliveryStore} from './mwf-delivery.mjs'
 import {createCandidateSupply} from './mwf-candidate-supply.mjs'
 import {metadataTopicOverlap} from './mwf-topic-overlap.mjs'
 import {projectCandidateHold,formatIntakeNotice} from './mwf-intake-notice.mjs'
@@ -68,8 +69,8 @@ export function createProductionRuntime({recoveryTopic,backfill,candidateSupplyE
  function inventory(){const raw=readText(env.MWF_INVENTORY_PATH);if(inventoryHash(raw)!==inventoryAnchor)throw Error('historical_inventory_evidence_missing');const data=JSON.parse(raw).payload;if(data?.schema!==2||!Array.isArray(data.entries))throw Error('historical_inventory_evidence_missing');return{raw,data}}
  const authenticateRequest=createGithubServerTransport({spawnImpl,native,request})
  function server(){if(!client)client=serverClient??createServerClient({github,authenticateRequest,inventoryRaw:inventory().raw,inventoryAnchor});return client}
- async function localComparisons(){const {data}=inventory();const entries=[...data.entries];for(const entry of entries.filter(e=>e.source==='local')){const path=join(env.MWF_PRESERVATION_DIR??'/Users/caelus/Library/Application Support/AisoukaiMWF/preservation/2026-09-14',basename(entry.path));if(inventoryHash(readOpaqueRegular(path))!==entry.blob)throw Error('preserved_artifact_changed')}
-  const revision=github('GET','git/ref/heads/main').object.sha,listing=github('GET',`contents/content/posts?ref=${revision}`);if(!Array.isArray(listing)||listing.length>=1000)throw Error('comparison_listing_incomplete')
+ async function localComparisons(pinnedRevision){const {data}=inventory();const entries=[...data.entries];for(const entry of entries.filter(e=>e.source==='local')){const path=join(env.MWF_PRESERVATION_DIR??'/Users/caelus/Library/Application Support/AisoukaiMWF/preservation/2026-09-14',basename(entry.path));if(inventoryHash(readOpaqueRegular(path))!==entry.blob)throw Error('preserved_artifact_changed')}
+  const revision=pinnedRevision??github('GET','git/ref/heads/main').object.sha,listing=github('GET',`contents/content/posts?ref=${revision}`);if(!Array.isArray(listing)||listing.length>=1000)throw Error('comparison_listing_incomplete')
 
   let claims=[];try{claims=github('GET',`contents/data/mwf/claims?ref=${revision}`)}catch(error){if(error.code!=='NOT_FOUND')throw error}
   if(!Array.isArray(claims)||claims.length>500)throw Error('comparison_history_invalid')
@@ -152,7 +153,7 @@ export function createProductionRuntime({recoveryTopic,backfill,candidateSupplyE
   const text=formatIntakeNotice({slot,reason,heldCount,candidateHolds,articleSummary,deferredCount})
   try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}
  }
- const prepareTopics=createCandidateSupply({root,github,comparisons:localComparisons,now,enabled:candidateSupplyEnabled&&!recoveryTopic&&!backfill&&Boolean(env.OPENAI_API_KEY),
+ const prepareTopics=createCandidateSupply({root,github,comparisons:localComparisons,reservedTopicIds:()=>openDeliveryStore(root).read().map(item=>item.topicId),now,enabled:candidateSupplyEnabled&&!recoveryTopic&&!backfill&&Boolean(env.OPENAI_API_KEY),
   request:(url,options)=>{if(url!=='https://api.openai.com/v1/chat/completions')throw Error('candidate_endpoint_rejected');return request(url,{...options,headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'}})},
   notify:async({month,count,url})=>{
    if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'}

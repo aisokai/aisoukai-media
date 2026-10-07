@@ -2,7 +2,7 @@ import {createHash,randomUUID} from 'node:crypto'
 import {mkdirSync,openSync,readFileSync,writeFileSync,fsyncSync,closeSync,renameSync,constants} from 'node:fs'
 import {join} from 'node:path'
 import {parseCsv} from '../csv-parser.mjs'
-import {isProtectedEditorialInput} from '../../src/lib/tieredPublication.mjs'
+import {isProtectedEditorialInput,topicContentVersion,BLOG_POLICY_VERSION,BLOG_POLICY_EVIDENCE} from '../../src/lib/tieredPublication.mjs'
 import {metadataTopicOverlap} from './mwf-topic-overlap.mjs'
 const hash=value=>createHash('sha256').update(value).digest('hex')
 const SHA=/^[a-f0-9]{40}$/
@@ -40,7 +40,20 @@ export function validateSuggestions(value,exclude){
  }
  return accepted
 }
-export function createCandidateSupply({root,github,request,notify,comparisons,now=()=>new Date(),enabled=false}){
+// Budget reservation only: envelope consistency is NOT signature verification or
+// adoption authority. The independent server.prepare/publication path is unchanged.
+function reservationRow(topic,month,rows,used){
+ const id=`MONTHLY-${topic.id.replace(/-/g,'').toUpperCase()}`,row=rows.get(id)
+ if(!row||row.status!=='approved'||used.has(id)||row.archived||row.rejection_reason||topic.archived||topic.rejection_reason)return null
+ const expected={id,source_type:topic.sourceType,source_url:topic.sourceUrl??'',topic:topic.title,title_candidate:topic.title,category:topic.category,target_keyword:topic.targetKeyword,patient_intent:topic.searchIntent,priority:topic.priority,medical_risk:topic.medicalRisk,status:'approved',publish_date:topic.recommendedPublishDate,notes:`月次ネタ候補 ${month} / MWF 月曜・水曜・金曜の週3投稿枠`}
+ const date=topic.recommendedPublishDate
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date??'')||!date.startsWith(month+'-')||!Number.isFinite(Date.parse(date+'T00:00:00Z'))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date||!['low','medium','high'].includes(topic.medicalRisk)||!['low','medium','high'].includes(topic.priority)||!['trend','news','seasonal','clinic','seo','patient_question'].includes(topic.sourceType)||!CATEGORIES.includes(topic.category)||['title','targetKeyword','searchIntent'].some(key=>typeof topic[key]!=='string'||!topic[key].trim())||Object.entries(expected).some(([key,value])=>String(row[key]??'').trim()!==String(value??'').trim()))throw Error('stock_unverified')
+ return row
+}
+function reservationEnvelope(receipt,row){
+ return receipt?.schema===1&&receipt.purpose==='teacher-topic-adoption'&&receipt.repository==='aisokai/aisoukai-media/main'&&receipt.policyVersion===BLOG_POLICY_VERSION&&/^[a-f0-9]{64}$/.test(receipt.signature??'')&&receipt.payload?.topicId===row.id&&receipt.payload.topicVersion===topicContentVersion(row)&&receipt.payload.editorialPolicy===BLOG_POLICY_VERSION&&receipt.payload.evidence===BLOG_POLICY_EVIDENCE&&Number.isFinite(Date.parse(receipt.payload.adoptedAt??''))
+}
+export function createCandidateSupply({root,github,request,notify,comparisons,reservedTopicIds=()=>[],now=()=>new Date(),enabled=false}){
  return async function prepareTopics(){
   if(!enabled)return{status:'disabled'}
   const today=new Date(+now()+9*3600000).toISOString().slice(0,10),current=today.slice(0,7),next=new Date(`${current}-01T00:00:00Z`);next.setUTCMonth(next.getUTCMonth()+1)
@@ -48,19 +61,32 @@ export function createCandidateSupply({root,github,request,notify,comparisons,no
   let state,journal
   try{
    const head=github('GET','git/ref/heads/main').object?.sha;if(!SHA.test(head))throw Error('head_invalid')
-   const comparison=await comparisons();if(!Array.isArray(comparison.entries)||comparison.entries.some(e=>!e.metadata||isProtectedEditorialInput(e.metadata)))throw Error('comparison_unavailable')
+   const comparison=await comparisons(head);if(!Array.isArray(comparison.entries)||comparison.entries.some(e=>!e.metadata||isProtectedEditorialInput(e.metadata)))throw Error('comparison_unavailable')
    let listing;try{listing=github('GET',`contents/data/monthly-topic-candidates?ref=${head}`)}catch(error){if(error.code==='NOT_FOUND')listing=[];else throw error}
    if(!Array.isArray(listing)||listing.length>120)throw Error('candidate_history_unavailable')
    const history=[]
-   for(const item of listing){if(item.type!=='file'||!/^data\/monthly-topic-candidates\/\d{4}-(0[1-9]|1[0-2])\.json$/.test(item.path))throw Error('candidate_history_unavailable');const file=readGithubJson(github,item.path,head);if(file.month!==item.path.slice(-12,-5)||!Array.isArray(file.topics))throw Error('candidate_history_unavailable');for(const topic of file.topics)publicTitle(topic);history.push(file)}
+   for(const item of listing){if(item.type!=='file'||!/^data\/monthly-topic-candidates\/\d{4}-(0[1-9]|1[0-2])\.json$/.test(item.path))throw Error('candidate_history_unavailable');const file=readGithubJson(github,item.path,head);if(file.month!==item.path.slice(-12,-5)||!Array.isArray(file.topics))throw Error('candidate_history_unavailable');const ids=new Set();for(const topic of file.topics){publicTitle(topic);if(!new RegExp(`^${file.month}-topic-\\d{3}$`).test(topic.id??'')||ids.has(topic.id))throw Error('stock_unverified');ids.add(topic.id)}history.push(file)}
    const csvFile=github('GET',`contents/data/article-topics.sample.csv?ref=${head}`);if(csvFile.encoding!=='base64')throw Error('csv_unavailable')
    const csv=parseCsv(Buffer.from(csvFile.content,'base64').toString('utf8')),known=[...comparison.entries,...csv.map(topic=>entry(publicTitle(topic)))]
+   const rows=new Map();for(const row of csv){if(!/^[A-Za-z0-9_-]{1,100}$/.test(row.id??'')||rows.has(row.id))throw Error('stock_unverified');rows.set(row.id,row)}
+   let used;try{const values=await reservedTopicIds();if(!Array.isArray(values)||values.some(id=>!/^[A-Za-z0-9_-]{1,100}$/.test(id)))throw Error('invalid');used=new Set(values)}catch{throw Error('stock_unverified')}
    let month,file,dates,exclude
    for(const target of allowed){
     const candidate=history.find(value=>value.month===target)??{month:target,generatedAt:now().toISOString(),targetPostCount:12,candidateCount:0,cadence:'MWF',notes:'先生の採用判断待ち',topics:[]}
     const targetDates=datesForMonth(target,today);if(!targetDates.length)continue
-    const other=[...known,...history.filter(h=>h.month!==target).flatMap(h=>h.topics.map(t=>entry(t.title)))]
-    const fresh=candidate.topics.filter(t=>['pending','selected'].includes(t.status)&&!metadataTopicOverlap(t,other).reason)
+    const otherHistory=history.filter(h=>h.month!==target).flatMap(h=>h.topics.map(t=>entry(t.title)))
+    const fresh=[]
+    for(const topic of candidate.topics){
+     if(topic.status==='pending'){if(!metadataTopicOverlap(topic,[...known,...otherHistory]).reason)fresh.push(topic);continue}
+     if(topic.status!=='selected')continue
+     const id=`MONTHLY-${topic.id.replace(/-/g,'').toUpperCase()}`,row=rows.get(id)
+     if(!row||row.status!=='approved'||used.has(id)||row.archived||row.rejection_reason||topic.archived||topic.rejection_reason)continue
+     let receipt;try{receipt=readGithubJson(github,`data/topic-adoptions/${row.id}.json`,head)}catch(error){if(error.code==='NOT_FOUND')continue;throw Error('stock_unverified')}
+     if(!reservationRow(topic,target,rows,used)||!reservationEnvelope(receipt,row))throw Error('stock_unverified')
+     // Only the exact matching self row is omitted; other IDs and articles remain.
+     const other=[...comparison.entries,...csv.filter(value=>value.id!==row.id).map(value=>entry(publicTitle(value))),...otherHistory]
+     if(!metadataTopicOverlap({...topic,id:row.id},other).reason)fresh.push(topic)
+    }
     const prior=durableState(join(root,'candidate-supply'),`topics-${target}`).read()
     if(fresh.length>=3&&(!prior||prior.status==='notified'))continue
     month=target;file=candidate;dates=targetDates;exclude=[...known,...history.flatMap(h=>h.topics.map(t=>entry(t.title)))];break
@@ -107,6 +133,6 @@ export function createCandidateSupply({root,github,request,notify,comparisons,no
     state.status=result?.status==='sent'?'notified':result?.status==='not-sent'?'committed':'notification-unknown';journal.write(state)
    }
    return{status:state.status,month,count:state.count}
-  }catch(error){if(journal&&state?.status==='committing'&&error.message==='remote_changed'){state.status='ready';journal.write(state)}if(journal&&state?.status==='requesting'){state.status='invalid';journal.write(state)}return{status:'attention'}}
+  }catch(error){if(error.message==='stock_unverified')return{status:'stock-unverified'};if(journal&&state?.status==='committing'&&error.message==='remote_changed'){state.status='ready';journal.write(state)}if(journal&&state?.status==='requesting'){state.status='invalid';journal.write(state)}return{status:'attention'}}
  }
 }

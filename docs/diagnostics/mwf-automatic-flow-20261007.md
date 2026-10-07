@@ -46,3 +46,14 @@ npx --no-install eslint scripts/lib/mwf-production.mjs scripts/lib/mwf-candidate
 主な検証は、既存判断の保持、通知後の再送防止、paid 結果不明の再試行防止、競合時追記再計画、後続 commit 後の復帰、未採用・保護テーマの画像 API 呼出しゼロ、画像未反映時の記事生成ゼロ、画像反映後に一度だけ unreviewed draft 同期、画像生成による記事承認の非付与。
 
 Next build／UI 目視は Manager 担当。実際の provider 出力品質、モデルの利用可能性、本番デプロイ待ち時間は合成テストでは証明していない。未知の paid／通知結果は運用確認が必要であり、成功と扱わない。
+
+
+## 同日過剰補充の修復
+
+採用後の selected テーマは、自分自身の MONTHLY CSV 行とタイトル一致し、旧判定では在庫から除外されていた。採用による status 変更で補充 journal の cycle も変わるため、採用のたびに新規提案を課金生成する余地があった。
+
+補充在庫だけに使う予約枠を追加した。候補・CSV・採用 receipt・比較 metadata を同じ main revision に固定する。selected の厳密な MONTHLY ID、CSV approved、候補との意味 field／日付／risk 一致、receipt の schema／purpose／repository／policy／topic ID／topic version を確認する。比較から外すのは自身の CSV 1 行だけで、別 ID・実記事・他月の重複は引き続き除外する。既存 delivery に topic ID があるもの、consumed／archived／in-progress は予約枠に数えない。
+
+これは追加候補課金を抑える予約枠であり、Mac では HMAC 署名を検証しない。真正な採用認定や生成許可ではなく、server.prepare／公開審査には結果を渡さない。署名検証は従来どおり server の責任である。receipt 404 の旧 selected は 0 件、receipt 読取異常・binding 不正・ID 重複は stock-unverified とし、追加生成を止める。
+
+合成回帰では、採用後の自己 CSV 一致、5 件中 1 件が delivery 処理中で残り 4 件、旧採用の receipt 不在、used topic、consumed、別 ID／記事／他月重複、receipt 破損／取得失敗／purpose・version 不一致、意味 field 差異、ID 重複を確認した。実データ・main・審査 API・認証設定は変更していない。
