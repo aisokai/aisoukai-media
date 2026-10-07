@@ -43,7 +43,7 @@ function pageHarness(){
 test('pending default survives refresh; handled filters recover cards and change their client state key',async()=>{
  const h=pageHarness(),tree=await h.page({searchParams:Promise.resolve({month:'2026-11'})})
  const pending=nodes(tree).filter(n=>n.type===h.Card);assert.equal(pending.length,1);assert.equal(pending[0].props.topic.id,base.id)
- const html=renderToStaticMarkup(tree);assert.match(html,/2026-11/);assert.match(html,/未判断の残り/);assert.match(html,/判断済みの候補は状態の絞り込み/)
+ const html=renderToStaticMarkup(tree);assert.match(html,/2026-11/);assert.match(html,/未判断の残り/);assert.match(html,/判断済みの候補は状態の絞り込み/);assert.match(html,/「今月採用」を押すと採用が確定/);assert.match(html,/追加の確定操作は不要/);assert.doesNotMatch(html,/保存しても採用の確定や記事作成は行いません/)
  const all=nodes(await h.page({searchParams:Promise.resolve({month:'2026-11',status:'all'})})).filter(n=>n.type===h.Card)
  assert.equal(all.length,2);assert.notEqual(all[0].key,pending[0].key)
  const rejected=nodes(await h.page({searchParams:Promise.resolve({status:'rejected'})})).filter(n=>n.type===h.Card)

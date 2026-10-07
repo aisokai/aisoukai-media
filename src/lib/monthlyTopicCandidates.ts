@@ -136,12 +136,8 @@ export function updateMonthlyTopicCandidateStatus(
   const topic = next.topics.find((item) => item.id === id)
   if (!topic) throw new Error(`ネタ候補が見つかりません: ${id}`)
 
-  if (status === 'selected') {
-    const selectedCount = next.topics.filter((item) => item.status === 'selected' && item.id !== id).length
-    if (selectedCount >= next.targetPostCount) {
-      throw new Error(`今月採用は ${next.targetPostCount} 件までです。追加分は予備にしてください。`)
-    }
-  }
+  // targetPostCount is a planning goal. Historical selections must not block
+  // a new explicit Human adoption; no prior selection is silently removed.
 
   topic.status = status
   topic.reviewerNote = reviewerNote.trim() || undefined

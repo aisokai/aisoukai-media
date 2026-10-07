@@ -6,23 +6,16 @@ const escapeCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`
 
 // Called only by the authenticated Human finalize action. CSV approval alone is
 // never an adoption: selected candidates must agree with the current CSV row.
-export async function planSelectedTopicAdoptions(file, existingCsv, { loadAdoption, secret = undefined, today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) }) {
+export async function planSelectedTopicAdoptions(file, existingCsv, { loadAdoption, secret = undefined, selectedTopicId = undefined, today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10) }) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(file?.month ?? '') || !Array.isArray(file?.topics) || !Number.isInteger(file.targetPostCount) || file.targetPostCount < 1) throw Error('候補一覧の形式が不正です')
   const candidateIds = new Set()
   for (const candidate of file.topics) {
     if (!new RegExp(`^${file.month}-topic-\\d{3}$`).test(candidate.id) || candidateIds.has(candidate.id)) throw Error('候補IDが不正または重複しています')
     candidateIds.add(candidate.id)
   }
-  const selected = file.topics.filter(topic => topic.status === 'selected')
-  if (!selected.length || selected.length > file.targetPostCount) throw Error('今月採用の件数を確認してください')
-  const [headers, ...csvRows] = parseCsvRows(existingCsv)
-  if (!headers || headers.length !== TOPIC_CSV_COLUMNS.length || headers.some((key, i) => key !== TOPIC_CSV_COLUMNS[i])) throw Error('記事ネタCSVの列が不正です')
-  const existing = new Map()
-  for (const cells of csvRows) {
-    if (cells.every(cell => !cell)) continue
-    if (cells.length !== headers.length || !cells[0] || existing.has(cells[0])) throw Error('記事ネタCSVのIDが空欄または重複しています')
-    existing.set(cells[0], Object.fromEntries(headers.map((key, i) => [key, cells[i]])))
-  }
+  const selected = file.topics.filter(topic => topic.status === 'selected' && (selectedTopicId === undefined || topic.id === selectedTopicId))
+  if (!selected.length) throw Error('今月採用の件数を確認してください')
+  const existing = readTopicRows(existingCsv)
   const lines = [], adoptions = []
   let preservedCount = 0
   for (const topic of selected) {
@@ -47,4 +40,46 @@ export async function planSelectedTopicAdoptions(file, existingCsv, { loadAdopti
     if (!existing.has(id)) lines.push(TOPIC_CSV_COLUMNS.map(key => escapeCsv(row[key])).join(','))
   }
   return { selectedCount: selected.length, lines, adoptions, preservedCount }
+}
+
+function readTopicRows(csv) {
+  const [headers, ...csvRows] = parseCsvRows(csv)
+  if (!headers || headers.length !== TOPIC_CSV_COLUMNS.length || headers.some((key, i) => key !== TOPIC_CSV_COLUMNS[i])) throw Error('記事ネタCSVの列が不正です')
+  const existing = new Map()
+  for (const cells of csvRows) {
+    if (cells.every(cell => !cell)) continue
+    if (cells.length !== headers.length || !cells[0] || existing.has(cells[0])) throw Error('記事ネタCSVのIDが空欄または重複しています')
+    existing.set(cells[0], Object.fromEntries(headers.map((key, i) => [key, cells[i]])))
+  }
+  return existing
+}
+
+// The caller passes the already-updated candidate file and only the ID clicked
+// by an authenticated Human. Other selected candidates never gain a receipt.
+export async function planTopicCandidateStatusChange(file, candidateId, csv, options) {
+  if (!Array.isArray(file?.topics) || file.topics.filter(topic => topic.id === candidateId).length !== 1) throw Error('候補IDが不正または重複しています')
+  const candidate = file.topics.find(topic => topic.id === candidateId)
+  if (!new RegExp(`^${file.month}-topic-\\d{3}$`).test(candidateId) || !['selected', 'pending', 'backup', 'hold', 'rejected'].includes(candidate.status)) throw Error('採用候補の状態を確認してください')
+  if (isProtectedEditorialInput(candidate)) throw Error('保護対象の候補は確定できません')
+  const id = `MONTHLY-${candidateId.replace(/-/g, '').toUpperCase()}`
+  const rows = readTopicRows(csv), existing = rows.get(id)
+  let nextCsv = csv
+  if (existing) {
+    if (isProtectedEditorialInput(existing)) throw Error('保護対象の候補は確定できません')
+    // Never revive consumed/archived rows. A Human can reselect a held/rejected
+    // theme, but the planner still verifies every other bound semantic field.
+    const reversibleStatus = ['approved', 'pending', 'backup', 'hold', 'rejected'].includes(existing.status)
+    if (candidate.status === 'selected' && !reversibleStatus) throw Error('記事ネタの状態を確認してください')
+    const status = candidate.status === 'selected' ? 'approved' : 'hold'
+    // Preserve consumed/archived/in-progress states on deselection too: turning
+    // them into hold would let a later selection bypass the revival guard.
+    if (reversibleStatus && existing.status !== status) {
+      rows.set(id, { ...existing, status })
+      nextCsv = `${TOPIC_CSV_COLUMNS.join(',')}\n${[...rows.values()].map(row => TOPIC_CSV_COLUMNS.map(key => escapeCsv(row[key])).join(',')).join('\n')}\n`
+    }
+  }
+  if (candidate.status !== 'selected') return { nextCsv, adoptions: [] }
+  const plan = await planSelectedTopicAdoptions(file, nextCsv, { ...options, selectedTopicId: candidateId })
+  if (plan.lines.length) nextCsv = `${nextCsv}${nextCsv.endsWith('\n') ? '' : '\n'}${plan.lines.join('\n')}\n`
+  return { nextCsv, adoptions: plan.adoptions }
 }

@@ -58,7 +58,7 @@ function main() {
   const file = JSON.parse(readFileSync(filePath, 'utf8'))
   if (file.month !== month) errors.push(`month がファイル名と一致しません: ${file.month}`)
   if (file.targetPostCount !== 12) errors.push('targetPostCount は 12 にしてください')
-  if (file.candidateCount !== 24) errors.push('candidateCount は 24 にしてください')
+  if (!Number.isInteger(file.candidateCount) || file.candidateCount < 1 || file.candidateCount > 999) errors.push('candidateCount は 1〜999 の整数にしてください')
   if (!VALID_CADENCE.has(file.cadence)) errors.push('cadence は MWF にしてください')
   if (!Array.isArray(file.topics)) errors.push('topics は配列にしてください')
 
@@ -87,9 +87,7 @@ function main() {
   }
 
   const selectedCount = topics.filter((topic) => topic.status === 'selected').length
-  if (selectedCount > file.targetPostCount) {
-    errors.push(`selectedCount が多すぎます: ${selectedCount} / ${file.targetPostCount}`)
-  }
+  // targetPostCount is a planning goal, not a cap on Human adoption.
 
   if (errors.length > 0) {
     for (const error of errors) console.error(`❌ ${error}`)

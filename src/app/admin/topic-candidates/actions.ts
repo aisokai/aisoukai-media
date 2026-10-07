@@ -8,12 +8,11 @@ import { commitGitHubFiles, readGitHubFile, readGitHubBranchHead } from '@/lib/g
 import {
   getMonthlyTopicCandidates,
   getTopicCandidatePath,
-  saveMonthlyTopicCandidatesLocal,
   type TopicCandidateStatus,
   updateMonthlyTopicCandidateStatus,
 } from '@/lib/monthlyTopicCandidates'
 
-import { planSelectedTopicAdoptions, TOPIC_CSV_COLUMNS } from '@/lib/selectedTopicAdoptions.mjs'
+import { planSelectedTopicAdoptions, planTopicCandidateStatusChange, TOPIC_CSV_COLUMNS } from '@/lib/selectedTopicAdoptions.mjs'
 
 export type TopicCandidateActionResult = {
   ok: boolean
@@ -60,6 +59,21 @@ async function loadCandidateFile(month: string, ref?: string) {
   return { file: JSON.parse(githubFile.content), raw: githubFile.content, filePath }
 }
 
+
+async function loadAdoption(adoptionPath: string, ref?: string) {
+  if (!process.env.GITHUB_REVIEW_TOKEN) {
+    const localPath = path.join(process.cwd(), adoptionPath)
+    if (!fs.existsSync(localPath)) return null
+    return JSON.parse(fs.readFileSync(localPath, 'utf8'))
+  }
+  try {
+    return JSON.parse((await readGitHubFile(adoptionPath, { ref })).content)
+  } catch (error) {
+    if ((error as { code?: string }).code === 'NOT_FOUND') return null
+    throw new Error('採用記録を取得できません。再度確認してください')
+  }
+}
+
 export async function updateTopicCandidateStatusAction({
   month,
   id,
@@ -76,26 +90,28 @@ export async function updateTopicCandidateStatusAction({
     validateId(id)
     validateStatus(status)
 
-    const { file, raw, filePath } = await loadCandidateFile(month)
+    // Candidate status, generation eligibility and the signed adoption must
+    // become visible together. Do not report a local-only selection as saved.
+    if (!process.env.GITHUB_REVIEW_TOKEN) throw new Error('採用の保存先が未設定です。管理者に確認してください')
+    const expectedHeadSha = await readGitHubBranchHead()
+    const { file, filePath } = await loadCandidateFile(month, expectedHeadSha)
+    if (file.month !== month) throw new Error('候補一覧の月が一致しません')
     const nextFile = updateMonthlyTopicCandidateStatus(file, id, status, reviewerNote)
     const nextContent = `${JSON.stringify(nextFile, null, 2)}\n`
-
-    if (nextContent === raw || nextContent.trim() === raw.trim()) {
-      return { ok: true, message: '変更はありません' }
-    }
-
-    if (!process.env.GITHUB_REVIEW_TOKEN) {
-      saveMonthlyTopicCandidatesLocal(nextFile)
-      revalidatePath('/admin/topic-candidates')
-      return { ok: true, message: 'ローカルファイルを更新しました' }
-    }
-
-    const commit = await commitGitHubFiles(`update topic candidate: ${id} ${status}`, [
-      { path: filePath, content: nextContent },
-    ])
+    const currentCsv = await loadTopicsCsv(expectedHeadSha)
+    const { nextCsv, adoptions } = await planTopicCandidateStatusChange(nextFile, id, currentCsv, {
+      loadAdoption: (adoptionPath: string) => loadAdoption(adoptionPath, expectedHeadSha),
+    })
+    const files = [
+      ...(JSON.stringify(nextFile) !== JSON.stringify(file) ? [{ path: filePath, content: nextContent }] : []),
+      ...(nextCsv !== currentCsv ? [{ path: TOPICS_PATH, content: nextCsv }] : []),
+      ...adoptions,
+    ]
+    if (!files.length) return { ok: true, message: status === 'selected' ? '採用済みです。予定日以降の定期処理で記事生成の対象になります' : '変更はありません' }
+    const commit = await commitGitHubFiles(`update topic candidate: ${id} ${status}`, files, { expectedHeadSha })
 
     revalidatePath('/admin/topic-candidates')
-    return { ok: true, message: `更新しました。GitHub commit: ${commit.sha.slice(0, 7)}` }
+    return { ok: true, message: `${status === 'selected' ? '採用しました。予定日以降の定期処理で記事生成の対象になります' : '保存しました。この候補は新規記事生成の対象から外れます'}。GitHub commit: ${commit.sha.slice(0, 7)}` }
   } catch (error) {
     return { ok: false, message: sanitizeError(error) }
   }
@@ -110,19 +126,7 @@ export async function finalizeSelectedTopicCandidatesAction(month: string): Prom
     if (file.month !== month) throw new Error('候補一覧の月が一致しません')
     const currentCsv = await loadTopicsCsv(expectedHeadSha)
     const { selectedCount, lines, adoptions } = await planSelectedTopicAdoptions(file, currentCsv, {
-      loadAdoption: async (adoptionPath: string) => {
-        if (!process.env.GITHUB_REVIEW_TOKEN) {
-          const localPath = path.join(process.cwd(), adoptionPath)
-          if (!fs.existsSync(localPath)) return null
-          return JSON.parse(fs.readFileSync(localPath, 'utf8'))
-        }
-        try {
-          return JSON.parse((await readGitHubFile(adoptionPath, { ref: expectedHeadSha })).content)
-        } catch (error) {
-          if ((error as { code?: string }).code === 'NOT_FOUND') return null
-          throw new Error('採用記録を取得できません。再度確認してください')
-        }
-      },
+      loadAdoption: (adoptionPath: string) => loadAdoption(adoptionPath, expectedHeadSha),
     })
 
     if (lines.length === 0 && adoptions.length === 0) {

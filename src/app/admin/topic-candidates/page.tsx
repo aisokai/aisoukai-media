@@ -168,7 +168,7 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
         <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
           <p className="text-xs font-bold text-blue-700">今月採用</p>
           <p className="mt-1 text-2xl font-bold text-blue-900">{selectedProgress}</p>
-          <p className="sr-only">{summary.targetPostCount}件が月次目標です</p>
+          <p className="mt-1 text-xs text-blue-800">月次目標 {summary.targetPostCount} 件（採用上限ではありません）</p>
         </div>
         <SummaryTile label="未判断の残り" value={summary.pendingCount} />
         <SummaryTile label="予備" value={summary.backupCount} />
@@ -177,7 +177,7 @@ export default async function TopicCandidatesPage({ searchParams }: PageProps) {
         <SummaryTile label="重複注意" value={summary.duplicateWarningCount} tone="amber" />
       </section>
 
-      <p className="mt-4 text-sm text-gray-600">判断済みの候補は状態の絞り込みで再確認・変更できます。保存しても採用の確定や記事作成は行いません。</p>
+      <p className="mt-4 text-sm text-gray-600">「今月採用」を押すと採用が確定し、予定日以降の定期処理で記事生成の対象になります。追加の確定操作は不要です。予備・保留・却下に変更すると新規生成の対象から外れます。判断済みの候補は状態の絞り込みで再確認・変更できます。</p>
       {file.previousMonthComparisonUnavailable && <p role="status" className="mt-3 text-sm text-amber-800">前月候補との照合ができませんでした。新しいテーマかどうかは未確認です。</p>}
       <section className="mt-4">
         <FinalizeTopicCandidatesButton

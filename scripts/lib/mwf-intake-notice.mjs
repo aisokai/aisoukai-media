@@ -25,11 +25,12 @@ export function formatIntakeNotice({slot,reason,candidateHolds=[],heldCount=0,de
  const summary=articleSummary,created=count(summary.created),tracked=count(summary.tracked),uncertain=count(summary.uncertain)
  const result=summary.observed!==true?'対象日分の記事の作成状況を確認しています。':created?`対象日分の記事は${created}件作成済みです。${count(summary.pending)?'確認・反映・通知が済んでいない記事があります。':''}`:tracked||uncertain?'対象日分に処理中または結果確認中の記事があります。作成件数はまだ確定していません。':'対象日分の新規記事は作成していません。'
  const lines=[`ブログ記事の作成結果（${day}）`,result]
- const teacher=[],technical=[],duplicates=[],related=[]
+ const teacher=[],technical=[],duplicates=[],related=[],images=[]
  for(const hold of candidateHolds){
   const id=safeId(hold?.topicId),title=hold?.reason==='protected_topic'?'':safeTitle(hold?.title)
   const label=title?`「${title}」${id?`（${id}）`:''}`:id?`テーマ ${id}（タイトル非表示）`:'タイトル非表示のテーマ'
   if(['topic_adoption_missing','topic_adoption_unproven','topic_date_invalid'].includes(hold?.reason))teacher.push({label,id,reason:hold.reason})
+  else if(/^image_[a-z_]+$/.test(hold?.reason??''))images.push({label,reason:hold.reason})
   else if(hold?.reason==='duplicate_metadata')duplicates.push(label)
   else if(['metadata_related','precheck_related'].includes(hold?.reason))related.push(label)
   else technical.push({label,reason:technicalReasons.has(hold?.reason)?hold.reason:'other'})
@@ -47,6 +48,7 @@ export function formatIntakeNotice({slot,reason,candidateHolds=[],heldCount=0,de
   for(const entry of technical.slice(0,2))lines.push(`${entry.label}：${entry.reason==='topic_adoption_unavailable'?'採用情報を取得できませんでした。':'記事作成前の確認を完了できませんでした。'}`)
   if(technical.length>2)lines.push(`ほか${technical.length-2}件も運用側の確認対象です。`)
  }
+ if(images.length){lines.push('',`記事に合う画像の準備待ち：${images.length}件（採用し直す操作は不要）`);for(const item of images.slice(0,2))lines.push(`${item.label}：${item.reason==='image_deployment_pending'?'画像は保存済みです。サイトへの反映を確認してから記事を作成します。':'画像の生成・確認結果を確定できないため、記事作成を保留しています。運用側の確認が必要です。'}`)}
  if(duplicates.length){lines.push('',`重複を避けて見送り：${duplicates.length}件（操作不要）`);lines.push(...duplicates.slice(0,2));if(duplicates.length>2)lines.push(`ほか${duplicates.length-2}件`)}
  if(related.length){lines.push('',`内容が重なる可能性があるため確認待ち：${related.length}件（重複確定ではありません）`,'運用側で既存記事との違いを確認する必要があります。採用し直す操作は不要です。');lines.push(...related.slice(0,2));if(related.length>2)lines.push(`ほか${related.length-2}件`)}
  if(count(deferredCount))lines.push('',`予定日前のため待機：${count(deferredCount)}件（操作不要。予定日以降の対象になります）`)

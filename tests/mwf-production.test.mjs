@@ -12,7 +12,7 @@ function fixture(){
  const root=mkdtempSync(join(tmpdir(),'mwf-mac-server-')),inventoryRaw=JSON.stringify({unsigned:true,payload:{schema:2,entries:[],quarantine:[],usedTopicIds:[]}}),calls=[],git=[],topic={id:'topic',title:'Synthetic',category:'その他',status:'approved'}
  const env={MWF_STATE_ROOT:root,MWF_TOPICS_PATH:'/synthetic/topics.csv',MWF_INVENTORY_PATH:'/synthetic/inventory.json',MWF_RUNNER_VERSION:'a'.repeat(40),OPENAI_API_KEY:'synthetic-generator-key',TELEGRAM_BOT_TOKEN:'synthetic-bot',TELEGRAM_CHAT_ID:'synthetic-teacher'}
  let raw,adopted=true,serverReady=true,published=false
- const options={env,inventoryAnchor:inventoryHash(inventoryRaw),readText:()=>inventoryRaw,now:()=>new Date('2026-09-13T23:30:00Z'),serverClient:{prepare:async({topicVersion})=>({status:serverReady?'ready':'hold',reason:'topic_adoption_unproven',topicVersion,comparisonHash:comparisonSet([]).hash}),reflect:async item=>({status:'draft-review-required',reason:'server_reviewer_configuration_missing',authenticated:true,source:'production-admin',path:item.path,originBlob:item.blob,blob:published?'e'.repeat(64):item.blob,contentVersion:published?'f'.repeat(64):item.contentVersion,reviewable:true,published})},
+ const options={candidateSupplyEnabled:false,autoImagesEnabled:false,env,inventoryAnchor:inventoryHash(inventoryRaw),readText:()=>inventoryRaw,now:()=>new Date('2026-09-13T23:30:00Z'),serverClient:{prepare:async({topicVersion})=>({status:serverReady?'ready':'hold',reason:'topic_adoption_unproven',topicVersion,comparisonHash:comparisonSet([]).hash}),reflect:async item=>({status:'draft-review-required',reason:'server_reviewer_configuration_missing',authenticated:true,source:'production-admin',path:item.path,originBlob:item.blob,blob:published?'e'.repeat(64):item.blob,contentVersion:published?'f'.repeat(64):item.contentVersion,reviewable:true,published})},
  spawnImpl:(command,args,options)=>{
   if(command==='/opt/homebrew/bin/gh'){
    assert.equal(args[0],'api');assert.equal(args[2],'github.com');assert.equal(args[4],'GET');assert.deepEqual(Object.keys(options.env).sort(),['GH_NO_UPDATE_NOTIFIER','GH_PROMPT_DISABLED','HOME','PATH'])
@@ -284,3 +284,39 @@ test('unavailable comparison metadata is an operator hold before any adoption lo
  const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
  assert.match(text,/運用側で確認が必要/);assert.doesNotMatch(text,/PRIVATE_RAW_DETAIL|approved|採用済みであることを確認できません/)
 })
+
+test('topic-only CLI does not enter article generation, independent review, sync or publication',async()=>{
+ const f=fixture();let result
+ assert.equal(await runMwfCli(['--production','--prepare-topics-only'],{productionOptions:f.options,output:value=>result=value}),1)
+ assert.equal(result.status,'topic-preparation');assert.equal(result.candidateSupply.status,'disabled');assert.equal(f.calls.length,0);assert.equal(openDeliveryStore(f.root).read().length,0);assert.equal(f.git.some(c=>c.args[0]==='push'),false)
+})
+
+test('adopted topic waits for generated image deployment, then syncs image-bound unreviewed article without repeating image calls',async()=>{
+ const f=fixture(),baseSpawn=f.options.spawnImpl,baseFetch=f.options.fetchImpl,blobs=new Map();let head='a'.repeat(40),tree=[],library={images:[]},deployed=false,images=0,vision=0;
+ const bytes=Buffer.alloc(40);Buffer.from([137,80,78,71,13,10,26,10]).copy(bytes);bytes.write('IHDR',12);bytes.writeUInt32BE(1536,16);bytes.writeUInt32BE(1024,20);
+ f.options.autoImagesEnabled=true;
+ f.options.spawnImpl=(command,args,options)=>{
+  if(command!=='/opt/homebrew/bin/gh')return baseSpawn(command,args,options);
+  const path=args[5].replace('repos/aisokai/aisoukai-media/',''),method=args[4],body=options.input?JSON.parse(options.input):null;let value;
+  if(path==='git/ref/heads/main')value={object:{sha:head}};
+  else if(path.startsWith('contents/data/image-library.json?'))value={encoding:'base64',content:Buffer.from(JSON.stringify(library)).toString('base64')};
+  else if(method==='GET'&&path.startsWith('git/commits/'))value={tree:{sha:'c'.repeat(40)}};
+  else if(method==='GET'&&path.startsWith('git/trees/'))value={truncated:false,tree:library.images.map(i=>({path:`public${i.path}`,sha:i.git_blob,type:'blob',mode:'100644'}))};
+  else if(path==='git/blobs'){const sha=String(blobs.size+1).padStart(40,'0');blobs.set(sha,body);value={sha};}
+  else if(path==='git/trees'){tree=body.tree;value={sha:'d'.repeat(40)};}
+  else if(path==='git/commits')value={sha:'e'.repeat(40)};
+  else if(path==='git/refs/heads/main'){assert.equal(body.force,false);head=body.sha;library=JSON.parse(blobs.get(tree.find(t=>t.path==='data/image-library.json').sha).content);value={object:{sha:head}};}
+  else return baseSpawn(command,args,options);
+  return{status:0,stdout:JSON.stringify(value)};
+ };
+ f.options.fetchImpl=async(url,options)=>{
+  if(url.includes('/images/generations')){images++;return{ok:true,headers:new Headers({'x-request-id':'req_synthetic'}),json:async()=>({data:[{b64_json:bytes.toString('base64')}]})};}
+  if(url.includes('/images/library/generated/'))return{ok:deployed,headers:new Headers({'content-type':'image/png'}),arrayBuffer:async()=>bytes};
+  if(url.includes('openai.com')&&Array.isArray(JSON.parse(options.body).messages?.[1]?.content)){vision++;return{ok:true,json:async()=>({id:'chatcmpl-synthetic',choices:[{finish_reason:'stop',message:{content:JSON.stringify({suitable:true,medicalAccuracy:true,notMisleading:true,noIdentifiablePeople:true})}}]})};}
+  return baseFetch(url,options);
+ };
+ let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value}),1);
+ assert.equal(result.items[0].generationReason,'image_deployment_pending');assert.equal(result.intakeNotification,'sent');assert.match(f.calls.at(-1).options.body,/画像は保存済み/);assert.equal(images,1);assert.equal(vision,1);assert.equal(f.getRaw(),undefined);assert.equal(f.git.some(c=>c.args[0]==='push'),false);
+ deployed=true;f.options.now=()=>new Date('2026-09-15T23:30:00Z');await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value});assert.equal(result.intakeError,'no-unused-topic');
+ assert.equal(images,1);assert.equal(vision,1);assert.equal(result.items[0].state,'notified');assert.match(f.getRaw(),/image_content_hash: "[a-f0-9]{64}"/);assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.match(f.getRaw(),/auto_approved: false/);
+});

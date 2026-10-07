@@ -119,3 +119,11 @@ test('intake notice receives current-slot article metadata without losing prior 
  assert.deepEqual(notice.articleSummary,{observed:true,tracked:1,created:0,uncertain:1,reviewable:0,pending:1})
  assert.equal(notice.deferredCount,11);assert.equal(store.read().find(i=>i.topicId==='current').state,'generation-unknown')
 })
+
+test('normal later slot resumes only known image deployment wait; explicit retry-only and unknown results remain stopped',async()=>{
+ for(const [reason,explicit,expected] of [['image_deployment_pending',false,1],['image_deployment_pending',true,0],['image_unknown',false,0]]){
+  const f=fixture();f.store.save({id:deliveryId(slot,'synthetic-topic'),slot,topicId:'synthetic-topic',topic:{id:'synthetic-topic'},state:'generation-failed',stage:'generation',generationReason:reason});
+  const result=await f.run({slot:'2026-09-16T08:30:00+09:00',retryOnly:explicit,select:async()=>({holdOnly:true,holds:[]})});
+  assert.equal(f.calls.generate,expected);assert.equal(result.items[0].slot,slot);assert.equal(result.items[0].state,expected?'notified':'generation-failed');
+ }
+})

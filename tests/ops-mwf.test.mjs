@@ -81,3 +81,7 @@ test('unbound runtime is stopped and old auto-publish options are rejected', asy
   assert.equal(status.status, 'stopped')
   await assert.rejects(runMwfCli(['--auto-publish']), /unsupported_argument/)
 })
+
+test('topic-only preparation rejects ambiguous business mode combinations before runtime',async()=>{
+ for(const args of [['--prepare-topics-only'],['--production','--prepare-topics-only','--status'],['--production','--prepare-topics-only','--retry-only'],['--production','--prepare-topics-only','--recover-topic','topic']])await assert.rejects(runMwfCli(args),/prepare_topics_options_invalid/)
+})

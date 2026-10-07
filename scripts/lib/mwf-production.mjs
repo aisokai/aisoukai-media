@@ -1,3 +1,6 @@
+import {createHash} from 'node:crypto'
+import {createAutoImages} from './mwf-auto-images.mjs'
+import {createCandidateSupply} from './mwf-candidate-supply.mjs'
 import {metadataTopicOverlap} from './mwf-topic-overlap.mjs'
 import {projectCandidateHold,formatIntakeNotice} from './mwf-intake-notice.mjs'
 import {selectMwfImage,imageShortage,imageShortageNotice} from './mwf-images.mjs'
@@ -43,7 +46,7 @@ export function latestElapsedMwfSlot(now=new Date()){
  while(+slot>+now||![1,3,5].includes(new Date(+slot+9*3600000).getUTCDay()))slot=new Date(+slot-86400000)
  return `${new Date(+slot+9*3600000).toISOString().slice(0,10)}T08:30:00+09:00`
 }
-export function createProductionRuntime({recoveryTopic,backfill,env=process.env,readText=path=>readFileSync(path,'utf8'),fetchImpl=fetch,spawnImpl=spawnSync,now=()=>new Date(),inventoryAnchor=MWF_INVENTORY_ANCHOR,serverClient}={}){
+export function createProductionRuntime({recoveryTopic,backfill,candidateSupplyEnabled=true,autoImagesEnabled=true,env=process.env,readText=path=>readFileSync(path,'utf8'),fetchImpl=fetch,spawnImpl=spawnSync,now=()=>new Date(),inventoryAnchor=MWF_INVENTORY_ANCHOR,serverClient}={}){
  for(const key of ['MWF_STATE_ROOT','MWF_TOPICS_PATH','MWF_INVENTORY_PATH','MWF_RUNNER_VERSION'])if(!env[key]?.trim())throw Error('production_configuration_missing')
  for(const key of ['MWF_STATE_ROOT','MWF_TOPICS_PATH','MWF_INVENTORY_PATH'])if(!env[key].startsWith('/'))throw Error('absolute_runtime_paths_required')
  if(!/^[a-f0-9]{40}$/.test(env.MWF_RUNNER_VERSION))throw Error('runner_version_required')
@@ -55,7 +58,7 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
  if(identity.status!==0||identity.stdout.trim()!==env.MWF_RUNNER_VERSION||clean.status!==0||clean.stdout.trim())throw Error('runner_version_mismatch')
  const request=(url,options)=>fetchImpl(url,{...options,redirect:'error',signal:AbortSignal.timeout(url.includes('openai.com')?180000:300000)})
  function github(method,path,body){
-  if(!['GET','POST','PATCH'].includes(method)||!(/^(?:contents\/(?:data\/[A-Za-z0-9_./-]+|content\/posts(?:\/\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]+\.md)?)(?:\?ref=(?:main|[a-f0-9]{40}))?|git\/(?:ref\/heads\/main|refs\/heads\/main|commits(?:\/[a-f0-9]{40})?|trees(?:\/[a-f0-9]{40}\?recursive=1)?|blobs))$/.test(path))||path.includes('..'))throw Error('github_scope_rejected')
+  if(!['GET','POST','PATCH'].includes(method)||!(/^(?:contents\/(?:data\/[A-Za-z0-9_./-]+|public\/images\/library\/generated\/[a-f0-9]{64}\.png|content\/posts(?:\/\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]+\.md)?)(?:\?ref=(?:main|[a-f0-9]{40}))?|git\/(?:ref\/heads\/main|refs\/heads\/main|commits(?:\/[a-f0-9]{40})?|trees(?:\/[a-f0-9]{40}\?recursive=1)?|blobs))$/.test(path))||path.includes('..'))throw Error('github_scope_rejected')
   const result=spawnImpl('/opt/homebrew/bin/gh',['api','--hostname','github.com','--method',method,`repos/aisokai/aisoukai-media/${path}`,...(body?['--input','-']:[])],{env:native,input:body?JSON.stringify(body):undefined,encoding:'utf8',timeout:30000,maxBuffer:16*1024*1024,stdio:['pipe','pipe','pipe']})
   if(result.status!==0||result.error){const missing=/HTTP 404/.test(result.stderr??'');throw Object.assign(Error('github_operation_failed'),{code:missing?'NOT_FOUND':'FAILED'})}
   try{return JSON.parse(result.stdout)}catch{throw Error('github_response_invalid')}
@@ -128,12 +131,15 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
   return selectMwfImage(library,topic,tree)
  }catch{return imageShortage('image_inventory_unavailable')}}
 
+ const autoImages=createAutoImages({root,github,now,enabled:autoImagesEnabled&&Boolean(env.OPENAI_API_KEY),request:(url,options)=>{if(!['https://api.openai.com/v1/images/generations','https://api.openai.com/v1/chat/completions'].includes(url))throw Error('image_endpoint_rejected');return request(url,{...options,headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'}})},publicRequest:(url,options)=>{if(!/^https:\/\/aisoukai-media\.vercel\.app\/images\/library\/generated\/[a-f0-9]{64}\.png$/.test(url))throw Error('image_public_endpoint_rejected');return request(url,options)}})
  const generate=async({slot,topic,idempotencyKey})=>{
   if(!topic||isProtectedEditorialInput(topic)||!env.OPENAI_API_KEY)return{status:'not-generated'}
   const prepared=await server().prepare({slot,publicationMode:backfill?'draft-only':undefined,topicId:topic.id,topicVersion:topicContentVersion(topic)});if(prepared.status!=='ready'||prepared.topicVersion!==topicContentVersion(topic)||precheckDraftDisposition(await precheck(topic,prepared.comparisonHash))==='hold')return{status:'not-generated'}
   const title=String(topic.title_candidate??topic.title??'').trim(),category=String(topic.category??'その他');if(!title)return{status:'not-generated'}
+  let selectedImage=await approvedImage(topic)
+  if(autoImagesEnabled&&selectedImage.image_selection_status==='missing'){const image=await autoImages(topic,{adoptionVerified:true});if(image.status!=='ready')return{status:'not-generated',reason:image.reason.startsWith('image_')?image.reason:`image_${image.reason.replaceAll('-','_')}`};selectedImage=image.image}
+  if(/^\/images\/library\/generated\/[a-f0-9]{64}\.png$/.test(selectedImage.image??'')){try{const response=await request(`https://aisoukai-media.vercel.app${selectedImage.image}`,{method:'GET'});if(!response.ok||response.headers?.get('content-type')?.split(';')[0]!=='image/png'||createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex')!==selectedImage.image_content_hash)return{status:'not-generated',reason:'image_deployment_pending'}}catch{return{status:'not-generated',reason:'image_deployment_pending'}}}
   try{const prompt=buildArticlePrompt({title,category,keyword:topic.target_keyword??topic.keyword??'',intent:topic.patient_intent??'',medicalRisk:topic.medical_risk??'medium',topic:topic.topic??title}),response=await request('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json','X-Client-Request-Id':idempotencyKey},body:JSON.stringify({model:'gpt-5-nano',max_completion_tokens:4000,reasoning_effort:'minimal',messages:[{role:'user',content:prompt}]})});if(!response.ok)return{status:[400,401,403,404,429].includes(response.status)?'not-generated':'unknown'};const result=await response.json(),body=result.choices?.[0]?.message?.content;if(!body||result.choices[0].finish_reason!=='stop')return{status:'unknown'}
-   const selectedImage=await approvedImage(topic)
    const raw=serializeMwfArticle(body+'\n',{title,date:slot.slice(0,10),category,tags:[],author:'藍想会メディア編集部',excerpt:`${title}について、受診目安と注意点を整理します。`,...selectedImage,draft:true,reviewed:false,auto_approved:false,publication_status:'draft',medical_risk:topic.medical_risk??'medium',generation_run_id:typeof result.id==='string'?`openai:${result.id}`:'',source_topic_id:topic.id,source_topic_version:topicContentVersion(topic)})
    if(validatePostArtifact(`${slot.slice(0,10)}-synthetic.md`,raw,{imageExists:()=>true}).errors.length)return{status:'unknown'};return{status:'generated',raw}
   }catch{return{status:'unknown'}}
@@ -146,10 +152,16 @@ export function createProductionRuntime({recoveryTopic,backfill,env=process.env,
   const text=formatIntakeNotice({slot,reason,heldCount,candidateHolds,articleSummary,deferredCount})
   try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}
  }
+ const prepareTopics=createCandidateSupply({root,github,comparisons:localComparisons,now,enabled:candidateSupplyEnabled&&!recoveryTopic&&!backfill&&Boolean(env.OPENAI_API_KEY),
+  request:(url,options)=>{if(url!=='https://api.openai.com/v1/chat/completions')throw Error('candidate_endpoint_rejected');return request(url,{...options,headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,'Content-Type':'application/json'}})},
+  notify:async({month,count,url})=>{
+   if(!env.TELEGRAM_BOT_TOKEN||!env.TELEGRAM_CHAT_ID)return{status:'not-sent'}
+   try{const response=await request(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:env.TELEGRAM_CHAT_ID,text:`${month} の新しいブログテーマを${count}件用意しました。採用するテーマを選んでください。記事は採用後に作成します。\n${url}`,disable_web_page_preview:true})}),result=await response.json();return{status:response.ok&&result.ok&&Number.isInteger(result.result?.message_id)?'sent':result.ok===false&&[400,401,403,404,429].includes(response.status)?'not-sent':'unknown'}}catch{return{status:'unknown'}}
+  }})
  async function checkRuntime(){
   const local={runnerVersion:env.MWF_RUNNER_VERSION,generatorAvailable:Boolean(env.OPENAI_API_KEY),notificationAvailable:Boolean(env.TELEGRAM_BOT_TOKEN&&env.TELEGRAM_CHAT_ID)}
   try{const response=await authenticateRequest('https://aisoukai-media.vercel.app/api/mwf',{method:'GET'});if(!response.ok||response.redirected||response.url!=='https://aisoukai-media.vercel.app/api/mwf')throw Error('unavailable');const result=await response.json();if(result.status!=='server-authority'||typeof result.aiReviewerAvailable!=='boolean'||!Number.isSafeInteger(result.adoptionCount)||result.adoptionCount<0||result.inventoryAnchor!==inventoryAnchor)throw Error('invalid');return{...local,status:'ready',serverReviewerAvailable:result.aiReviewerAvailable,adoptionCount:result.adoptionCount,inventoryAnchor:result.inventoryAnchor}}catch{return{...local,status:'server-unavailable'}}
  }
  const restore=async(store,item)=>{const entry=inventory().data.entries.find(e=>e.source==='local'&&e.path===item.path&&e.blob===item.blob);if(!entry||entry.quarantine)throw Error('preserved_draft_unproven');const raw=readOpaqueRegular(join(env.MWF_PRESERVATION_DIR??'/Users/caelus/Library/Application Support/AisoukaiMWF/preservation/2026-09-14',basename(item.path)));return restorePreservedDraft({store,item,entry,raw,sync:args=>syncPreservedDraft({...args,github}),reflect:item=>server().restore(item),notify})}
- return{root,restore,version:env.MWF_RUNNER_VERSION,slot:backfill?`${backfill.plannedDate}T08:30:00+09:00`:recoveryTopic?latestElapsedMwfSlot(now()):currentMwfSlot(now()),checkRuntime,select,minor:input=>server().minor(input),adapters:{serverAuthority:true,generate,sync:createIsolatedSync({spool:join(root,'git-spool'),run:git}),reflect:item=>server().reflect(item),notify,notifyIntake}}
+ return{root,restore,prepareTopics,version:env.MWF_RUNNER_VERSION,slot:backfill?`${backfill.plannedDate}T08:30:00+09:00`:recoveryTopic?latestElapsedMwfSlot(now()):currentMwfSlot(now()),checkRuntime,select,minor:input=>server().minor(input),adapters:{serverAuthority:true,generate,sync:createIsolatedSync({spool:join(root,'git-spool'),run:git}),reflect:item=>server().reflect(item),notify,notifyIntake}}
 }

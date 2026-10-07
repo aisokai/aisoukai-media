@@ -39,3 +39,35 @@ test('invalid signatures, another topic ID, duplicate IDs and protected markers 
 test('read errors cannot be treated as missing adoption', async () => {
   await assert.rejects(planSelectedTopicAdoptions(file(), header, { secret, loadAdoption: async () => { throw Error('unavailable') } }), /unavailable/)
 })
+
+test('explicit single selection cannot adopt a semantically changed, consumed, duplicate or protected row', async () => {
+  const { planTopicCandidateStatusChange } = await import('../src/lib/selectedTopicAdoptions.mjs')
+  const { csv } = await existing()
+  for (const variant of [csv.replace('Synthetic theme', 'Other theme'), csv.replace('"approved"', '"used"'), csv + csv.split('\n')[1] + '\n']) {
+    await assert.rejects(planTopicCandidateStatusChange(file(), candidate.id, variant, { secret, loadAdoption: async () => null }))
+  }
+  await assert.rejects(planTopicCandidateStatusChange({ ...file(), topics: [{ ...candidate, sensitive_data: true }] }, candidate.id, csv, { secret, loadAdoption: async () => null }), /保護/)
+})
+test('single-theme status changes never read or create another selected candidate receipt', async () => {
+  const { planTopicCandidateStatusChange } = await import('../src/lib/selectedTopicAdoptions.mjs')
+  const f = { ...file(), targetPostCount: 2, topics: [candidate, { ...candidate, id: '2026-09-topic-002', title: 'Another selected theme' }] }, reads = []
+  const result = await planTopicCandidateStatusChange(f, candidate.id, header, { secret, loadAdoption: async path => { reads.push(path); return null } })
+  assert.equal(result.adoptions.length, 1); assert.deepEqual(reads, ['data/topic-adoptions/MONTHLY-202609TOPIC001.json'])
+  f.topics[0] = { ...candidate, status: 'hold' }
+  const held = await planTopicCandidateStatusChange(f, candidate.id, result.nextCsv, { secret, loadAdoption: async () => { throw Error('must not read signatures on cancellation') } })
+  assert.equal(parseCsv(held.nextCsv)[0].status, 'hold'); assert.deepEqual(held.adoptions, [])
+})
+
+test('deselection cannot erase consumed or archived status and enable a later revival', async () => {
+  const { planTopicCandidateStatusChange } = await import('../src/lib/selectedTopicAdoptions.mjs')
+  const { csv } = await existing()
+  for (const terminal of ['used', 'archived', 'drafting', 'reviewed', 'published']) {
+    for (const status of ['pending', 'backup', 'hold', 'rejected']) {
+      const original = csv.replace('"approved"', `"${terminal}"`)
+      const unselected = { ...file(), topics: [{ ...candidate, status }] }
+      const result = await planTopicCandidateStatusChange(unselected, candidate.id, original, { secret, loadAdoption: async () => { throw Error('must not inspect or issue receipts') } })
+      assert.equal(result.nextCsv, original); assert.deepEqual(result.adoptions, [])
+      await assert.rejects(planTopicCandidateStatusChange(file(), candidate.id, result.nextCsv, { secret, loadAdoption: async () => null }), /状態/)
+    }
+  }
+})

@@ -88,7 +88,7 @@ export function deliveryStatus(store, now = new Date(), onlyTopic) {
   while (+next <= +now || ![1,3,5].includes(new Date(+next + 9*3600000).getUTCDay())) next = new Date(+next + 86400000)
   return { nextScheduledAt: next.toISOString(), status: items.length ? 'tracked' : 'not-run', schedule: 'Mon/Wed/Fri 08:30 Asia/Tokyo',
     lastSuccessAt: items.filter(i => i.state === 'notified').map(i => i.notifiedAt).sort().at(-1) ?? null,
-    items: items.map(({ id, slot, topicId, state, stage, updatedAt, contentVersion }) => ({ id, slot, topicId, state, stage, updatedAt, contentVersion })) }
+    items: items.map(({ id, slot, topicId, state, stage, updatedAt, contentVersion, generationReason }) => ({ id, slot, topicId, state, stage, updatedAt, contentVersion, ...(generationReason?{generationReason}:{}) })) }
 }
 export function summarizeIntakeHolds(holds){
  const counts={adoptionMissing:0,adoptionUnverified:0,adoptionUnavailable:0,comparisons:0,dateInvalid:0,duplicate:0,precheck:0,other:0}
@@ -100,6 +100,8 @@ export function summarizeIntakeHolds(holds){
 }
 export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic, backfill }) {
   const release = store.acquire()
+  // Only a normal scheduled invocation may resume a known, ungenerated image wait.
+  const resumeImageWait = !retryOnly && !backfill && !onlyTopic && /^\d{4}-\d{2}-\d{2}T08:30:00\+09:00$/.test(slot??'')
   try {
     let items = store.read()
     if(backfill){const existing=items.find(i=>i.topicId===onlyTopic);if(existing&&(existing.deliveryMode!=='backfill'||existing.slot!==slot||existing.topic?.serverTopicVersion!==backfill.topicVersion))return{...deliveryStatus(store,new Date(),onlyTopic),ok:false,intakeError:'backfill_existing_topic_conflict'}}
@@ -133,12 +135,12 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         let raw = store.artifact(item.id, undefined, item.certified===true)
         if (['selected','generating','generation-failed'].includes(item.state)) {
           if (!raw && item.state === 'generating') { save({ state: 'generation-unknown' }); continue }
-          if (!raw && retryOnly) continue
+          if (!raw && retryOnly && !(resumeImageWait && item.state==='generation-failed' && item.generationReason==='image_deployment_pending')) continue
           if (!raw) {
             save({ state: 'generating', stage: 'generation' })
             // Provider must honor the stable key or return an explicit unknown.
             const result = await adapters.generate({ idempotencyKey: item.id, topicId: item.topicId, slot: item.slot, topic: item.topic })
-            if (result?.status !== 'generated') { save({ state: result?.status === 'not-generated' ? 'generation-failed' : 'generation-unknown' }); continue }
+            if (result?.status !== 'generated') { save({ state: result?.status === 'not-generated' ? 'generation-failed' : 'generation-unknown',generationReason:typeof result?.reason==='string'&&/^[a-z_]{1,80}$/.test(result.reason)?result.reason:null }); continue }
             raw = result.raw
             validateDraft(raw, verificationSecret)
             store.artifact(item.id, raw)
@@ -181,6 +183,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         save({ state: item.state === 'sending' ? 'notification-unknown' : item.state === 'generating' ? 'generation-unknown' : item.stage === 'sync' ? 'sync-failed' : 'pending-reflection' })
       }
     }
+    if(!intakeError&&slot&&!backfill){const imageWait=store.read().filter(item=>item.slot===slot&&item.state==='generation-failed'&&/^image_[a-z_]+$/.test(item.generationReason??''));if(imageWait.length){intakeError='image-preparation-pending';candidateHolds=[...candidateHolds,...imageWait.map(item=>({topicId:item.topicId,reason:item.generationReason}))]}}
     const holdCounts=summarizeIntakeHolds(candidateHolds)
     let intakeNotification
     if(intakeError&&slot&&!backfill&&adapters.notifyIntake&&store.intakeNotice){
