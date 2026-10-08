@@ -3490,6 +3490,42 @@
         "request_id": "req_a12b21b10e714f98aab8ca177c6e56fb",
         "visual_review_id": "chatcmpl-EWKi4ea8vlAgjzQKttSwz9Ba8Cxgk"
       }
+    },
+    {
+      "id": "generated-d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6",
+      "category": "pediatric",
+      "title": "小児歯科での歯みがき習慣の作り方",
+      "format": "png",
+      "sha256": "d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6",
+      "source_filename": "d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6.png",
+      "usage_status": "active",
+      "created_at": "2026-10-08T23:32:05.712Z",
+      "updated_at": "2026-10-08T23:32:05.712Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6.png",
+      "alt": "小児歯科での歯みがき習慣の作り方を説明するイラスト",
+      "content_sha256": "d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6",
+      "git_blob": "08b1aedfa2f2ecc6d4680784df90510a83cdca65",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC026",
+        "title": "小児歯科での歯みがき習慣の作り方",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EWrskDJw792w2BDpBMdgURrIfSmHg:d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6"
+      },
+      "generation_provenance": {
+        "topic_version": "d4e73bba9a74a8d9ed966ae616b64190d7054750aa222f2544a68a3d260ce8ff",
+        "content_sha256": "d5ea4682dfc3fca723518e6c9da5fadbc02b4acb2f467d58db96f89984d196b6",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-08T23:32:05.712Z",
+        "request_id": "req_15a976b85fba4e5abe2222b471927de7",
+        "visual_review_id": "chatcmpl-EWrskDJw792w2BDpBMdgURrIfSmHg"
+      }
     }
   ]
 }
