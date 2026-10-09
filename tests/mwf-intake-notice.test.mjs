@@ -11,13 +11,13 @@ const holds=[projectCandidateHold({id:'TOPIC-TEST',title:'合成テーマ'},'top
 test('notice leads with result then exact adoption action and normal duplicate/future skips',()=>{
  const text=formatIntakeNotice({slot,reason:'candidate-holds',candidateHolds:holds,heldCount:2,deferredCount:11,articleSummary:empty})
  assert.match(text,/対象日分の新規記事は作成していません/)
- assert.match(text,/「合成テーマ」（TOPIC-TEST）/)
+ assert.match(text,/「合成テーマ」/)
  assert.match(text,/状態を「approved」のまま「保存」/)
  assert.match(text,/不要なら「hold」/)
  assert.match(text,/https:\/\/aisoukai-media.vercel.app\/admin\/article-topics\?id=TOPIC-TEST/)
- assert.ok(text.indexOf('先生に確認')<text.indexOf('重複を避けて'))
- assert.match(text,/重複を避けて見送り：1件（操作不要）/)
- assert.match(text,/予定日前のため待機：11件（操作不要/)
+ assert.ok(text.indexOf('先生の操作')<text.indexOf('重複を避けて'))
+ assert.match(text,/操作不要：重複を避けて見送り1件/)
+ assert.match(text,/予定日前のため待機11件/)
  assert.doesNotMatch(text,/受付|停止|生成・配信完了|pending-review|topic_adoption|duplicate_metadata/)
 })
 test('title projection omits protected fields and formatter bounds untrusted inputs',()=>{
@@ -33,11 +33,11 @@ test('title projection omits protected fields and formatter bounds untrusted inp
 })
 test('technical faults, dates, related topics and old metadata each have distinct safe handling',()=>{
  const text=formatIntakeNotice({slot,reason:'candidate-holds',candidateHolds:[{topicId:'legacy',reason:'topic_adoption_missing'},{topicId:'network',reason:'topic_adoption_unavailable'},{topicId:'calendar',reason:'topic_date_invalid'},{topicId:'related',reason:'precheck_related'}],articleSummary:empty})
- assert.match(text,/テーマ legacy（タイトル非表示）/)
+ assert.match(text,/対象のテーマ/)
  assert.match(text,/採用情報を取得できませんでした/)
  assert.match(text,/運用側で確認が必要/)
  assert.match(text,/日付を修正し「保存」/)
- assert.match(text,/内容が重なる可能性があるため確認待ち：1件/);assert.doesNotMatch(text,/重複を避けて見送り/)
+ assert.match(text,/内容が重なる可能性：1件/);assert.doesNotMatch(text,/重複を避けて見送り/)
  assert.doesNotMatch(text,/pending-review/)
 })
 test('same-slot saved or uncertain work never becomes a zero-created claim; other days do not inflate today',()=>{
@@ -79,10 +79,30 @@ test('unauthenticated exact topic link retains safe returnTo and never loads row
 test('exact duplicates and possible overlap have separate counts and no readoption CTA',()=>{
  const candidateHolds=[{topicId:'exact',title:'完全一致',reason:'duplicate_metadata'},{topicId:'lexical',title:'語句が近い',reason:'metadata_related'},{topicId:'precheck',title:'既存確認で関連あり',reason:'precheck_related'}]
  const text=formatIntakeNotice({slot,reason:'candidate-holds',candidateHolds,heldCount:3,articleSummary:empty})
- assert.match(text,/重複を避けて見送り：1件/)
- assert.match(text,/内容が重なる可能性があるため確認待ち：2件（重複確定ではありません）/)
- assert.match(text,/新規作成へ進めるテーマはありません/)
+ assert.match(text,/重複を避けて見送り1件/)
+ assert.match(text,/内容が重なる可能性：2件（重複確定ではありません）/)
+ assert.match(text,/先生の操作：不要です/);assert.doesNotMatch(text,/完全一致|語句が近い|既存確認で関連あり/)
  assert.doesNotMatch(text,/article-topics|approved|先生に確認をお願い|採用済みであることを確認できません/)
  const mixed=formatIntakeNotice({slot,reason:'candidate-holds',candidateHolds:[...candidateHolds,{topicId:'new',title:'新しいテーマ',reason:'topic_adoption_missing'}],articleSummary:empty})
  assert.match(mixed,/article-topics\?id=new/);assert.doesNotMatch(mixed,/新規作成へ進めるテーマはありません/)
+})
+
+test('known image deployment wait leads with unfinished article and no teacher action, without technical ID lists',()=>{
+ const day='2026-10-09T08:30:00+09:00',summary=summarizeSlotArticles([{slot:day,state:'generation-failed',generationReason:'image_deployment_pending'}],day)
+ const candidateHolds=[{topicId:'MONTHLY-SYNTHETIC-026',reason:'image_deployment_pending'},...Array.from({length:4},(_,i)=>({topicId:`DUP${i}`,title:`重複テーマ${i}`,reason:'duplicate_metadata'})),...Array.from({length:2},(_,i)=>({topicId:`REL${i}`,reason:'metadata_related'}))]
+ const text=formatIntakeNotice({slot:day,reason:'image-preparation-pending',candidateHolds,heldCount:7,deferredCount:7,articleSummary:summary})
+ assert.deepEqual(text.split('\n').slice(0,3),['ブログ記事（2026-10-09）','記事は未完成です。本文はまだ作成していません。','先生の操作：不要です。'])
+ assert.match(text,/画像は保存済みですが、サイトへの反映をまだ確認できていません/);assert.match(text,/重複を避けて見送り4件／予定日前のため待機7件/);assert.match(text,/内容が重なる可能性：2件（重複確定ではありません）/)
+ assert.doesNotMatch(text,/MONTHLY|DUP|REL|タイトル非表示|件数はまだ確定|重複テーマ|自動再開|公開済み/)
+ assert.match(text,/今回は反映待ちで終了しました。次回の定期処理（月・水・金の8:30）で再確認します/);assert.ok(text.length<500)
+})
+test('image wait never overrides saved articles or ambiguous generation and sending',()=>{
+ const wait={slot,state:'generation-failed',generationReason:'image_deployment_pending'}
+ for(const extra of [{slot,state:'generation-unknown'},{slot,state:'generating'}]){
+  const text=formatIntakeNotice({slot,articleSummary:summarizeSlotArticles([wait,extra],slot),candidateHolds:[{reason:'image_deployment_pending'}]})
+  assert.match(text,/作成結果を確認中/);assert.doesNotMatch(text,/本文はまだ作成していません/)
+ }
+ const text=formatIntakeNotice({slot,articleSummary:summarizeSlotArticles([wait,{slot,state:'notification-unknown',serverPublished:false}],slot),candidateHolds:[{reason:'image_deployment_pending'}]})
+ assert.match(text,/本文は1件作成済み/);assert.match(text,/先生の確認待ち/);assert.match(text,/通知の送信結果は確認中/);assert.doesNotMatch(text,/本文はまだ作成していません|送信完了|公開済み/)
+ assert.ok(text.indexOf('先生の操作')<text.indexOf('画像は保存済み'))
 })

@@ -116,14 +116,47 @@ test('intake notice receives current-slot article metadata without losing prior 
  const holds=[{topicId:'safe-topic',title:'合成テーマ',reason:'topic_adoption_missing'}];let notice
  const result=await runDelivery({store,slot,select:async()=>({holdOnly:true,holds,deferredCount:11}),adapters:{notifyIntake:async value=>{notice=value;return{status:'sent'}}}})
  assert.equal(result.ok,false);assert.deepEqual(notice.candidateHolds,holds)
- assert.deepEqual(notice.articleSummary,{observed:true,tracked:1,created:0,uncertain:1,reviewable:0,pending:1})
+ assert.deepEqual(notice.articleSummary,{observed:true,tracked:1,created:0,uncertain:1,reviewable:0,pending:1,imageWaiting:0,notificationUncertain:0})
  assert.equal(notice.deferredCount,11);assert.equal(store.read().find(i=>i.topicId==='current').state,'generation-unknown')
 })
 
-test('normal later slot resumes only known image deployment wait; explicit retry-only and unknown results remain stopped',async()=>{
- for(const [reason,explicit,expected] of [['image_deployment_pending',false,1],['image_deployment_pending',true,0],['image_unknown',false,0]]){
+test('normal later slot resumes only known image deployment wait; retry-only resumes known waits while unknown results remain stopped',async()=>{
+ for(const [reason,explicit,expected] of [['image_deployment_pending',false,1],['image_deployment_pending',true,1],['image_unknown',false,0]]){
   const f=fixture();f.store.save({id:deliveryId(slot,'synthetic-topic'),slot,topicId:'synthetic-topic',topic:{id:'synthetic-topic'},state:'generation-failed',stage:'generation',generationReason:reason});
   const result=await f.run({slot:'2026-09-16T08:30:00+09:00',retryOnly:explicit,select:async()=>({holdOnly:true,holds:[]})});
   assert.equal(f.calls.generate,expected);assert.equal(result.items[0].slot,slot);assert.equal(result.items[0].state,expected?'notified':'generation-failed');
  }
+})
+
+
+test('bounded same-run continuation reaches notification without repeated selection or article generation',async()=>{
+ const f=fixture();let generationAttempts=0,articles=0,reflections=0,selections=0,elapsed=0;const resumes=[]
+ f.adapters.generate=async input=>{resumes.push(input.resumeImageWait);generationAttempts++;if(generationAttempts<3)return{status:'not-generated',reason:'image_deployment_pending'};articles++;return{status:'generated',raw}}
+ const reflect=f.adapters.reflect;f.adapters.reflect=async item=>++reflections<3?{status:'draft-review-required',authenticated:false}:reflect(item)
+ const result=await f.run({select:async()=>{selections++;return{topicId:'synthetic-topic'}},continuation:true,monotonicNow:()=>elapsed,wait:async ms=>{assert.equal(ms,15000);elapsed+=ms}})
+ assert.equal(result.ok,true);assert.equal(selections,1);assert.equal(articles,1);assert.equal(f.calls.sync,1);assert.equal(f.calls.notify,1);assert.deepEqual(resumes,[false,true,true]);assert.equal(elapsed,60000)
+ await f.run({retryOnly:true});assert.equal(articles,1);assert.equal(f.calls.notify,1)
+})
+test('deployment continuation has a shared elapsed/count bound and unknown is never replayed',async()=>{
+ for(const unknown of [false,true]){
+  const f=fixture();let calls=0,waits=0
+  f.adapters.generate=async()=>{calls++;return unknown?{status:'unknown'}:{status:'not-generated',reason:'image_deployment_pending'}}
+  await f.run({continuation:true,monotonicNow:()=>0,wait:async()=>{waits++}})
+  assert.equal(calls,unknown?1:41);assert.equal(waits,unknown?0:40);assert.equal(f.calls.sync,0)
+ }
+ const f=fixture();let elapsed=0,calls=0
+ f.adapters.generate=async()=>{calls++;elapsed+=590000;return{status:'not-generated',reason:'image_deployment_pending'}}
+ await f.run({continuation:true,monotonicNow:()=>elapsed,wait:async()=>assert.fail('deadline reached')});assert.equal(calls,1)
+})
+test('retry-only resumes existing image wait without selecting another topic',async()=>{
+ const f=fixture();f.store.save({id:deliveryId(slot,'synthetic-topic'),slot,topicId:'synthetic-topic',state:'generation-failed',generationReason:'image_deployment_pending'})
+ f.store.save({id:deliveryId('2026-09-16T08:30:00+09:00','other'),slot:'2026-09-16T08:30:00+09:00',topicId:'other',state:'selected'})
+ await f.run({retryOnly:true,select:async()=>assert.fail('no selection')});assert.equal(f.calls.generate,1);assert.equal(f.store.read()[1].state,'selected')
+})
+
+test('unknown server review is not retried by deployment continuation',async()=>{
+ const f=fixture();let checks=0
+ f.adapters.reflect=async()=>{checks++;return{status:'unknown'}}
+ await f.run({continuation:true,wait:async()=>assert.fail('unknown must not poll')})
+ assert.equal(checks,1);assert.equal(f.calls.generate,1);assert.equal(f.calls.notify,0)
 })

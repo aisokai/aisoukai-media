@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { createProductionRuntime } from './lib/mwf-production.mjs'
 import { openDeliveryStore, deliveryStatus, runDelivery } from './lib/mwf-delivery.mjs'
 
-export async function runMwfCli(args, { adapters, productionOptions, output = value => console.log(JSON.stringify(value)) } = {}) {
+export async function runMwfCli(args, { adapters, productionOptions, wait, monotonicNow, output = value => console.log(JSON.stringify(value)) } = {}) {
   const options = {}
   for (let i = 0; i < args.length; i++) {
     if (['--state-root','--slot','--topic','--recover-topic','--backfill','--restore'].includes(args[i])) {
@@ -53,7 +53,7 @@ export async function runMwfCli(args, { adapters, productionOptions, output = va
   if(options['prepare-topics-only']){const release=store.acquire();try{const result=await runtime.prepareTopics();output({status:'topic-preparation',candidateSupply:result});return ['notified','stock-ready'].includes(result.status)?0:1}finally{release()}}
   if (options.status) { output(deliveryStatus(store,new Date(),options['recover-topic'])); return 0 }
   if (!adapters) { output({ status: 'stopped', reason: 'runtime_not_bound' }); return 2 }
-  const result = await runDelivery({ store, slot: options.slot, topicId: options.topic, retryOnly: options['retry-only'], adapters, select: runtime?.select, verificationSecret:runtime?.verificationSecret,onlyTopic:options['recover-topic'] })
+  const result = await runDelivery({ store, slot: options.slot, topicId: options.topic, retryOnly: options['retry-only'], adapters, select: runtime?.select, verificationSecret:runtime?.verificationSecret,onlyTopic:options['recover-topic'], continuation:Boolean(runtime), wait, monotonicNow })
   let candidateSupply
   if(runtime&&options.slot&&!options['retry-only']&&!options['recover-topic']){const release=store.acquire();try{candidateSupply=await runtime.prepareTopics()}catch{candidateSupply={status:'attention'}}finally{release()}}
   output({ ...result,...(candidateSupply?{candidateSupply}:{}), ...(runtime ? { runnerVersion: runtime.version } : {}) })

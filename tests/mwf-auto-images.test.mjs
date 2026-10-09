@@ -48,3 +48,9 @@ test('disabled gate and protected topic never call image API; non-PNG/oversized 
  const f=fixture();assert.equal((await f.ensure({...topic,contains_patient_data:true},{adoptionVerified:true})).reason,'adoption_required');assert.equal(f.generated(),0)
  for(const input of ['not png','abcd','a'.repeat(8*1024*1024)])assert.throws(()=>validateGeneratedPng(input))
 })
+
+test('deployment-only continuation cannot create an image without a saved deployment',async()=>{
+ const f=fixture();assert.equal((await f.ensure(topic,{adoptionVerified:true,deploymentOnly:true})).reason,'image_resume_unproven');assert.equal(f.generated(),0)
+ await f.ensure(topic,{adoptionVerified:true});for(let i=0;i<3;i++)assert.equal((await f.ensure(topic,{adoptionVerified:true,deploymentOnly:true})).reason,'image_deployment_pending')
+ f.deploy();assert.equal((await f.ensure(topic,{adoptionVerified:true,deploymentOnly:true})).status,'ready');assert.equal(f.generated(),1);assert.equal(f.reviewed(),1);assert.equal(f.updates(),1)
+})

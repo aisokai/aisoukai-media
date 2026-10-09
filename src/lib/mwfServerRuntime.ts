@@ -105,7 +105,7 @@ export function createMwfServerRuntime(){
  const authority=createServerAuthority({readHead:readGitHubBranchHead,readJson:json,
   commit:async(files:{path:string;content:string}[],head:string)=>commitGitHubFiles('MWF server authority transition',files,{expectedHeadSha:head}),
   seal:(value:unknown)=>signBlogEvidence('mwf-server-claim',value,secret),unseal:(value:unknown)=>verifyBlogEvidence(value,'mwf-server-claim',secret),
-  validate,reviewerAvailable:()=>Boolean(process.env.OPENAI_API_KEY),
+  validate,humanReviewRequired:()=>true,reviewerAvailable:()=>Boolean(process.env.OPENAI_API_KEY),
   recordArtifacts:(request:ServerRequest,validated:Awaited<ReturnType<typeof validate>>,files:{path:string;content:string}[])=>{
    if(!validated.ok)return[]
    if(validated.kind==='restore')return[validated.restoreEntry]
@@ -134,7 +134,7 @@ export function createMwfServerRuntime(){
    const result=await reviewer({raw:candidate,path:request.artifactPath,baselineRaw:undefined,baselineApproval:undefined})
    return result.status==='certified'?{result:{status:'server-reviewed',artifactBlob:serverHash(result.raw)},files:[{path:request.artifactPath!,content:result.raw}]}:{result:{status:'draft-review-required',reason:result.reason},files:[]}
   },
-  reflect:async(request:ServerRequest,result:{status:string;artifactBlob?:string},ref:string)=>{
+  reflect:async(request:ServerRequest,result:{status:string;reason?:string;artifactBlob?:string},ref:string)=>{
    if(request.operation==='restore-reflect'){
     const checked=await validate(request,ref);if(!checked.ok||checked.kind!=='restore')return{reflection:'pending'}
     const deployed=await readDeployedPostFile(request.artifactPath!)
@@ -150,6 +150,7 @@ export function createMwfServerRuntime(){
    const parsed=matter(decoded)
    const topic=request.operation==='minor-review'?undefined:parseCsv(await text('data/article-topics.sample.csv',ref)).find((t:Record<string,string>)=>t.id===request.topicId)
    const state=getDmpArticleState({data:parsed.data,content:parsed.content,verificationSecret:secret,publicationContext:{path:request.artifactPath,topic},today:new Date(Date.now()+9*3600000).toISOString().slice(0,10)})
+   if(result.reason==='human_review_required'&&(state.publishable||serverHash(raw)!==request.artifactBlob||parsed.data.draft!==true||parsed.data.reviewed!==false||parsed.data.auto_approved!==false))return{reflection:'pending'}
    if(isProtectedEditorialInput(parsed.data,parsed.content)||parsed.data.archived||parsed.data.rejection_reason)return{}
    const deployed=await readDeployedPostFile(request.artifactPath!);if(serverHash(deployed)!==serverHash(raw))return{reflection:'pending'}
    if(!state.publishable){

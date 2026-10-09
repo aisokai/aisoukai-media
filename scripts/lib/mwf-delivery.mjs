@@ -98,10 +98,17 @@ export function summarizeIntakeHolds(holds){
  }
  return counts
 }
-export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic, backfill }) {
+export async function runDelivery({ store, slot, topicId, adapters, retryOnly = false, select, verificationSecret, onlyTopic, backfill, continuation = false, wait = ms => new Promise(resolve => setTimeout(resolve, ms)), monotonicNow = () => performance.now() }) {
   const release = store.acquire()
-  // Only a normal scheduled invocation may resume a known, ungenerated image wait.
-  const resumeImageWait = !retryOnly && !backfill && !onlyTopic && /^\d{4}-\d{2}-\d{2}T08:30:00\+09:00$/.test(slot??'')
+  // One budget for this invocation, shared by image and admin deployment reads.
+  const started = monotonicNow()
+  let waits = 0
+  const pauseForDeployment = async () => {
+    if (!continuation || waits >= 40 || monotonicNow() - started + 15000 > 600000) return false
+    waits++
+    await wait(15000)
+    return monotonicNow() - started < 600000
+  }
   try {
     let items = store.read()
     if(backfill){const existing=items.find(i=>i.topicId===onlyTopic);if(existing&&(existing.deliveryMode!=='backfill'||existing.slot!==slot||existing.topic?.serverTopicVersion!==backfill.topicVersion))return{...deliveryStatus(store,new Date(),onlyTopic),ok:false,intakeError:'backfill_existing_topic_conflict'}}
@@ -110,6 +117,7 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
     if(intakeError)retryOnly=true
     let candidateHolds = [],deferredCount=0
     let topic
+    if (!backfill && items.some(i => i.slot === slot && (!onlyTopic || i.topicId === onlyTopic) && i.state === 'generation-failed' && i.generationReason === 'image_deployment_pending')) retryOnly = true
     if (!retryOnly && select) {
       try {
         const selection = await select({ items, slot })
@@ -135,18 +143,26 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
         let raw = store.artifact(item.id, undefined, item.certified===true)
         if (['selected','generating','generation-failed'].includes(item.state)) {
           if (!raw && item.state === 'generating') { save({ state: 'generation-unknown' }); continue }
-          if (!raw && retryOnly && !(resumeImageWait && item.state==='generation-failed' && item.generationReason==='image_deployment_pending')) continue
+          if (!raw && retryOnly && !(item.state==='generation-failed' && item.generationReason==='image_deployment_pending')) continue
           if (!raw) {
-            save({ state: 'generating', stage: 'generation' })
-            // Provider must honor the stable key or return an explicit unknown.
-            const result = await adapters.generate({ idempotencyKey: item.id, topicId: item.topicId, slot: item.slot, topic: item.topic })
-            if (result?.status !== 'generated') { save({ state: result?.status === 'not-generated' ? 'generation-failed' : 'generation-unknown',generationReason:typeof result?.reason==='string'&&/^[a-z_]{1,80}$/.test(result.reason)?result.reason:null }); continue }
+            let result
+            let resumeImageWait = item.state === 'generation-failed' && item.generationReason === 'image_deployment_pending'
+            do {
+              save({ state: 'generating', stage: 'generation' })
+              result = await adapters.generate({ idempotencyKey: item.id, topicId: item.topicId, slot: item.slot, topic: item.topic, resumeImageWait })
+              if (result?.status === 'generated') break
+              save({ state: result?.status === 'not-generated' ? 'generation-failed' : 'generation-unknown',generationReason:typeof result?.reason==='string'&&/^[a-z_]{1,80}$/.test(result.reason)?result.reason:null })
+              // Only a proven no-article-call deployment wait is safe to continue.
+              if (item.state !== 'generation-failed' || item.generationReason !== 'image_deployment_pending') break
+              resumeImageWait = true
+            } while (await pauseForDeployment())
+            if (result?.status !== 'generated') continue
             raw = result.raw
             validateDraft(raw, verificationSecret)
             store.artifact(item.id, raw)
             save({generatedAt:new Date().toISOString()})
           }
-          save({ state: 'saved', stage: 'sync', ...validateDraft(raw, verificationSecret), path: `content/posts/${item.slot.slice(0,10)}-mwf-${item.id}.md` })
+          save({ state: 'saved', stage: 'sync', generationReason:null, ...validateDraft(raw, verificationSecret), path: `content/posts/${item.slot.slice(0,10)}-mwf-${item.id}.md` })
         }
         if (!raw || validateDraft(raw, verificationSecret).blob !== item.blob) throw new Error('artifact_mismatch')
         if (item.deliveryMode!=='backfill' && item.state==='saved' && !item.reviewAttempted && adapters.review) {
@@ -168,11 +184,19 @@ export async function runDelivery({ store, slot, topicId, adapters, retryOnly = 
           save({ state: 'pending-reflection', stage: 'reflection', commit: result.commit })
         }
         if (['pending-reflection','reviewable','notification-failed'].includes(item.state)) {
-          const proof = await adapters.reflect(item)
-          const serverProof=adapters.serverAuthority===true&&proof?.originBlob===item.blob&&ID.test(proof?.contentVersion??'')&&ID.test(proof?.blob??'')&&typeof proof?.published==='boolean'
-          if ((item.deliveryMode==='backfill'&&(proof?.published!==false||proof?.blob!==item.blob)) || proof?.authenticated !== true || proof.source !== 'production-admin' || proof.path !== item.path || (!serverProof&&(proof.contentVersion !== item.contentVersion || proof.blob !== item.blob || proof.published !== (item.certified===true))) || proof.reviewable !== true || (adapters.serverAuthority===true&&!serverProof)) {
-            save({ state: 'pending-reflection', stage: 'reflection' }); continue
-          }
+          let proof, reflectionVerified = false, serverProof
+          do {
+            proof = await adapters.reflect(item)
+            serverProof=adapters.serverAuthority===true&&proof?.originBlob===item.blob&&ID.test(proof?.contentVersion??'')&&ID.test(proof?.blob??'')&&typeof proof?.published==='boolean'
+            if ((item.deliveryMode==='backfill'&&(proof?.published!==false||proof?.blob!==item.blob)) || proof?.authenticated !== true || proof.source !== 'production-admin' || proof.path !== item.path || (!serverProof&&(proof.contentVersion !== item.contentVersion || proof.blob !== item.blob || proof.published !== (item.certified===true))) || proof.reviewable !== true || (adapters.serverAuthority===true&&!serverProof)) {
+              save({ state: 'pending-reflection', stage: 'reflection' });
+              if (['draft-review-required','server-reviewed'].includes(proof?.status) && await pauseForDeployment()) continue
+              break
+            }
+            reflectionVerified = true
+            break
+          } while (true)
+          if (!reflectionVerified) continue
           save({ state: 'reviewable', stage: 'notification', ...(serverProof?{deliveredBlob:proof.blob,deliveredContentVersion:proof.contentVersion,serverPublished:proof.published,reviewReason:proof.reason??null}:{}) })
           // Never retry an ambiguous send automatically; Telegram lacks an idempotency key.
           save({ state: 'sending' })

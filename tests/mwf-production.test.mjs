@@ -4,7 +4,8 @@ import {mkdtempSync} from 'node:fs'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 import {createProductionRuntime,createGithubServerTransport} from '../scripts/lib/mwf-production.mjs'
-import {runMwfCli} from '../scripts/ops-mwf.mjs'
+import {runMwfCli as runMwfCliImpl} from '../scripts/ops-mwf.mjs'
+const runMwfCli=(args,options)=>runMwfCliImpl(args,{wait:async()=>{},monotonicNow:()=>0,...options})
 import {openDeliveryStore} from '../scripts/lib/mwf-delivery.mjs'
 import {comparisonProjection} from '../scripts/lib/mwf-human-comparisons.mjs'
 import {inventoryHash,comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
@@ -127,7 +128,7 @@ test('cached ambiguous creates one unreviewed draft and review request after exa
  for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0)
  assert.equal(result.items.length,1);assert.equal(result.items[0].state,'notified');assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.match(f.getRaw(),/auto_approved: false/);assert.doesNotMatch(f.getRaw(),/tiered_review_proof/)
  const item=openDeliveryStore(f.root).read()[0];assert.equal(item.topic.metadataReviewReason,'metadata_review_required');assert.equal(item.serverPublished,false);assert.equal(item.deliveredBlob,item.blob)
- assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,1);assert.equal(f.calls.filter(c=>c.url.includes('telegram')).length,1);assert.match(f.calls.at(-1).options.body,/未審査記事/)
+ assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,1);assert.equal(f.calls.filter(c=>c.url.includes('telegram')).length,1);assert.match(f.calls.at(-1).options.body,/先生の内容確認・承認/)
 })
 test('related, rejected and unknown prechecks never generate',async()=>{
  for(const kind of ['related','http','unknown']){
@@ -220,7 +221,7 @@ test('scheduled selection defers future dates before adoption lookup and exclude
  assert.deepEqual(f.adoptionReads,['today','past','unscheduled','today','past','unscheduled']);assert.deepEqual(f.prepared,f.adoptionReads)
  assert.equal(result.deferredCount,1);assert.equal(result.candidateHolds.length,3);assert.equal(result.holdCounts.comparisons,3)
  const notices=f.calls.filter(c=>c.url.includes('telegram'));assert.equal(notices.length,1);const text=JSON.parse(notices[0].options.body).text
- assert.match(text,/運用側で確認が必要/);assert.match(text,/予定日前のため待機：1件/);assert.match(text,/SYNTHETIC_TITLE/);assert.doesNotMatch(text,/comparison_current_changed|future/)
+ assert.match(text,/運用側で確認が必要/);assert.match(text,/予定日前のため待機1件/);assert.match(text,/SYNTHETIC_TITLE/);assert.doesNotMatch(text,/comparison_current_changed|future/)
  assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
 })
 test('invalid calendar dates hold before lookup; leap day is accepted and future-only slots remain unsuccessful',async()=>{
@@ -237,7 +238,7 @@ test('missing adoption and temporary retrieval failure have different safe count
  assert.deepEqual(result.candidateHolds.map(h=>h.reason),['topic_adoption_missing','topic_adoption_unavailable','topic_adoption_unproven'])
  assert.equal(result.holdCounts.adoptionMissing,1);assert.equal(result.holdCounts.adoptionUnavailable,1);assert.equal(result.holdCounts.adoptionUnverified,1);assert.deepEqual(f.prepared,['unverified'])
  const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
- assert.match(text,/先生に確認をお願いしたいテーマ：2件/);assert.match(text,/採用済みであることを確認できません/);assert.match(text,/採用情報を取得できませんでした/);assert.match(text,/article-topics\?id=missing/);assert.doesNotMatch(text,/PRIVATE|HTTP|topic_adoption/)
+ assert.match(text,/確認するテーマ：2件/);assert.match(text,/採用済みであることを確認できません/);assert.match(text,/採用情報を取得できませんでした/);assert.match(text,/article-topics\?id=missing/);assert.doesNotMatch(text,/PRIVATE|HTTP|topic_adoption/)
 })
 
 function overlapFixture(candidates,titles,{unavailable=false}={}){
@@ -265,7 +266,7 @@ test('exact and potential overlap are checked once before adoption and distinct 
  assert.equal(f.metadataReads.length,1);assert.equal(f.adoptionReads.length,1);assert.match(f.adoptionReads[0],/distinct.json/);assert.equal(result.deferredCount,1)
  assert.equal(f.prepared.length,0);assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,0)
  const text=JSON.parse(f.calls.find(c=>c.url.includes('telegram')).options.body).text
- assert.match(text,/重複を避けて見送り：2件/);assert.match(text,/内容が重なる可能性があるため確認待ち：2件/)
+ assert.match(text,/重複を避けて見送り2件/);assert.match(text,/内容が重なる可能性/)
  assert.match(text,/article-topics\?id=distinct/);assert.doesNotMatch(text,/article-topics\?id=(exact|related)/)
 })
 test('future-only and existing-slot retries do not perform early comparison or adoption lookup',async()=>{
@@ -320,3 +321,36 @@ test('adopted topic waits for generated image deployment, then syncs image-bound
  deployed=true;f.options.now=()=>new Date('2026-09-15T23:30:00Z');await runMwfCli(['--production'],{productionOptions:f.options,output:value=>result=value});assert.equal(result.intakeError,'no-unused-topic');
  assert.equal(images,1);assert.equal(vision,1);assert.equal(result.items[0].state,'notified');assert.match(f.getRaw(),/image_content_hash: "[a-f0-9]{64}"/);assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.match(f.getRaw(),/auto_approved: false/);
 });
+
+test('production CLI continues a deployed-image wait to one article, admin reflection and one clear notice',async()=>{
+ const f=fixture(),bytes=Buffer.from('synthetic-image-bytes'),{createHash}=await import('node:crypto'),hash=createHash('sha256').update(bytes).digest('hex'),image=`/images/library/generated/${hash}.png`,spawn=f.options.spawnImpl,fetch=f.options.fetchImpl,reflect=f.options.serverClient.reflect
+ const asset={path:image,alt:'合成画像',content_sha256:hash,git_blob:'b'.repeat(40),license_status:'approved',license_source:'synthetic',license_note:'Synthetic permitted fixture',topic_assignment:{topic_id:'topic',title:'Synthetic',status:'visually_matched',evidence:'synthetic'}}
+ f.options.spawnImpl=(command,args,options)=>{
+  const endpoint=args[5]??''
+  if(command==='/opt/homebrew/bin/gh'&&endpoint.includes('contents/data/image-library.json'))return{status:0,stdout:JSON.stringify({encoding:'base64',content:Buffer.from(JSON.stringify({images:[asset]})).toString('base64')})}
+  if(command==='/opt/homebrew/bin/gh'&&endpoint.includes('git/trees/'))return{status:0,stdout:JSON.stringify({truncated:false,tree:[{path:`public${image}`,type:'blob',mode:'100644',sha:'b'.repeat(40)}]})}
+  return spawn(command,args,options)
+ }
+ let imageReads=0,reflections=0,waits=0
+ f.options.fetchImpl=async(url,options)=>url.endsWith(image)?{ok:++imageReads>2,headers:new Headers({'content-type':'image/png'}),arrayBuffer:async()=>bytes}:fetch(url,options)
+ f.options.serverClient.reflect=async item=>++reflections===1?{status:'draft-review-required'}:reflect(item)
+ let result
+ assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,wait:async()=>{waits++},output:value=>result=value}),0)
+ assert.equal(waits,3);assert.equal(imageReads,3);assert.equal(reflections,2);assert.equal(result.items[0].state,'notified');assert.match(f.getRaw(),/draft: true/)
+ assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)
+ const notices=f.calls.filter(c=>c.url.includes('telegram'));assert.equal(notices.length,1)
+ const text=JSON.parse(notices[0].options.body).text;assert.match(text,/記事を1件作成しました。/);assert.match(text,/先生の内容確認・承認/);assert.doesNotMatch(text,/content\/posts|内容版|[a-f0-9]{64}/)
+ await runMwfCli(['--production','--retry-only'],{productionOptions:f.options,output:()=>{}})
+ assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2);assert.equal(f.calls.filter(c=>c.url.includes('telegram')).length,1)
+})
+
+test('retry-only image resume rechecks current adoption and cannot fall back to a new image or image-free draft',async()=>{
+ for(const ready of [false,true]){
+  const f=fixture();f.setReady(ready)
+  const {deliveryId}=await import('../scripts/lib/mwf-delivery.mjs'),slot='2026-09-14T08:30:00+09:00'
+  openDeliveryStore(f.root).save({id:deliveryId(slot,'topic'),slot,topicId:'topic',topic:f.topic,state:'generation-failed',stage:'generation',generationReason:'image_deployment_pending'})
+  await runMwfCli(['--production','--retry-only'],{productionOptions:f.options,output:()=>{}})
+  assert.equal(f.getRaw(),undefined);assert.equal(f.calls.some(c=>c.url.includes('/images/generations')),false)
+  assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,ready?1:0)
+ }
+})

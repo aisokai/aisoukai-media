@@ -20,7 +20,7 @@ export function validServerRequest(value,inventoryAnchor=MWF_INVENTORY_ANCHOR){
 export const semanticRequestKey=value=>value.operation==='restore-reflect'?serverHash(`restore:${value.artifactPath}:${value.artifactBlob}`):value.operation==='minor-review'?serverHash(`minor-review:${value.artifactPath}:${value.baselineBlob}:${value.artifactBlob}`):serverHash(`${value.operation==='prepare'&&value.schema===3?'backfill-prepare':value.operation}:${value.topicId}:${value.topicVersion}${value.operation==='prepare'?`:${value.slot}`:''}`)
 // Public input is ONLY a request ID. Authority comes from fixed canonical GitHub
 // requests, real Human adoption and server validation, never caller decisions.
-export function createServerAuthority({readHead,readJson,commit,validate,review,reflect,owner=()=>randomUUID(),now=()=>new Date(),reviewerAvailable=()=>false,recordArtifacts,seal,unseal}){
+export function createServerAuthority({readHead,readJson,commit,validate,review,reflect,owner=()=>randomUUID(),now=()=>new Date(),reviewerAvailable=()=>false,humanReviewRequired=()=>false,recordArtifacts,seal,unseal}){
  async function load(id,ref){if(!HASH.test(id??''))throw Error('invalid_request');const value=await readJson(`data/mwf/requests/${id}.json`,ref);if(!validServerRequest(value)||serverRequestId(value)!==id)throw Error('invalid_request');return value}
  async function state(path,ref){try{const verified=unseal(await readJson(path,ref));if(!verified)throw Error('invalid_server_claim');return verified}catch(error){if(error?.code==='NOT_FOUND')return null;throw error}}
  async function status(id){try{const head=await readHead(),request=await load(id,head),claim=await state(`data/mwf/claims/${semanticRequestKey(request)}.json`,head);if(!claim||claim.requestId!==id)return{status:'pending',requestId:id};if(claim.status!=='done')return{status:'unknown',requestId:id};if(request.operation!=='prepare')return{...claim.result,requestId:id,...await reflect(request,claim.result,head)};const verified=await validate(request,head);if(!verified?.ok)return{status:'hold',reason:'prepare_evidence_stale',requestId:id};return{...claim.result,comparisonHash:verified.comparisonHash,requestId:id}}catch{return{status:'unavailable'}}}
@@ -39,6 +39,7 @@ export function createServerAuthority({readHead,readJson,commit,validate,review,
    else if(request.schema===4)result={status:'draft-review-required',reason:'preserved_draft_restored',artifactBlob:request.artifactBlob}
    else if(request.schema===3)result={status:'draft-review-required',reason:'backfill_draft_only',artifactBlob:request.artifactBlob}
    else if(validated.publicationAllowed===false)result={status:'draft-review-required',reason:'topic_adoption_unproven',artifactBlob:request.artifactBlob}
+   else if(request.schema===1&&request.operation==='review'&&humanReviewRequired())result={status:'draft-review-required',reason:'human_review_required',artifactBlob:request.artifactBlob}
    else if(!reviewerAvailable())result={status:'draft-review-required',reason:'server_reviewer_configuration_missing',artifactBlob:request.artifactBlob}
    else {const decision=await review(request,validated);result=decision.result;files=decision.files??[]}
    // Recheck inputs at latest canonical head before a result/publication commit.

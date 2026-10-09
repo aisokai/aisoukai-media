@@ -97,3 +97,29 @@ test('generated missing and assigned image markers pass the closed draft guard w
   assert.equal(isClosedMwfDraftBytes(Buffer.from(serializeMwfArticle('Synthetic',invalid))),false)
  }
 })
+
+
+test('production Human-review policy preserves normal request identity and never calls configured reviewer',async()=>{
+ const f=fixture();f.options.humanReviewRequired=()=>true
+ const authority=createServerAuthority(f.options),before=f.request.artifactBlob
+ for(let i=0;i<2;i++){
+  const result=await authority.wake(f.id)
+  assert.equal(result.status,'draft-review-required');assert.equal(result.reason,'human_review_required');assert.equal(result.originBlob,before);assert.equal(result.published,false)
+ }
+ assert.equal(f.paid(),0);assert.equal(f.files.has(f.request.artifactPath),false)
+ const claim=verifyBlogEvidence(f.files.get(`data/mwf/claims/${semanticRequestKey(f.request)}.json`),'mwf-server-claim',key)
+ assert.equal(claim.result.artifactBlob,before);assert.equal(claim.result.reason,'human_review_required')
+ const prepare=fixture('prepare');prepare.options.humanReviewRequired=()=>true
+ assert.equal((await createServerAuthority(prepare.options).wake(prepare.id)).status,'ready');assert.equal(prepare.paid(),0)
+})
+test('Human-review policy leaves completed claims immutable without another publication operation',async()=>{
+ const f=fixture(),legacy=createServerAuthority(f.options)
+ await legacy.wake(f.id);const snapshot=JSON.stringify([...f.files]);assert.equal(f.paid(),1)
+ const human=createServerAuthority({...f.options,humanReviewRequired:()=>true})
+ await human.wake(f.id);assert.equal(f.paid(),1);assert.equal(JSON.stringify([...f.files]),snapshot)
+})
+test('production runtime enables Human-only policy independent of API configuration',async()=>{
+ const {readFileSync}=await import('node:fs'),source=readFileSync(new URL('../src/lib/mwfServerRuntime.ts',import.meta.url),'utf8')
+ assert.match(source,/humanReviewRequired:\(\)=>true/)
+ assert.match(source,/result.reason==='human_review_required'&&\(state.publishable/)
+})

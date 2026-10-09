@@ -16,11 +16,12 @@ export function validateGeneratedPng(encoded){
  return bytes
 }
 export function createAutoImages({root,github,request,publicRequest,enabled=false,now=()=>new Date()}){
- return async function ensureImage(topic,{adoptionVerified=false}={}){
+ return async function ensureImage(topic,{adoptionVerified=false,deploymentOnly=false}={}){
   if(!enabled)return short('automatic_image_disabled')
   if(!adoptionVerified||isProtectedEditorialInput(topic)||!/^[A-Za-z0-9_-]{1,100}$/.test(topic?.id??''))return short('adoption_required')
   const version=topicContentVersion(topic),dir=join(root,'generated-images'),journal=durableState(dir,`image-${version}`)
   let state=journal.read()
+  if(deploymentOnly&&(!state||!['deployed-pending','ready'].includes(state.status)))return short('image_resume_unproven')
   if(state?.status==='committing'){try{
    const head=github('GET','git/ref/heads/main').object?.sha,library=readGithubJson(github,'data/image-library.json',head),asset=library.images?.find(item=>item.path===state.asset.path)
    const remote=github('GET',`contents/public${state.asset.path}?ref=${head}`)
@@ -56,7 +57,7 @@ export function createAutoImages({root,github,request,publicRequest,enabled=fals
     const commit=commitRuntimeFiles({github,head,files:[{path:`public${imagePath}`,content:bytes.toString('base64'),encoding:'base64'},{path:'data/image-library.json',content:JSON.stringify({...library,images:[...library.images,asset]},null,2)+'\n'}],message:`add generated blog illustration: ${topic.id}`,beforeUpdate:commit=>{state={...state,status:'committing',commit,asset};journal.write(state)}})
     state={...state,status:'deployed-pending',commit,asset};journal.write(state)
    }
-   // A deployment may lag the Git commit. Fetch once per run; never regenerate.
+   // A deployment may lag the Git commit. Recheck the exact saved bytes; never regenerate during deployment continuation.
    if(['deployed-pending','ready'].includes(state.status)){
     let response;try{response=await publicRequest(`https://aisoukai-media.vercel.app${imagePath}`,{method:'GET'})}catch{return short('image_deployment_pending')}
     if(!response.ok||response.headers?.get('content-type')?.split(';')[0]!=='image/png'||sha(Buffer.from(await response.arrayBuffer()))!==state.hash)return short('image_deployment_pending')
