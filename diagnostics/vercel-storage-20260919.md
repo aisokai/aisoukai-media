@@ -257,3 +257,47 @@ git diff --no-index --check /dev/null diagnostics/vercel-storage-20260919.md
 3. source/trace/deployment ID対応を得た後、同じ合成入力・同じruntimeで修正前後のtrace bytesを比較する。Storageの削減見込みはunique Functions・region・保持deploymentと圧縮定義を確認後に算出する。
 
 再現手順は保存元の明示 `.nft.json` の `files` だけをJSON解析し、`manifest.parent / file` をresolve、setで重複排除、statサイズを合計する。環境/認証/data本文やcompiled JSは読まない。source参照例: `git show 72439cd8bcc09ae685ef5a7a1603a3f101128e9f:src/lib/mwfServerAuthority.mjs`。本調査ではref変更・source変更・dependency install・build・運用実行を行っていない。
+
+## 2026-10-09: actual Turbopack tracing repair
+
+全アプリの source/config/dependencies と合成データだけを新しい `/tmp` fixture に置き、Next 16.2.6 `next build --turbopack` の実際の route `.nft.json` を比較した。以前の standalone NFT helper の結果を Turbopack の容量証明として使っていない。外部通信と `.env` 読み取りは禁止し、CSS build worker の localhost 通信だけを許可した。
+
+確認できた原因と修正:
+
+- topic-candidates の採用記録読取と保存先を `data/topic-adoptions` 固定 prefix に限定。
+- admin/posts のローカル保存は posts/logs 各分岐内で固定 directory を使う。結合後の動的 dirname/union path が root 全体を tracing させていた。
+- article-topics のローカル CSV 保存先を同じ `data/article-topics.sample.csv` の literal prefix にする。
+- 公開画像の SHA-256 計算は実 bytes のまま、読取 prefix を `public/images` に限定。正規化された `./` / `//`、欠落、改変の挙動を回帰検証。
+- production build のみ、すべての記事（draft/archived を含む）の frontmatter image を参照集合にする。未参照画像だけを exact safe path で Function tracing から除外する。static public 配信・画像本体・公開証明は変更しない。header/型/パス/ファイル状態が不明なら除外ゼロ。body は decode しない。symlink と glob 特殊文字を保守的に扱う。
+
+同一の合成記事、参照画像1MiB、未参照画像3MiB、不要動画4MiB、一時ファイル1MiB、CSV/採用metadata/履歴ログを使った結果（bytes）:
+
+| traced target | before | after |
+| --- | ---: | ---: |
+| all route trace union | 36,073,699 | 25,976,668 |
+| admin/topic-candidates | 13,223,698 | 3,125,808 |
+| admin/article-topics | 13,217,163 | 3,119,131 |
+| admin/posts | 13,397,727 | 2,251,463 |
+| api/mwf | 10,372,305 | 3,032,291 |
+
+修正後は root tracing warning なし。全 route で合成 tmp/動画/未参照画像は非包含、必要画像・記事・CSV・採用記録・posts/logs の必要先は包含。これは合成 trace の logical bytes であり、本番 Function 圧縮容量や課金削減率の予測ではない。本番効果は reviewed rollout 後に metadata で別確認する。
+
+- before fixture: `/tmp/mwf-storage-turbo-wpnnam6y`
+- after fixture: `/tmp/mwf-storage-turbo-k2plby1f`
+- build logs: `/tmp/mwf-storage-turbo-before.log`, `/tmp/mwf-storage-turbo-after.log`
+- measurements: `/tmp/mwf-storage-trace-before.json`, `/tmp/mwf-storage-trace-after.json`
+- fixture builder: `/tmp/mwf-storage-build-fixture.py`（source allowlist、依存は clone copy、実データなし）
+
+```sh
+node scripts/measure-function-trace.mjs --built-synthetic /tmp/mwf-storage-turbo-wpnnam6y
+node scripts/measure-function-trace.mjs --built-synthetic /tmp/mwf-storage-turbo-k2plby1f
+node --test tests/function-trace.test.mjs tests/monthly-topic-candidates-github-action.test.mjs tests/admin-post-file-paths.test.mjs tests/tiered-publication.test.mjs tests/deployed-post-file.test.mjs tests/vercel-ignore-state-only.test.mjs
+```
+
+40 tests PASS、対象 ESLint/diff check PASS。Turbopack build/TypeScript/26 static pages PASS。UI変更なし。local worker は commit/push/deploy・本番記事読取・削除を実行していない。
+
+### Deployment queue audit
+
+deploy gate worker の合成9 testsでは既存の累積差分判定に再現bugなし。未反映の記事/画像変更を含む間は build、成功 baseline 到達後の state-only は skip、baseline 不明は fetch せず build を維持する。production gate と vercel.json は変更なし。
+
+[Vercel ignored build step](https://vercel.com/docs/project-configuration/project-settings#ignored-build-step) は BUILDING に入ってから実行され、skip された deployment も quota/concurrent slot に数えられる。[VERCEL_GIT_PREVIOUS_SHA](https://vercel.com/docs/environment-variables/system-environment-variables#vercel_git_previous_sha) は同 project/branch の前回成功 deploy。state-only の Next build と Function artifact 作成は省略できるが、一覧の queued/canceled entry 自体をこの gate でゼロにはできない。

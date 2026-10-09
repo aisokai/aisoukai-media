@@ -95,3 +95,30 @@ test('vercel.json invokes CLI with correct 0=skip and 1=build exit semantics', (
   assert.equal(invoke(f.previousSha).status, 0)
   assert.equal(invoke('').status, 1)
 })
+
+test('queued state commits keep an undeployed article and image buildable until the successful baseline advances', () => {
+  const f = fixture()
+  const article = f.commit('content/posts/synthetic.md', 'synthetic article\n')
+  const image = f.commit('public/images/library/synthetic.svg', '<svg/>\n')
+  const pending = f.commit(request, '{"synthetic":"request"}\n')
+  const completed = f.commit(claim, '{"synthetic":"done"}\n')
+  // Queueing a build is not evidence of a successful deployment. HEAD^ would
+  // incorrectly skip both state commits while the required build is pending.
+  for (const baseline of [f.previousSha, article]) {
+    assert.equal(canSkipStateOnlyBuild({ ...f.options(completed), previousSha: baseline }), false)
+  }
+  // Once the image/article tree is actually the successful deployment baseline,
+  // the same cumulative request+claim change is safe to skip.
+  assert.equal(canSkipStateOnlyBuild({ ...f.options(completed), previousSha: image }), true)
+  assert.equal(canSkipStateOnlyBuild({ ...f.options(completed), previousSha: pending }), true)
+})
+
+test('missing successful baseline in a shallow checkout continues build without fetching history', () => {
+  const f = fixture(), current = f.commit(request)
+  const target = join(mkdtempSync(join(tmpdir(), 'mwf-ignore-shallow-')), 'checkout')
+  const clone = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', 'clone', '--quiet', '--no-local', '--depth=1', `file://${f.cwd}`, target], { env, encoding: 'utf8' })
+  assert.equal(clone.status, 0, clone.stderr)
+  const before = readFileSync(join(target, '.git', 'shallow'), 'utf8')
+  assert.equal(canSkipStateOnlyBuild({ ...f.options(current), cwd: target }), false)
+  assert.equal(readFileSync(join(target, '.git', 'shallow'), 'utf8'), before)
+})
