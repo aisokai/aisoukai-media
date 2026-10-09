@@ -59,7 +59,7 @@ async function loadAdminLog() {
   }
   const fs = await import('node:fs')
   const path = await import('node:path')
-  const logLocalPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'logs', 'admin-post-history.md')
+  const logLocalPath = path.join(process.cwd(), 'logs', 'admin-post-history.md')
   return fs.existsSync(logLocalPath) ? fs.readFileSync(logLocalPath, 'utf8') : ''
 }
 
@@ -73,7 +73,7 @@ async function loadReviewLog() {
   }
   const fs = await import('node:fs')
   const path = await import('node:path')
-  const logLocalPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'logs', 'review-history.md')
+  const logLocalPath = path.join(process.cwd(), 'logs', 'review-history.md')
   return fs.existsSync(logLocalPath) ? fs.readFileSync(logLocalPath, 'utf8') : ''
 }
 
@@ -84,7 +84,7 @@ async function readPost(slug: string) {
   }
   const fs = await import('node:fs')
   const path = await import('node:path')
-  const localPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'content', 'posts', `${slug}.md`)
+  const localPath = path.join(process.cwd(), 'content', 'posts', `${slug}.md`)
   if (!fs.existsSync(localPath)) throw new Error(`記事が見つかりません: ${slug}`)
   return { postPath, raw: fs.readFileSync(localPath, 'utf8') }
 }
@@ -98,20 +98,24 @@ async function writeFiles(message: string, files: Array<{ path: string; content:
   const fs = await import('node:fs')
   const path = await import('node:path')
   for (const file of files) {
-    let localPath: string
     if (file.path.startsWith('content/posts/')) {
-      localPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'content', 'posts', path.basename(file.path))
+      const localPath = path.join(process.cwd(), 'content', 'posts', path.basename(file.path))
+      if (file.content === null) {
+        if (fs.existsSync(localPath)) fs.unlinkSync(localPath)
+      } else {
+        fs.mkdirSync(path.join(process.cwd(), 'content', 'posts'), { recursive: true })
+        fs.writeFileSync(localPath, file.content, 'utf8')
+      }
     } else if (file.path === LOG_PATH || file.path === REVIEW_LOG_PATH) {
-      localPath = path.join(/* turbopackIgnore: true */ process.cwd(), 'logs', path.basename(file.path))
+      const localPath = path.join(process.cwd(), 'logs', path.basename(file.path))
+      if (file.content === null) {
+        if (fs.existsSync(localPath)) fs.unlinkSync(localPath)
+      } else {
+        fs.mkdirSync(path.join(process.cwd(), 'logs'), { recursive: true })
+        fs.writeFileSync(localPath, file.content, 'utf8')
+      }
     } else {
       throw new Error(`許可されていない書き込み先です: ${file.path}`)
-    }
-
-    if (file.content === null) {
-      if (fs.existsSync(localPath)) fs.unlinkSync(localPath)
-    } else {
-      fs.mkdirSync(path.dirname(localPath), { recursive: true })
-      fs.writeFileSync(localPath, file.content, 'utf8')
     }
   }
   return 'ローカルファイルを更新しました'

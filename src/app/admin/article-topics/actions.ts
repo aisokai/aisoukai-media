@@ -41,7 +41,7 @@ async function saveCsv(content: string, id: string, source: ArticleTopicSource, 
     return `GitHub commit: ${commit.sha.slice(0, 7)}`
   }
 
-  fs.writeFileSync(path.join(process.cwd(), ARTICLE_TOPICS_RELATIVE_PATH), content, 'utf8')
+  fs.writeFileSync(path.join(process.cwd(), 'data', 'article-topics.sample.csv'), content, 'utf8')
   if (adoption) { fs.mkdirSync(path.join(process.cwd(), 'data/topic-adoptions'), { recursive: true }); fs.writeFileSync(path.join(process.cwd(), `data/topic-adoptions/${id}.json`), adoption, 'utf8') }
   return source === 'local_fallback'
     ? 'GitHub読込失敗時のローカルCSVを更新しました'

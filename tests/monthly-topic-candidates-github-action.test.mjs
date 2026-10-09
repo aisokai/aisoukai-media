@@ -116,3 +116,13 @@ test('two Human clicks cannot revive terminal CSV state through a nonselected ca
     assert.equal(JSON.parse(h.store.get('data/monthly-topic-candidates/2026-09.json')).topics[0].status, 'pending')
   }
 })
+
+test('local adoption reads and writes use the same bounded directory and reject traversal',()=>{
+ const source=readFileSync('src/app/admin/topic-candidates/actions.ts','utf8'),modules={fs:{},path:{join:(...parts)=>parts.join('/')},'next/cache':{},'@/lib/adminAuth':{},'@/lib/githubContents':{},'@/lib/monthlyTopicCandidates':{},'@/lib/selectedTopicAdoptions.mjs':adoptionPlanner}
+ const exported={}
+ const compiled=ts.transpileModule(source+'\nexport { localAdoptionPath }',{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText
+ new Function('require','exports','process',compiled)(name=>modules[name],exported,{cwd:()=>'/synthetic',env:{}})
+ assert.equal(exported.localAdoptionPath('data/topic-adoptions/MONTHLY-202610TOPIC026.json'),'/synthetic/data/topic-adoptions/MONTHLY-202610TOPIC026.json')
+ for(const value of ['public/image.png','data/topic-adoptions/../other.json','data/topic-adoptions/nested/topic.json','data/topic-adoptions/topic.json\n'])assert.throws(()=>exported.localAdoptionPath(value))
+ assert.match(source,/fs.writeFileSync\(localAdoptionPath\(adoption.path\)/)
+})

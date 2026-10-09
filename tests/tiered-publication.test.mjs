@@ -113,3 +113,20 @@ test('runner revision supplied by plist overrides stale environment-file metadat
  const result=spawnSync(process.execPath,[`--env-file=${fixture}`,'-e','process.stdout.write(process.env.MWF_RUNNER_VERSION)'],{env:{MWF_RUNNER_VERSION:'a'.repeat(40)},encoding:'utf8'})
  assert.equal(result.status,0);assert.equal(result.stdout,'a'.repeat(40));assert.equal(readFileSync(fixture,'utf8'),raw)
 })
+
+test('scoped deployed image reader preserves exact hash semantics including slash/dot aliases',async()=>{
+ const fs=await import('node:fs'),os=await import('node:os'),paths=await import('node:path'),original=process.cwd()
+ for(const image of ['/images/synthetic.png','/images/./synthetic.png','/images//synthetic.png']){
+  const root=fs.mkdtempSync(paths.join(os.tmpdir(),'tiered-image-path-synthetic-'));fs.mkdirSync(paths.join(root,'public/images'),{recursive:true})
+  const localAsset={...asset,path:image},localEvidence={...imageEvidence,licenseVersion:imageLicenseVersion(localAsset)},next=certify({data:{...data,image},imageEvidence:localEvidence})
+  assert.ok(next);process.chdir(root)
+  try{
+   const localContext={path,topic,asset:localAsset}
+   assert.equal(assessTieredPublication(next,content,secret,localContext),false)
+   fs.writeFileSync(paths.join(root,'public/images/synthetic.png'),imageBytes)
+   assert.equal(assessTieredPublication(next,content,secret,localContext),true)
+   fs.writeFileSync(paths.join(root,'public/images/synthetic.png'),'changed synthetic bytes')
+   assert.equal(assessTieredPublication(next,content,secret,localContext),false)
+  }finally{process.chdir(original)}
+ }
+})

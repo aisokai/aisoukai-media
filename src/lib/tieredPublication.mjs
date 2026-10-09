@@ -78,7 +78,7 @@ export function assessTieredPublication(data,content,secret,context) {
     const proof=data.tiered_review_proof.payload
     if(context?.path!==proof.path)return false
     if(!/^\/images\/[A-Za-z0-9_./-]+$/.test(data.image??'')||data.image.includes('..'))return false
-    const imageHash=context?.imageHash??createHash('sha256').update(readFileSync(join(process.cwd(),'public',data.image))).digest('hex')
+    const imageHash=context?.imageHash??createHash('sha256').update(readFileSync(join(process.cwd(),'public','images',data.image.slice('/images/'.length)))).digest('hex')
     const asset=context?.asset??JSON.parse(readFileSync(join(process.cwd(),'data/image-library.json'),'utf8')).images?.find(i=>i.path===data.image)
     if(imageHash!==proof.imageHash||!asset||!['approved','verified'].includes(asset.license_status)||imageLicenseVersion(asset)!==proof.licenseVersion)return false
     if(proof.tier==='normal'){

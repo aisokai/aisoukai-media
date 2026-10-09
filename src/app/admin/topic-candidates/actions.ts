@@ -60,9 +60,14 @@ async function loadCandidateFile(month: string, ref?: string) {
 }
 
 
+function localAdoptionPath(adoptionPath: string) {
+  if (!/^data\/topic-adoptions\/[A-Za-z0-9_-]+\.json$/.test(adoptionPath)) throw new Error('採用記録のパスが不正です')
+  return path.join(process.cwd(), 'data', 'topic-adoptions', adoptionPath.slice('data/topic-adoptions/'.length))
+}
+
 async function loadAdoption(adoptionPath: string, ref?: string) {
   if (!process.env.GITHUB_REVIEW_TOKEN) {
-    const localPath = path.join(process.cwd(), adoptionPath)
+    const localPath = localAdoptionPath(adoptionPath)
     if (!fs.existsSync(localPath)) return null
     return JSON.parse(fs.readFileSync(localPath, 'utf8'))
   }
@@ -140,7 +145,7 @@ export async function finalizeSelectedTopicCandidatesAction(month: string): Prom
     if (!process.env.GITHUB_REVIEW_TOKEN) {
       if (lines.length) fs.writeFileSync(path.join(process.cwd(), TOPICS_PATH), nextCsv, 'utf8')
       fs.mkdirSync(path.join(process.cwd(), 'data/topic-adoptions'), { recursive: true })
-      for (const adoption of adoptions) fs.writeFileSync(path.join(process.cwd(), adoption.path), adoption.content, 'utf8')
+      for (const adoption of adoptions) fs.writeFileSync(localAdoptionPath(adoption.path), adoption.content, 'utf8')
       revalidatePath('/admin/topic-candidates')
       return { ok: true, message: `確定しました。CSV追加 ${lines.length} 件、採用記録の作成・更新 ${adoptions.length} 件` }
     }
