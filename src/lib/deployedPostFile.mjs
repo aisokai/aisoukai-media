@@ -10,3 +10,14 @@ export async function readDeployedPostFile(artifactPath) {
   const filename = artifactPath.slice('content/posts/'.length)
   return readFile(join(process.cwd(), 'content', 'posts', filename))
 }
+
+// A freshly synced article can be absent from the still-running old deployment.
+// Only absence is pending; invalid paths and all other IO failures still reject.
+export async function readDeployedPostFileIfPresent(artifactPath) {
+  try {
+    return await readDeployedPostFile(artifactPath)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null
+    throw error
+  }
+}

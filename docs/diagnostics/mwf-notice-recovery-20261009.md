@@ -28,3 +28,10 @@ node --test tests/mwf-delivery.test.mjs tests/mwf-auto-images.test.mjs tests/ops
 ## Human 最終審査の固定
 
 本番 server authority は `humanReviewRequired:()=>true` を固定する。通常 schema1 review は API 設定の有無にかかわらず `human_review_required` の下書き結果とし、原本を変更せず記事審査 API を呼ばない。reflection は原本 hash と未承認 draft flags / 非公開状態を確認する。prepare の採用検証、schema2 minor、backfill、復元は従来通り。要求形式や semantic claim key は変えず、既存 done claim は読み返すだけで再審査・再公開しない。既存 caller の既定 policy は互換維持。
+
+
+## 記事デプロイ未完了時の ENOENT
+
+画像待ち修復後、記事自体のデプロイが未完了だと稼働中 deployment には対象ファイルがなく、既存 read が ENOENT を投げて authority status が unavailable になった。これにより確定審査結果の反映待ちを継続できなかった。
+
+反映確認専用 `readDeployedPostFileIfPresent` を追加し、ENOENT だけ null に投影する。通常/復元の reflection は null を pending として返し、確定済み review status と bounded continuation を維持する。元の read 関数は変更せず、path validation、他の IO エラー、bytes/hash 検証、unknown の停止は維持する。合成テストで missing → bytes 作成後一致、および invalid path / EISDIR の拒否を確認する。
