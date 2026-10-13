@@ -3562,6 +3562,42 @@
         "request_id": "req_93f03dc53dcc45639689521b7390e9d6",
         "visual_review_id": "chatcmpl-EXxJYa2Azo6NYKfFiVO5YNESEG3gQ"
       }
+    },
+    {
+      "id": "generated-2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28",
+      "category": "root-canal",
+      "title": "根管治療を理解する前提知識",
+      "format": "png",
+      "sha256": "2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28",
+      "source_filename": "2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28.png",
+      "usage_status": "active",
+      "created_at": "2026-10-13T23:32:27.550Z",
+      "updated_at": "2026-10-13T23:32:27.550Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28.png",
+      "alt": "根管治療を理解する前提知識を説明するイラスト",
+      "content_sha256": "2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28",
+      "git_blob": "dbd28ae439b57b092743dd6745d42a625e8d671d",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC028",
+        "title": "根管治療を理解する前提知識",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EYgGqFuFnnwKDkbG7XwNotfNJW1o3:2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28"
+      },
+      "generation_provenance": {
+        "topic_version": "4294c2759a9a9dc03ddba5c9e4c192f98d1f081e96c4891d8828c1f7d3ebe04d",
+        "content_sha256": "2f4a2877a67ec33973f06632786a4ff4f4ec26610e0c8307d9af4c863e19ba28",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-13T23:32:27.550Z",
+        "request_id": "req_5aacfda95d9d4ead89819fe25253653f",
+        "visual_review_id": "chatcmpl-EYgGqFuFnnwKDkbG7XwNotfNJW1o3"
+      }
     }
   ]
 }
