@@ -16,7 +16,7 @@ export default function ChairboardPrivacyPage() {
       <HeroSection title="チェアボード プライバシーポリシー" />
       <div className="mx-auto max-w-[1100px] px-4 py-8">
         <div className="space-y-6 rounded-lg bg-white p-6 text-[14px] leading-relaxed text-gray-700 shadow-sm">
-          <p>最終更新日: 2026年10月9日</p>
+          <p>最終更新日: 2026年10月14日</p>
           <p>
             「チェアボード」は、歯科医院の院内で、診療チェアの呼び出しの状況をスタッフのiPadで共有するためのアプリです。
           </p>
@@ -42,7 +42,7 @@ export default function ChairboardPrivacyPage() {
           <section className="space-y-2">
             <h2 className="text-[16px] font-bold text-[#1e3a5f]">通知</h2>
             <p>
-              通知を届けるために、医院の中のサーバーから Apple の通知の仕組み（Apple Push Notification service）へ、チェアの名前とステータス名（例: 「チェアー3：メンテチェック」）と、意味を持たない識別子を送ります。
+              通知を届けるために、医院の中のサーバーから Apple の通知の仕組み（Apple Push Notification service）へ、チェアの名前とステータス名（例: 「チェアー3：メンテチェック」）と、意味を持たない識別子を送ります。依頼のときに呼び出し先を選んだ場合は、その呼び出し先の役職名（例: 「チェアー3：メンテチェック（院長）」）も送ります。呼び出し先には役職名だけを使い、個人の名前は使いません。
             </p>
           </section>
 
