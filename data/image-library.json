@@ -3598,6 +3598,42 @@
         "request_id": "req_5aacfda95d9d4ead89819fe25253653f",
         "visual_review_id": "chatcmpl-EYgGqFuFnnwKDkbG7XwNotfNJW1o3"
       }
+    },
+    {
+      "id": "generated-4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c",
+      "category": "implant",
+      "title": "インプラント相談前に確認したい検査と通院の流れ",
+      "format": "png",
+      "sha256": "4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c",
+      "source_filename": "4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c.png",
+      "usage_status": "active",
+      "created_at": "2026-10-18T23:32:48.821Z",
+      "updated_at": "2026-10-18T23:32:48.821Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c.png",
+      "alt": "インプラント相談前に確認したい検査と通院の流れを説明するイラスト",
+      "content_sha256": "4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c",
+      "git_blob": "0b6f1c6db0f72a6801be20e7f24c2535e3f11be6",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC007",
+        "title": "インプラント相談前に確認したい検査と通院の流れ",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EaUewh5UlHu6E8T2Zj47y6H0mzZj1:4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c"
+      },
+      "generation_provenance": {
+        "topic_version": "3d8ab69d752901f4c18a1a24699c30e72147067329f1d789c9b6584d95cbb253",
+        "content_sha256": "4444d379ae5202dae8819ea2970ebc3b991dd3dfc6c7da0fbaf14a874ce3427c",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-18T23:32:48.821Z",
+        "request_id": "req_722f5cd8818f462bb7f3f8bdc3f50132",
+        "visual_review_id": "chatcmpl-EaUewh5UlHu6E8T2Zj47y6H0mzZj1"
+      }
     }
   ]
 }
