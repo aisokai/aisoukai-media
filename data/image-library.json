@@ -3634,6 +3634,42 @@
         "request_id": "req_722f5cd8818f462bb7f3f8bdc3f50132",
         "visual_review_id": "chatcmpl-EaUewh5UlHu6E8T2Zj47y6H0mzZj1"
       }
+    },
+    {
+      "id": "generated-9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd",
+      "category": "pediatric",
+      "title": "子どものむし歯予防を家庭で始める第一歩",
+      "format": "png",
+      "sha256": "9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd",
+      "source_filename": "9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd.png",
+      "usage_status": "active",
+      "created_at": "2026-10-20T23:33:13.264Z",
+      "updated_at": "2026-10-20T23:33:13.264Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd.png",
+      "alt": "子どものむし歯予防を家庭で始める第一歩を説明するイラスト",
+      "content_sha256": "9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd",
+      "git_blob": "09503487e1d0b3d51cba44ca20738c6516890053",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC030",
+        "title": "子どものむし歯予防を家庭で始める第一歩",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EbDcQepq1y1BOCKGaW46IByjgPXrx:9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd"
+      },
+      "generation_provenance": {
+        "topic_version": "cd4a8be6eeddc87a98d186d01c4f65bb12fd5aca53773b5846d83b89855a9361",
+        "content_sha256": "9ac2514ef0210b00821d3850cb21756f9e255ea5cf2b4222791da087e42839fd",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-20T23:33:13.264Z",
+        "request_id": "req_bc540502cbfb4446840bb0b0284536d1",
+        "visual_review_id": "chatcmpl-EbDcQepq1y1BOCKGaW46IByjgPXrx"
+      }
     }
   ]
 }
