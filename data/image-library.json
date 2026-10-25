@@ -3706,6 +3706,42 @@
         "request_id": "req_67d70a0bfbed473c9f55ad2e7875ca0f",
         "visual_review_id": "chatcmpl-EbwZj3foXbLbojYbozSiLRjvmYka6"
       }
+    },
+    {
+      "id": "generated-f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf",
+      "category": "preventive",
+      "title": "正しいセルフケアとセルフチェックの組み合わせ方",
+      "format": "png",
+      "sha256": "f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf",
+      "source_filename": "f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf.png",
+      "usage_status": "active",
+      "created_at": "2026-10-25T23:33:29.935Z",
+      "updated_at": "2026-10-25T23:33:29.935Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf.png",
+      "alt": "正しいセルフケアとセルフチェックの組み合わせ方を説明するイラスト",
+      "content_sha256": "f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf",
+      "git_blob": "839c8a7a666efaf184f072ff8833623e3bcf3040",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC034",
+        "title": "正しいセルフケアとセルフチェックの組み合わせ方",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-Ed20RCXUlBshrzv9ZBccZSzxvBADw:f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf"
+      },
+      "generation_provenance": {
+        "topic_version": "a7169258d485ca25f6613f9f7d8c0e6ee2608d4950b6ab15c100ddece8e777e7",
+        "content_sha256": "f2138eec0ace14dccda87e6ed408ea52e8bb3fdac393f09070ec1471ba627fbf",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-25T23:33:29.935Z",
+        "request_id": "req_95e7250f8b5d4ecb88b97de708a05b25",
+        "visual_review_id": "chatcmpl-Ed20RCXUlBshrzv9ZBccZSzxvBADw"
+      }
     }
   ]
 }
