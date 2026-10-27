@@ -3742,6 +3742,42 @@
         "request_id": "req_95e7250f8b5d4ecb88b97de708a05b25",
         "visual_review_id": "chatcmpl-Ed20RCXUlBshrzv9ZBccZSzxvBADw"
       }
+    },
+    {
+      "id": "generated-35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9",
+      "category": "preventive",
+      "title": "正しいブラッシング習慣の作り方：家庭での実践ガイド",
+      "format": "png",
+      "sha256": "35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9",
+      "source_filename": "35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9.png",
+      "usage_status": "active",
+      "created_at": "2026-10-27T23:33:37.660Z",
+      "updated_at": "2026-10-27T23:33:37.660Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9.png",
+      "alt": "正しいブラッシング習慣の作り方：家庭での実践ガイドを説明するイラスト",
+      "content_sha256": "35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9",
+      "git_blob": "f74393fcaee414e7bd508b9d82b2f7dde69c28aa",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC037",
+        "title": "正しいブラッシング習慣の作り方：家庭での実践ガイド",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EdkxfsiEDkaGfC0js1Dm5URoOLVd0:35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9"
+      },
+      "generation_provenance": {
+        "topic_version": "6b5920375da23adcd52fda00c033b728a0c913a8cc2a88355fcfd7548c88ac11",
+        "content_sha256": "35c497f7193b78d69f69b133933c1006130953511d61991b4792442ffe1862e9",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-27T23:33:37.660Z",
+        "request_id": "req_ffdeb3887f14424d96aa92b3e8fa0879",
+        "visual_review_id": "chatcmpl-EdkxfsiEDkaGfC0js1Dm5URoOLVd0"
+      }
     }
   ]
 }
