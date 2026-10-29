@@ -3778,6 +3778,42 @@
         "request_id": "req_ffdeb3887f14424d96aa92b3e8fa0879",
         "visual_review_id": "chatcmpl-EdkxfsiEDkaGfC0js1Dm5URoOLVd0"
       }
+    },
+    {
+      "id": "generated-8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897",
+      "category": "preventive",
+      "title": "予防歯科で始める暮らしの歯みがき習慣づくり",
+      "format": "png",
+      "sha256": "8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897",
+      "source_filename": "8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897.png",
+      "usage_status": "active",
+      "created_at": "2026-10-29T23:33:57.608Z",
+      "updated_at": "2026-10-29T23:33:57.608Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897.png",
+      "alt": "予防歯科で始める暮らしの歯みがき習慣づくりを説明するイラスト",
+      "content_sha256": "8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897",
+      "git_blob": "fd86d5679c3640940009074bc8a50407c543ebaf",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC038",
+        "title": "予防歯科で始める暮らしの歯みがき習慣づくり",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EeTv5NCjmWplu4zjPwfeX9Z82ksBZ:8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897"
+      },
+      "generation_provenance": {
+        "topic_version": "a7b4bc0c000f9f68b91ed2b638aaa1f45782511ba56ec1e8006322064c5763dd",
+        "content_sha256": "8ef2acabbd95290391a35dcf15c0fe6ed015ef4faa4d565ac29b30bac2ef9897",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-10-29T23:33:57.608Z",
+        "request_id": "req_d337b9d9dd734ae68cd5ac444388048c",
+        "visual_review_id": "chatcmpl-EeTv5NCjmWplu4zjPwfeX9Z82ksBZ"
+      }
     }
   ]
 }
