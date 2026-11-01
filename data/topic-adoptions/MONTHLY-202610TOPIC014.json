@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "purpose": "teacher-topic-adoption",
+  "repository": "aisokai/aisoukai-media/main",
+  "policyVersion": "aisoukai-media-tiered-blog-2026-09-14",
+  "payload": {
+    "topicId": "MONTHLY-202610TOPIC014",
+    "topicVersion": "327f61514f9fe8cbe9de0b04c22724ce7ed9c5f35c41cd2de8b21255e9dad843",
+    "editorialPolicy": "aisoukai-media-tiered-blog-2026-09-14",
+    "evidence": "teacher_20260914_explicit_blog_three_levels_and_scoped_validator_execution_amendment",
+    "adoptedAt": "2026-11-01T05:41:23.490Z"
+  },
+  "signature": "ef9172ee5b900f600fbe2a91bb6d22617e63da75c33969c19b653cb4034275c4"
+}
