@@ -824,3 +824,10 @@ slug: 2026-10-30-mwf-c6eec5ec57d5eeb2c1cc270d5ae64b9a52ee67a6090d0150b3e10b451c8
 reviewed_by: 三谷
 date: 2026-10-30
 
+## 2026-11-04T08:38:37.894+09:00
+datetime: 2026-11-04T08:38:37.894+09:00
+action: approve
+slug: 2026-11-04-mwf-bb70850297ef9815168df09061318dc209a72e13f86436f99d1ff7c3bed2a0d5
+reviewed_by: 三谷
+date: 2026-11-04
+
