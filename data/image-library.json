@@ -3814,6 +3814,42 @@
         "request_id": "req_d337b9d9dd734ae68cd5ac444388048c",
         "visual_review_id": "chatcmpl-EeTv5NCjmWplu4zjPwfeX9Z82ksBZ"
       }
+    },
+    {
+      "id": "generated-89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f",
+      "category": "wisdom-tooth",
+      "title": "親知らず抜歯後の腫れはいつまで？過ごし方の注意点",
+      "format": "png",
+      "sha256": "89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f",
+      "source_filename": "89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f.png",
+      "usage_status": "active",
+      "created_at": "2026-11-03T23:34:25.581Z",
+      "updated_at": "2026-11-03T23:34:25.581Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f.png",
+      "alt": "親知らず抜歯後の腫れはいつまで？過ごし方の注意点を説明するイラスト",
+      "content_sha256": "89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f",
+      "git_blob": "d69b85075b8bb51cba435a342044892e48b12f67",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC022",
+        "title": "親知らず抜歯後の腫れはいつまで？過ごし方の注意点",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EgIJHf1pZDDvlYS3I8rJ7hxSLv2Q4:89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f"
+      },
+      "generation_provenance": {
+        "topic_version": "d9cd1eb4b944c9dad03ce90bfee747b3897789a18a9f307ac7f613c2cc6c1d89",
+        "content_sha256": "89ea3c78a8ad5c809a8fbf752685e5367bc8013ca2b802081db711a350a5236f",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-03T23:34:25.581Z",
+        "request_id": "req_c7f260d64872401d8f9e8691b6f56a69",
+        "visual_review_id": "chatcmpl-EgIJHf1pZDDvlYS3I8rJ7hxSLv2Q4"
+      }
     }
   ]
 }
