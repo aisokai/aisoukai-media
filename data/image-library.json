@@ -3850,6 +3850,42 @@
         "request_id": "req_c7f260d64872401d8f9e8691b6f56a69",
         "visual_review_id": "chatcmpl-EgIJHf1pZDDvlYS3I8rJ7hxSLv2Q4"
       }
+    },
+    {
+      "id": "generated-4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c",
+      "category": "general",
+      "title": "歯科健診の効果を最大化する準備リスト",
+      "format": "png",
+      "sha256": "4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c",
+      "source_filename": "4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c.png",
+      "usage_status": "active",
+      "created_at": "2026-11-05T23:34:57.668Z",
+      "updated_at": "2026-11-05T23:34:57.668Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c.png",
+      "alt": "歯科健診の効果を最大化する準備リストを説明するイラスト",
+      "content_sha256": "4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c",
+      "git_blob": "631c9ef89f31562383bb46485b00bee03fdf5361",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC036",
+        "title": "歯科健診の効果を最大化する準備リスト",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-Eh1Guh2xX8QoayIH1F2VNpLOUzzzQ:4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c"
+      },
+      "generation_provenance": {
+        "topic_version": "2f36b0439b147e6d2ade6a83ad2656c882e371346e54067ced1169b56e20f6c6",
+        "content_sha256": "4ae74a428788c68ddd4e027f900825f013dcf69e9a30e15892d46ab48257582c",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-05T23:34:57.668Z",
+        "request_id": "req_92a791ecee564214aede75ff054df900",
+        "visual_review_id": "chatcmpl-Eh1Guh2xX8QoayIH1F2VNpLOUzzzQ"
+      }
     }
   ]
 }
