@@ -17,6 +17,8 @@ policy `aisoukai-media-tiered-blog-sns-2026-11-06`（AGENTS.md の `sns-mutual-r
 4. **投稿**: 実行主体が投稿直前に `scripts/lib/sns-mutual-review.mjs` の `verifySnsPublishable` で hash と証拠を再照合し、一致した場合のみ投稿する（このリポジトリは投稿を実行しない）。
 5. **監査**: 投稿結果・事後巡回・削除／修正は `data/sns-review/posting-audit.jsonl` に追記する。
 
+- `media_files` は repo 内の通常ファイルの相対パスのみ（絶対パス・`..`・ドットで始まるパス・repo 外を指す symlink は不可）。
+- レビュー後は `mutual_review` を正本とし、互換用の top-level `reviewed: true` / `reviewed_by` / `reviewed_at` を同じ値で持つ（不一致はエラー）。
 - `approved_for_manual_post` は常に `false`。Human 承認 CLI（`sns:approve` / `sns:reject`）の対象外。
 - `mutual_review` / `created_by` を manual_only のドラフトに含めることはできない。
 - 患者が特定され得る内容・個別相談・クレーム・判断が割れたものは `escalated`（`exception_category` 必須）とし、自動フローから外す。

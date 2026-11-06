@@ -7,7 +7,7 @@
 //   npm run sns:record-review -- <draft-filename> --decision pass|changes_requested|escalate \
 //     --reviewed-by "chatgpt:<run-id>" \
 //     --checks medical_ad=true,facts=true,exception_category=true,brand_tone=true,media_rights=true,mixup_prevention=true,flag_alignment=true \
-//     [--exception-category <category>] [--notes "差し戻し理由"] [--evidence-dir <dir>]
+//     [--exception-category <category>] [--notes "差し戻し理由"] [--evidence-dir <dir>] [--drafts-dir <dir>]
 import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -45,7 +45,7 @@ function main() {
     console.error(`エラー: ファイル名にパスを含めることはできません: ${target}`)
     process.exit(1)
   }
-  const draftPath = join(SNS_DRAFTS_DIR, name)
+  const draftPath = join(getFlag('drafts-dir') ?? SNS_DRAFTS_DIR, name)
   if (!existsSync(draftPath)) {
     console.error(`エラー: ドラフトが見つかりません: ${name}`)
     process.exit(1)

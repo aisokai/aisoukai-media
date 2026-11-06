@@ -2,9 +2,11 @@
 // 本物の data/sns-review/ には書き込まない。
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import matter from 'gray-matter'
 import { applySnsReviewDecision } from '../scripts/lib/sns-review.mjs'
 import { parseChecks } from '../scripts/record-sns-review.mjs'
@@ -375,3 +377,114 @@ test('投稿監査: action: post では post_id / post_url が必須', () => {
     action: 'post', post_id: null, post_url: null, result: 'success', detail: null,
   }, { evidenceDir: ctx.evidenceDir }), /post_id と post_url/)
 })
+
+const REPO = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+test('レビュー指摘: media_files の symlink が repo 外を指す場合は読み込まずエラー', () => {
+  const ctx = setup({ withMedia: false })
+  const outside = mkdtempSync(join(tmpdir(), 'sns-outside-'))
+  roots.push(outside)
+  writeFileSync(join(outside, 'secret.txt'), 'fictional-outside')
+  symlinkSync(join(outside, 'secret.txt'), join(ctx.root, 'public', 'images', 'sns', 'link.png'))
+  const parsed = matter(readFileSync(ctx.draftPath, 'utf8'))
+  writeFileSync(ctx.draftPath, matter.stringify(parsed.content, { ...parsed.data, media_files: ['public/images/sns/link.png'] }))
+  assert.throws(() => record(ctx), /repo 外/)
+  assert.match(
+    collectErrors(() => computeSnsContentHash({ data: { media_files: ['public/images/sns/link.png'] }, content: '', rootDir: ctx.root })),
+    /repo 外/,
+  )
+})
+
+test('レビュー指摘: repo 内のドットファイルへの symlink も拒否する', () => {
+  const ctx = setup({ withMedia: false })
+  writeFileSync(join(ctx.root, '.env.local'), 'FICTIONAL=1')
+  symlinkSync(join(ctx.root, '.env.local'), join(ctx.root, 'public', 'images', 'sns', 'env.png'))
+  assert.match(
+    collectErrors(() => computeSnsContentHash({ data: { media_files: ['public/images/sns/env.png'] }, content: '', rootDir: ctx.root })),
+    /許可されないパス/,
+  )
+})
+
+test('レビュー指摘: 証拠追記後に frontmatter 更新が失敗した状態 (pending のまま) を検出する', () => {
+  const ctx = setup()
+  const before = readFileSync(ctx.draftPath, 'utf8')
+  record(ctx)
+  writeFileSync(ctx.draftPath, before) // frontmatter 更新が失敗した状態を模す
+  const result = verify(ctx)
+  assert.match(result.errors.join('\n'), /未反映/)
+  assert.equal(result.publishable, false)
+})
+
+test('レビュー指摘: 再レビューの証拠が frontmatter に反映されていない場合 (古い evidence_id のまま) を検出する', () => {
+  const ctx = setup()
+  record(ctx, { decision: 'changes_requested', checks: { ...ALL_TRUE, facts: false } })
+  const afterFirst = readFileSync(ctx.draftPath, 'utf8')
+  record(ctx)
+  writeFileSync(ctx.draftPath, afterFirst)
+  assert.match(verify(ctx).errors.join('\n'), /最新の証拠/)
+  // 再記録で整合が取れる (changes_requested → pass)
+  record(ctx)
+  assert.deepEqual(verify(ctx).errors, [])
+})
+
+test('レビュー指摘: 証拠レコードに定義外キーを追加するとチェーン検証でエラー', () => {
+  const ctx = setup()
+  record(ctx)
+  const path = join(ctx.evidenceDir, EVIDENCE_FILE)
+  const line = JSON.parse(readFileSync(path, 'utf8').trim())
+  line.approved_by_human = true
+  writeFileSync(path, JSON.stringify(line) + '\n')
+  assert.match(verify(ctx).errors.join('\n'), /定義外のキー/)
+  const checksExtra = JSON.parse(readFileSync(path, 'utf8').trim())
+  delete checksExtra.approved_by_human
+  checksExtra.checks.extra = true
+  writeFileSync(path, JSON.stringify(checksExtra) + '\n')
+  assert.match(verify(ctx).errors.join('\n'), /checks に定義外の項目/)
+})
+
+test('CLI: record-sns-review の引数処理 → validate-sns-drafts が通る (C-18 CLI 経由)', () => {
+  const ctx = setup({ withMedia: false })
+  const checks = REVIEW_CHECK_KEYS.map((k) => `${k}=true`).join(',')
+  const rec = spawnSync(process.execPath, [
+    join(REPO, 'scripts', 'record-sns-review.mjs'), ctx.file,
+    '--decision', 'pass', '--reviewed-by', 'chatgpt:run-cli-001', '--checks', checks,
+    '--drafts-dir', ctx.draftsDir, '--evidence-dir', ctx.evidenceDir,
+  ], { encoding: 'utf8' })
+  assert.equal(rec.status, 0, rec.stderr)
+  assert.match(rec.stdout, /レビュー証拠を記録しました/)
+
+  const val = spawnSync(process.execPath, [
+    join(REPO, 'scripts', 'validate-sns-drafts.mjs'), '--drafts-dir', ctx.draftsDir, '--evidence-dir', ctx.evidenceDir,
+  ], { encoding: 'utf8' })
+  assert.equal(val.status, 0, val.stderr)
+  assert.match(val.stdout, /All SNS drafts valid \(1 件\)/)
+
+  const bad = spawnSync(process.execPath, [
+    join(REPO, 'scripts', 'record-sns-review.mjs'), ctx.file,
+    '--decision', 'pass', '--reviewed-by', 'chatgpt:run-cli-002', '--checks', 'medical_ad=true',
+    '--drafts-dir', ctx.draftsDir, '--evidence-dir', ctx.evidenceDir,
+  ], { encoding: 'utf8' })
+  assert.equal(bad.status, 1)
+  assert.match(bad.stderr, /未指定/)
+})
+
+test('CLI: 不正な YAML のドラフトもファイル単位のエラーとして報告し、他のドラフトの検証を続ける', () => {
+  const ctx = setup({ withMedia: false })
+  writeFileSync(join(ctx.draftsDir, '2026-11-11-instagram-broken.md'), '---\ntitle: [unclosed\n---\n本文\n')
+  const val = spawnSync(process.execPath, [
+    join(REPO, 'scripts', 'validate-sns-drafts.mjs'), '--drafts-dir', ctx.draftsDir, '--evidence-dir', ctx.evidenceDir,
+  ], { encoding: 'utf8' })
+  assert.equal(val.status, 1)
+  assert.match(val.stderr, /2026-11-11-instagram-broken\.md/)
+  assert.match(val.stderr, /読み込み・検証に失敗しました/)
+  assert.doesNotMatch(val.stderr, /2026-11-10-instagram-sns-202611-001\.md/)
+})
+
+function collectErrors(fn) {
+  try {
+    fn()
+  } catch (e) {
+    return e.message
+  }
+  return ''
+}

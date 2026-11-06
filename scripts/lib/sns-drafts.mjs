@@ -71,11 +71,11 @@ export function parseIdentity(value) {
   return { system: system.toLowerCase(), runId }
 }
 
-// media_files は repo 相対パスのみ (絶対パス・.. を含むパスは拒否)
+// media_files は repo 相対パスのみ。絶対パス・..・空セグメント・ドットで始まるセグメント (.env* 等) は拒否
 export function isSafeRelativePath(value) {
   if (typeof value !== 'string' || value.trim() === '') return false
   if (value.startsWith('/') || value.includes('\\')) return false
-  return !value.split('/').some((seg) => seg === '..' || seg === '')
+  return !value.split('/').some((seg) => seg === '' || seg.startsWith('.'))
 }
 
 function validateMutualReviewData(data, errors) {
@@ -129,6 +129,14 @@ function validateMutualReviewData(data, errors) {
     }
     if (review.content_hash && !CONTENT_HASH_RE.test(String(review.content_hash))) {
       errors.push('mutual_review.content_hash が SHA-256 hex (小文字64桁) ではありません')
+    }
+    // 互換用 top-level 写し (§2-3)。正本は mutual_review 側で、写しとの不一致はエラー
+    if (data.reviewed !== true) errors.push(`state: ${state} では top-level の reviewed が true である必要があります`)
+    if (String(data.reviewed_by ?? '') !== String(review.reviewed_by ?? '')) {
+      errors.push('top-level の reviewed_by が mutual_review.reviewed_by と一致しません')
+    }
+    if (String(data.reviewed_at ?? '') !== String(review.reviewed_at ?? '')) {
+      errors.push('top-level の reviewed_at が mutual_review.reviewed_at と一致しません')
     }
   }
 

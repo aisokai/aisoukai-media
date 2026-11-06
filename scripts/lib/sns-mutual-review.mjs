@@ -7,7 +7,7 @@
 // - この関数群は投稿を実行しない。外部送信・publish API は持たない。
 // - media-gate のフラグ (sns_auto_suspend を含む) は読まない。「いま投稿してよいか」は実行主体が gate 判定で別途行う。
 import { createHash, randomUUID } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
 import {
@@ -87,11 +87,22 @@ export function normalizeBody(content) {
   return String(content ?? '').replace(/\r\n/g, '\n').replace(/\n+$/, '') + '\n'
 }
 
-function resolveInsideRoot(rootDir, relPath) {
-  const root = resolve(rootDir)
+function isInside(root, full) {
+  return full.startsWith(root + sep)
+}
+
+// 文字列上のパスだけでなく実体 (symlink 解決後) も repo 内の通常ファイルであることを確認する
+function resolveMediaFile(rootDir, relPath) {
+  const root = realpathSync(resolve(rootDir))
   const full = resolve(root, relPath)
-  if (full !== root && !full.startsWith(root + sep)) return null
-  return full
+  if (!isInside(root, full)) return { error: `media_files が repo 外を指しています: "${relPath}"` }
+  if (!existsSync(full)) return { error: `media_files のファイルが存在しません: ${relPath}` }
+  const real = realpathSync(full)
+  if (!isInside(root, real)) return { error: `media_files の実体が repo 外を指しています: "${relPath}"` }
+  const relReal = real.slice(root.length + 1).split(sep).join('/')
+  if (!isSafeRelativePath(relReal)) return { error: `media_files の実体が許可されないパスです: "${relPath}"` }
+  if (!lstatSync(real).isFile()) return { error: `media_files が通常ファイルではありません: ${relPath}` }
+  return { full: real }
 }
 
 // media_files の検査。欠落・不正パスは errors に積み、hash は算出しない。
@@ -101,13 +112,13 @@ export function collectMediaHashes(mediaFiles, rootDir = ROOT) {
   if (!Array.isArray(list)) return { errors: ['media_files は配列である必要があります'], mediaHashes: null }
   const hashes = []
   for (const p of [...list].sort()) {
-    const full = isSafeRelativePath(p) ? resolveInsideRoot(rootDir, p) : null
-    if (!full) {
+    if (!isSafeRelativePath(p)) {
       errors.push(`media_files に不正なパスがあります: "${p}"`)
       continue
     }
-    if (!existsSync(full)) {
-      errors.push(`media_files のファイルが存在しません: ${p}`)
+    const { full, error } = resolveMediaFile(rootDir, p)
+    if (error) {
+      errors.push(error)
       continue
     }
     hashes.push({ path: p, sha256: sha256Hex(readFileSync(full)) })
@@ -190,6 +201,35 @@ export function readJsonl(filePath) {
   return { exists: true, records, errors }
 }
 
+// レコード形式の厳格検査。定義外キーは hash の対象外になるため、存在自体をエラーにする
+export function validateRecordShape(record, expectedType) {
+  const errors = []
+  if (!record || typeof record !== 'object' || Array.isArray(record)) return ['レコードがオブジェクトではありません']
+  const keys = KEYS_BY_TYPE[expectedType]
+  const allowed = new Set([...keys, 'record_hash'])
+  const unknown = Object.keys(record).filter((k) => !allowed.has(k))
+  if (unknown.length > 0) errors.push(`定義外のキーがあります: ${unknown.join(', ')}`)
+  const missing = [...allowed].filter((k) => !(k in record))
+  if (missing.length > 0) errors.push(`キーが欠落しています: ${missing.join(', ')}`)
+  if (record.version !== RECORD_VERSION) errors.push(`version が ${RECORD_VERSION} ではありません`)
+  if (expectedType === EVIDENCE_RECORD_TYPE) {
+    const checks = record.checks
+    if (!checks || typeof checks !== 'object' || Array.isArray(checks)) {
+      errors.push('checks がオブジェクトではありません')
+    } else {
+      const extra = Object.keys(checks).filter((k) => !REVIEW_CHECK_KEYS.includes(k))
+      if (extra.length > 0) errors.push(`checks に定義外の項目があります: ${extra.join(', ')}`)
+    }
+    if (!Array.isArray(record.media_hashes)) {
+      errors.push('media_hashes が配列ではありません')
+    } else if (record.media_hashes.some((m) => !m || typeof m !== 'object'
+      || Object.keys(m).length !== 2 || typeof m.path !== 'string' || typeof m.sha256 !== 'string')) {
+      errors.push('media_hashes の要素が { path, sha256 } 形式ではありません')
+    }
+  }
+  return errors
+}
+
 export function verifyChain(records, expectedType, label = expectedType) {
   const errors = []
   let prev = null
@@ -200,6 +240,7 @@ export function verifyChain(records, expectedType, label = expectedType) {
       prev = record?.record_hash ?? null
       return
     }
+    for (const e of validateRecordShape(record, expectedType)) errors.push(`${at}: ${e}`)
     if (record.prev_hash !== prev) errors.push(`${at}: prev_hash が直前レコードの record_hash と一致しません (チェーン破損)`)
     let recomputed = null
     try {
@@ -303,15 +344,25 @@ export function verifySnsPublishable(draftPath, {
   }
   const review = data.mutual_review ?? {}
   const state = review.state
+  const evidenceLog = loadLog(evidenceDir, EVIDENCE_FILE, EVIDENCE_RECORD_TYPE)
+  // 証拠追記後に frontmatter 更新が失敗した状態 (未反映の証拠) を検出する。
+  // このドラフトの証拠のうち最新のものが、frontmatter の evidence_id と一致しなければならない
+  const ownRecords = evidenceLog.records.filter((r) => r?.draft_file === file)
+  const latest = ownRecords[ownRecords.length - 1]
   if (state === 'pending' || state === undefined) {
-    return { file, errors, publishable: false, skipped: true }
+    if (latest) {
+      errors.push(`state: pending ですが証拠ログにこのドラフトの証拠 (${latest.record_id}) があります (frontmatter への未反映)`)
+    }
+    return { file, errors, publishable: false, skipped: errors.length === 0 }
+  }
+  if (latest && latest.record_id !== review.evidence_id) {
+    errors.push(`このドラフトの最新の証拠 (${latest.record_id}) が mutual_review.evidence_id と一致しません (frontmatter への未反映)`)
   }
 
   // 10. メディアの実在 (hash 再計算の前提)
   const media = collectMediaHashes(data.media_files, rootDir)
   errors.push(...media.errors)
 
-  const evidenceLog = loadLog(evidenceDir, EVIDENCE_FILE, EVIDENCE_RECORD_TYPE)
   if (!evidenceLog.exists) {
     errors.push(`証拠ログ ${EVIDENCE_FILE} がありません (state: ${state} を裏付ける証拠がない)`)
     return { file, errors, publishable: false, skipped: false }

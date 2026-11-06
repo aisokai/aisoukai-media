@@ -98,11 +98,15 @@ test('C-10: ai_mutual_review で approved_for_manual_post: true はエラー', (
   assert.match(result.errors.join('\n'), /approved_for_manual_post/)
 })
 
+// レビュー済み state の互換用 top-level 写し
+const reviewedTop = { reviewed: true, reviewed_by: 'chatgpt:run-test-002', reviewed_at: '2026-06-15T10:00:00.000+09:00' }
+
 test('C-11: state: escalated で exception_category 欠落はエラー', () => {
-  const result = validateSnsDraftData(FILE, { ...mutualDraft, mutual_review: reviewedBlock('escalated') }, BODY)
+  const result = validateSnsDraftData(FILE, { ...mutualDraft, ...reviewedTop, mutual_review: reviewedBlock('escalated') }, BODY)
   assert.match(result.errors.join('\n'), /exception_category が必須/)
   const ok = validateSnsDraftData(FILE, {
     ...mutualDraft,
+    ...reviewedTop,
     mutual_review: reviewedBlock('escalated', { exception_category: 'complaint' }),
   }, BODY)
   assert.deepEqual(ok.errors, [])
@@ -124,7 +128,7 @@ test('C 状態整合: status: approved は state: passed のときだけ許可�
   assert.match(pending.errors.join('\n'), /state が passed ではありません/)
   const changes = validateSnsDraftData(FILE, { ...mutualDraft, status: 'approved', mutual_review: reviewedBlock('changes_requested') }, BODY)
   assert.ok(changes.errors.length > 0)
-  const passed = validateSnsDraftData(FILE, { ...mutualDraft, status: 'approved', mutual_review: reviewedBlock('passed') }, BODY)
+  const passed = validateSnsDraftData(FILE, { ...mutualDraft, ...reviewedTop, status: 'approved', mutual_review: reviewedBlock('passed') }, BODY)
   assert.deepEqual(passed.errors, [])
   assert.deepEqual(passed.warnings, [], 'approved_for_manual_post の警告は manual_only のみ')
 })
@@ -139,8 +143,17 @@ test('C 状態整合: レビュー済み state では reviewed_by / reviewed_at 
   }
 })
 
+test('C 互換用 top-level (reviewed / reviewed_by / reviewed_at) が mutual_review と一致しなければエラー', () => {
+  const block = reviewedBlock('passed')
+  const base = { ...mutualDraft, ...reviewedTop, status: 'approved', mutual_review: block }
+  assert.match(validateSnsDraftData(FILE, { ...base, reviewed: false }, BODY).errors.join('\n'), /reviewed が true/)
+  assert.match(validateSnsDraftData(FILE, { ...base, reviewed_by: undefined }, BODY).errors.join('\n'), /top-level の reviewed_by/)
+  assert.match(validateSnsDraftData(FILE, { ...base, reviewed_by: 'chatgpt:other' }, BODY).errors.join('\n'), /top-level の reviewed_by/)
+  assert.match(validateSnsDraftData(FILE, { ...base, reviewed_at: '2026-06-16T10:00:00.000+09:00' }, BODY).errors.join('\n'), /top-level の reviewed_at/)
+})
+
 test('C media_files は repo 相対パスのみ許可する', () => {
-  for (const bad of ['/etc/passwd', '../outside.png', 'public//x.png']) {
+  for (const bad of ['/etc/passwd', '../outside.png', 'public//x.png', '.env.local', 'public/.hidden/x.png', './x.png']) {
     const result = validateSnsDraftData(FILE, { ...mutualDraft, media_files: [bad] }, BODY)
     assert.match(result.errors.join('\n'), /media_files/, bad)
   }
