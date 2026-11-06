@@ -47,6 +47,8 @@ export const TARGET_CHANNELS = Object.freeze([
   'blog',
   'instagram',
   'x',
+  'threads',
+  'facebook',
   'line_official',
   'gmb',
   'website_notice',

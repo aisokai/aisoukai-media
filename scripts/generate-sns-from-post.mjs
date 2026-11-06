@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // SNS repurpose generator。
-// ブログ記事 Markdown から SNS 下書き (instagram / x / line) を生成し、
+// ブログ記事 Markdown から SNS 下書き (instagram / x / line、指定時は threads / facebook も) を生成し、
 // 既存の content/sns-drafts/ 規約 (scripts/lib/sns-drafts.mjs) に従って保存する。
 // publish_mode は manual_only のみ。外部投稿は一切しない。
 //
 // 使い方:
-//   node scripts/generate-sns-from-post.mjs --post <slug または ファイル名> [--platforms instagram,x,line] [--dry-run]
+//   node scripts/generate-sns-from-post.mjs --post <slug または ファイル名> [--platforms instagram,x,line,threads,facebook] [--dry-run]
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -20,13 +20,17 @@ const POSTS_DIR = join(ROOT, 'content', 'posts')
 
 // 横展開先 platform (既存sns-drafts enumのサブセット)。
 // GMBへの横展開は generate-gmb-draft.mjs --type blog_summary を使う。
-export const REPURPOSE_PLATFORMS = Object.freeze(['instagram', 'x', 'line'])
+export const REPURPOSE_PLATFORMS = Object.freeze(['instagram', 'x', 'line', 'threads', 'facebook'])
+// --platforms 省略時の既定。従来の3 platform を維持し、threads / facebook は明示指定時のみ生成する
+export const DEFAULT_REPURPOSE_PLATFORMS = Object.freeze(['instagram', 'x', 'line'])
 
 // platform → media queue channel の固定対応表
 export const PLATFORM_TO_CHANNEL = Object.freeze({
   instagram: 'instagram',
   x: 'x',
   line: 'line_official',
+  threads: 'threads',
+  facebook: 'facebook',
 })
 
 const X_LIMIT = 280
@@ -41,10 +45,19 @@ export function buildSnsDraftBody({ platform, title, excerpt, tags }) {
     if (text.length > X_LIMIT - 30) text = `${title.slice(0, X_LIMIT - 60)}…\n\nブログで詳しく解説しています。`
     return `## 本文\n\n${text}\n（記事URLは投稿時に添付）\n`
   }
+  if (platform === 'threads') {
+    // 文字数上限は未確認のため切り詰めない。ハッシュタグは末尾にまとめる (短文フォーマット)
+    const tagLine = hashtags ? `\n\n${hashtags}` : ''
+    return `## 本文\n\n${title}\n\n${excerpt}\n\nブログで詳しく解説しています。（記事URLは投稿時に添付）${tagLine}\n`
+  }
+  if (platform === 'facebook') {
+    const tagLine = hashtags ? `\n\n${hashtags}` : ''
+    return `## 本文\n\n${title}\n\n${excerpt}\n\n詳しくはブログをご覧ください。（記事URLは投稿時に添付）${tagLine}\n`
+  }
   return `## メッセージ\n\n${title}\n\n${excerpt}\n\nブログに詳しい記事を掲載しました。ぜひご覧ください。\n`
 }
 
-export function buildSnsDrafts({ postFile, postData, platforms = REPURPOSE_PLATFORMS, date = getTodayJst() }) {
+export function buildSnsDrafts({ postFile, postData, platforms = DEFAULT_REPURPOSE_PLATFORMS, date = getTodayJst() }) {
   const title = String(postData.title ?? '')
   const excerpt = String(postData.excerpt ?? '')
   const slugBase = postFile.replace(/\.md$/, '').replace(/^\d{4}-\d{2}-\d{2}-/, '')
@@ -74,7 +87,7 @@ export function buildSnsDrafts({ postFile, postData, platforms = REPURPOSE_PLATF
   return drafts
 }
 
-export function generateSnsFromPost({ postArg, platforms = REPURPOSE_PLATFORMS, dryRun = false }) {
+export function generateSnsFromPost({ postArg, platforms = DEFAULT_REPURPOSE_PLATFORMS, dryRun = false }) {
   const postFile = postArg.endsWith('.md') ? postArg : `${postArg}.md`
   const postPath = join(POSTS_DIR, postFile)
   if (!existsSync(postPath)) throw new Error(`記事が見つかりません: ${postFile}`)
@@ -125,10 +138,10 @@ function getArg(name) {
 function main() {
   const postArg = getArg('post')
   if (!postArg) {
-    console.error('使い方: node scripts/generate-sns-from-post.mjs --post <slug> [--platforms instagram,x,line] [--dry-run]')
+    console.error('使い方: node scripts/generate-sns-from-post.mjs --post <slug> [--platforms instagram,x,line,threads,facebook] [--dry-run]')
     process.exit(1)
   }
-  const platforms = getArg('platforms')?.split(',') ?? [...REPURPOSE_PLATFORMS]
+  const platforms = getArg('platforms')?.split(',') ?? [...DEFAULT_REPURPOSE_PLATFORMS]
   const dryRun = process.argv.includes('--dry-run')
   try {
     const { job, drafts, warnings } = generateSnsFromPost({ postArg, platforms, dryRun })

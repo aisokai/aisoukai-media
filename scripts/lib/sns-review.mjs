@@ -6,6 +6,11 @@
 export const REVIEWABLE_STATUSES = Object.freeze(['draft', 'pending_review'])
 
 export function applySnsReviewDecision({ data, decision, reviewedBy, reason, timestamp }) {
+  // ai_mutual_review のドラフトは相互監視の証拠経路 (record-sns-review) の対象。
+  // Human 手動投稿承認で approved_for_manual_post: true にしない (共存ルール)。
+  if (data.publish_mode === 'ai_mutual_review') {
+    throw new Error('publish_mode: ai_mutual_review のドラフトは Human 手動投稿承認 (sns:approve / sns:reject) の対象外です')
+  }
   if (!REVIEWABLE_STATUSES.includes(data.status)) {
     throw new Error(`status "${data.status}" のドラフトは操作できません (対象: ${REVIEWABLE_STATUSES.join(', ')})`)
   }
