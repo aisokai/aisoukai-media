@@ -19,6 +19,7 @@ DMPブログで完成した次の仕組みを、SNS運用にも使えるよう�
 SNSでは外部APIによる自動投稿は行わない。
 
 > 2026-11-06 追記: `publish_mode` に `ai_mutual_review`（AI 相互監視）を追加した。経路・証拠形式は `content/sns-drafts/README.md` と `data/sns-review/README.md` を参照。このリポジトリは引き続き投稿を実行しない。
+> 2026-11-06 追記: platform に `threads` / `facebook` を追加した（ドラフト規格・生成・検証・media queue）。X / Threads の短文フォーマットとお知らせ投稿の検証は `content/sns-drafts/README.md` を参照。`threads_auto` / `facebook_auto` などのフラグは OFF のままで、ON にするのは先生のみ。
 最初の完成形は「投稿担当者がそのままコピーして使える投稿パッケージ」を作ること。
 
 ---

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSnsDrafts, PLATFORM_TO_CHANNEL, REPURPOSE_PLATFORMS } from '../scripts/generate-sns-from-post.mjs'
+import { buildSnsDrafts, DEFAULT_REPURPOSE_PLATFORMS, PLATFORM_TO_CHANNEL, REPURPOSE_PLATFORMS } from '../scripts/generate-sns-from-post.mjs'
 import { validateSnsDraftData } from '../scripts/lib/sns-drafts.mjs'
 import { TARGET_CHANNELS } from '../scripts/lib/media-queue.mjs'
 
@@ -13,9 +13,9 @@ const postData = {
   source_topic_id: 'TOPIC-001',
 }
 
-test('ブログ記事から全platformの下書きが生成され、既存SNS規約を通過する', () => {
+test('ブログ記事から既定platformの下書きが生成され、既存SNS規約を通過する', () => {
   const drafts = buildSnsDrafts({ postFile, postData, date: '2026-06-11' })
-  assert.equal(drafts.length, REPURPOSE_PLATFORMS.length)
+  assert.equal(drafts.length, DEFAULT_REPURPOSE_PLATFORMS.length)
   for (const draft of drafts) {
     const result = validateSnsDraftData(draft.filename, draft.data, draft.content)
     assert.deepEqual(result.errors, [], `${draft.filename}: ${result.errors.join(' / ')}`)
@@ -32,5 +32,5 @@ test('platform → channel の対応表は固定enum内に収まる', () => {
 })
 
 test('固定enum外のplatformは拒否される', () => {
-  assert.throws(() => buildSnsDrafts({ postFile, postData, platforms: ['facebook'] }))
+  assert.throws(() => buildSnsDrafts({ postFile, postData, platforms: ['tiktok'] }))
 })

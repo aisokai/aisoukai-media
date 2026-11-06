@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export const ROOT = join(__dirname, '..', '..')
 export const SNS_DRAFTS_DIR = join(ROOT, 'content', 'sns-drafts')
 
-export const VALID_PLATFORMS = ['instagram', 'x', 'line', 'youtube', 'website']
+export const VALID_PLATFORMS = ['instagram', 'x', 'line', 'youtube', 'website', 'threads', 'facebook']
 export const VALID_STATUSES = ['draft', 'pending_review', 'approved', 'rejected', 'posted', 'archived']
 export const VALID_MEDICAL_RISK = ['low', 'medium', 'high']
 export const REQUIRED_FIELDS = [
@@ -45,7 +45,16 @@ const STATE_ALLOWED_STATUSES = {
 const CONTENT_HASH_RE = /^[0-9a-f]{64}$/
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-(instagram|x|line|youtube|website)-.+\.md$/
+
+// 短文フォーマット検証の対象 (指示書D §5)
+export const SHORT_FORM_PLATFORMS = ['x', 'threads']
+// お知らせ投稿の種別。frontmatter の notice_type (任意) で宣言する
+export const NOTICE_TYPES = ['temporary_closure_notice', 'schedule_change_notice']
+// 文字数上限・ハッシュタグ個数上限は公式情報で未確認のため、推測でハードコードせず上限チェックを行わない
+// (content/sns-drafts/README.md の「短文フォーマット」に未確認と記録。確認後に値と根拠を記録して追加する)
+
+// platform 部分は VALID_PLATFORMS から生成する (enum とファイル名規則を二重管理しない)
+const FILENAME_RE = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-(${VALID_PLATFORMS.join('|')})-.+\\.md$`)
 
 export function toDateStr(val) {
   if (val instanceof Date) return val.toISOString().slice(0, 10)
@@ -157,6 +166,104 @@ function validateMutualReviewData(data, errors) {
   }
 }
 
+// ---- 短文フォーマット (x / threads) ----
+
+const HASHTAG_RE = /(^|[\s　])#[^\s#　]+/u
+const URL_RE = /https?:\/\/[^\s)）」』>]+/g
+
+// 見出し行 (`## 本文` 等) を除いた本文行
+function bodyLines(content) {
+  return String(content ?? '').replace(/\r\n/g, '\n').split('\n').filter((line) => !/^#{1,6}\s/.test(line))
+}
+
+function isHashtagOnlyLine(line) {
+  const tokens = line.trim().split(/[\s　]+/).filter(Boolean)
+  return tokens.length > 0 && tokens.every((t) => /^#[^#]+$/u.test(t))
+}
+
+export function checkShortFormFormat(content) {
+  const errors = []
+  const warnings = []
+  const lines = bodyLines(content)
+  let end = lines.length
+  while (end > 0 && lines[end - 1].trim() === '') end -= 1
+  let start = end
+  while (start > 0 && isHashtagOnlyLine(lines[start - 1])) start -= 1
+  const misplaced = lines.slice(0, start).some((line) => HASHTAG_RE.test(line))
+  if (misplaced) errors.push('ハッシュタグは本文の末尾にまとめてください (x / threads の短文フォーマット)')
+  const urls = String(content ?? '').match(URL_RE) ?? []
+  if (urls.length > 1) warnings.push(`リンクが ${urls.length} 件あります (短文フォーマットでは1件までを推奨)`)
+  return { errors, warnings }
+}
+
+// ---- お知らせ投稿 (notice_type) の日付・曜日・時刻 ----
+
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
+const WEEKDAY_SUFFIX = String.raw`(?:\s*[（(]\s*([日月火水木金土])(?:曜日?)?\s*[）)])?`
+const DATE_PATTERNS = [
+  new RegExp(String.raw`(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日` + WEEKDAY_SUFFIX, 'g'),
+  new RegExp(String.raw`(?<![\d年])()(\d{1,2})月\s*(\d{1,2})日` + WEEKDAY_SUFFIX, 'g'),
+  new RegExp(String.raw`(\d{4})-(\d{2})-(\d{2})` + WEEKDAY_SUFFIX, 'g'),
+  new RegExp(String.raw`(?<![\d/])()(\d{1,2})\/(\d{1,2})(?![\d/])` + WEEKDAY_SUFFIX, 'g'),
+]
+const TIME_RE = /(?<!\d)(\d{1,2})[:：](\d{2})(?!\d)|(?<!\d)(\d{1,2})時(?:(\d{1,2})分|半)?/g
+
+function pad2(n) {
+  return String(n).padStart(2, '0')
+}
+
+function isValidDate(y, m, d) {
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d
+}
+
+// 本文中の日付記載を抽出する。年の省略は frontmatter date の年で補う
+export function extractNoticeDates(content, defaultYear) {
+  const found = []
+  const text = String(content ?? '')
+  for (const re of DATE_PATTERNS) {
+    for (const m of text.matchAll(re)) {
+      const y = m[1] ? Number(m[1]) : defaultYear
+      const mo = Number(m[2])
+      const d = Number(m[3])
+      found.push({ text: m[0], year: y, month: mo, day: d, weekday: m[4] ?? null, valid: isValidDate(y, mo, d) })
+    }
+  }
+  return found
+}
+
+export function checkNoticeConsistency(data, content) {
+  const errors = []
+  const dateStr = toDateStr(data.date)
+  if (!DATE_RE.test(dateStr)) return { errors }
+  const [fy, fm, fd] = dateStr.split('-').map(Number)
+  const dates = extractNoticeDates(content, fy)
+  if (dates.length === 0) {
+    errors.push(`お知らせ投稿の本文に日付の記載がありません (frontmatter date: ${dateStr})`)
+  }
+  for (const item of dates) {
+    if (!item.valid) {
+      errors.push(`お知らせ投稿の日付が存在しません: "${item.text}"`)
+      continue
+    }
+    if (item.weekday) {
+      const actual = WEEKDAYS[new Date(Date.UTC(item.year, item.month - 1, item.day)).getUTCDay()]
+      if (actual !== item.weekday) {
+        errors.push(`お知らせ投稿の曜日が日付と一致しません: "${item.text}" (${item.year}-${pad2(item.month)}-${pad2(item.day)} は${actual}曜日)`)
+      }
+    }
+  }
+  if (dates.length > 0 && !dates.some((x) => x.year === fy && x.month === fm && x.day === fd)) {
+    errors.push(`お知らせ投稿の本文の日付が frontmatter の date (${dateStr}) と一致しません`)
+  }
+  for (const m of String(content ?? '').matchAll(TIME_RE)) {
+    const h = Number(m[1] ?? m[3])
+    const min = m[2] !== undefined ? Number(m[2]) : (m[4] !== undefined ? Number(m[4]) : 0)
+    if (h > 24 || min > 59 || (h === 24 && min > 0)) errors.push(`お知らせ投稿の時刻が不正です: "${m[0]}"`)
+  }
+  return { errors }
+}
+
 export function isDraftMarkdownFile(filename) {
   return filename.endsWith('.md') && filename !== 'README.md'
 }
@@ -229,6 +336,20 @@ export function validateSnsDraftData(filename, data, content) {
         errors.push(`date (${dateStr}) がファイル名の日付 (${filenameDate}) と一致しません`)
       }
     }
+  }
+
+  if (data.notice_type !== undefined && data.notice_type !== null) {
+    if (!NOTICE_TYPES.includes(data.notice_type)) {
+      errors.push(`notice_type が無効です: "${data.notice_type}" (許可値: ${NOTICE_TYPES.join(' / ')})`)
+    } else {
+      errors.push(...checkNoticeConsistency(data, content).errors)
+    }
+  }
+
+  if (SHORT_FORM_PLATFORMS.includes(data.platform)) {
+    const shortForm = checkShortFormFormat(content)
+    errors.push(...shortForm.errors)
+    warnings.push(...shortForm.warnings)
   }
 
   if (data.publish_mode === 'manual_only' && data.status === 'approved' && data.approved_for_manual_post !== true) {

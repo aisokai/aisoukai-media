@@ -10,8 +10,8 @@
     "source_topic_id", "publish_mode"
   ],
   "properties": {
-    "channel": { "enum": ["instagram", "x", "line", "youtube", "website"] },
-    "platform": { "enum": ["instagram", "x", "line", "youtube", "website"] },
+    "channel": { "enum": ["instagram", "x", "line", "youtube", "website", "threads", "facebook"] },
+    "platform": { "enum": ["instagram", "x", "line", "youtube", "website", "threads", "facebook"] },
     "title": { "type": "string", "minLength": 1 },
     "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
     "status": { "enum": ["draft", "pending_review", "approved", "rejected", "posted", "archived"] },
@@ -22,6 +22,7 @@
     "source_topic_id": { "type": "string" },
     "source_post": { "type": "string", "description": "横展開元のブログ記事ファイル名" },
     "media_job_id": { "type": "string", "description": "対応する media queue job の id" },
+    "notice_type": { "enum": ["temporary_closure_notice", "schedule_change_notice"], "description": "お知らせ投稿の種別 (任意)。指定時は本文の日付・曜日・時刻を frontmatter の date と照合する" },
     "publish_mode": { "enum": ["manual_only", "ai_mutual_review"] },
     "created_by": { "type": "string", "pattern": "^[^:\\s]+:\\S+$", "description": "作成AIの identity (<system>:<run-id>)。ai_mutual_review では必須、manual_only では指定不可" },
     "media_files": { "type": "array", "items": { "type": "string" }, "description": "投稿に使うメディア実ファイルの repo 相対パス一覧 (public/images/ 配下のみ)。sns-content-hash/v1 の算出対象" },
