@@ -190,6 +190,27 @@ export function loadGateConfig(path = GATE_CONFIG_PATH) {
   }
 }
 
+// ── SNS緊急停止 (sns_auto_suspend) ─────────────────────────────────────
+// 治理改定パッケージ §3-4: flags.sns_auto_suspend が true の間、
+// SNS系 type × 外部SNS channel の判定をすべて human_gate に倒す。
+export const SNS_SUSPEND_TYPES = Object.freeze([
+  'sns_repurpose',
+  'temporary_closure_notice',
+  'schedule_change_notice',
+])
+
+export const SNS_SUSPEND_CHANNELS = Object.freeze([
+  'instagram', 'facebook', 'x', 'threads',
+])
+
+export function isSnsAutoSuspended(config) {
+  return config?.flags?.sns_auto_suspend === true
+}
+
+export function isSnsSuspendTarget(type, channel) {
+  return SNS_SUSPEND_TYPES.includes(type) && SNS_SUSPEND_CHANNELS.includes(channel)
+}
+
 // type × channel × risk_level → gate_policy。
 // 安全側ルール:
 //   - config なし → human_gate
@@ -206,6 +227,15 @@ export function resolveGatePolicy({ type, channel, riskLevel = 'low', config = l
   if (!RISK_LEVELS.includes(riskLevel) || riskLevel === 'high') {
     if (GATE_SEVERITY[policy] < GATE_SEVERITY.human_gate) policy = 'human_gate'
   }
+  // SNS緊急停止: 表引き結果に対する「締める方向のみ」のクランプ。
+  // forbidden (severity 4) と human_gate (3) はクランプ条件に該当せず素通りする。
+  if (
+    isSnsAutoSuspended(config) &&
+    isSnsSuspendTarget(type, channel) &&
+    GATE_SEVERITY[policy] < GATE_SEVERITY.human_gate
+  ) {
+    policy = 'human_gate'
+  }
   return policy
 }
 
@@ -213,6 +243,16 @@ export function resolveGatePolicy({ type, channel, riskLevel = 'low', config = l
 // variant により同一 type:channel 内の細分化を許す
 // (例: review_reply:gmb:template_only と review_reply:gmb:normal を別flagで解禁)。
 export function effectiveGatePolicy({ type, channel, policy, variant = null, config = loadGateConfig() }) {
+  // SNS緊急停止: 実行時点の実効判定でも tighten-only に倒す。
+  // forbidden 等 human_gate 以上の厳しさの policy、および未知の policy 値は変更しない。
+  if (
+    isSnsAutoSuspended(config) &&
+    isSnsSuspendTarget(type, channel) &&
+    GATE_POLICIES.includes(policy) &&
+    GATE_SEVERITY[policy] < GATE_SEVERITY.human_gate
+  ) {
+    return 'human_gate'
+  }
   if (policy !== 'auto_when_enabled') return policy
   const flags = config?.flags ?? {}
   const bindings = (variant ? config?.flag_bindings?.[`${type}:${channel}:${variant}`] : undefined)
