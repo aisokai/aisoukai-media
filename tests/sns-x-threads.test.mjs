@@ -164,6 +164,22 @@ test('D 短文フォーマット: x / threads ではハッシュタグを本文�
   assert.deepEqual(checkShortFormFormat(SHORT_BODY).errors, [])
 })
 
+test('D レビュー指摘: 日本語に隣接するハッシュタグも検出し、URL の fragment は誤検出しない', () => {
+  assert.match(checkShortFormFormat('## 本文\n\n本文#予防歯科 の続きです（架空）。\n').errors.join('\n'), /ハッシュタグは本文の末尾/)
+  assert.deepEqual(checkShortFormFormat('## 本文\n\n詳しくは https://example.invalid/page#section へ（架空）。\n\n#予防歯科\n').errors, [])
+})
+
+test('D レビュー指摘: 年付き日付は年を補完した別の日付として二重に抽出しない / 「半」は30分', () => {
+  const file = '2026-11-10-threads-closure.md'
+  const notice = baseData('threads', { notice_type: 'temporary_closure_notice' })
+  const otherYear = validateSnsDraftData(file, notice, '## 本文\n\n2027年 11月10日（水）は臨時休診です（架空）。\n')
+  assert.match(otherYear.errors.join('\n'), /frontmatter の date \(2026-11-10\) と一致しません/)
+  const halfPast24 = validateSnsDraftData(file, notice, '## 本文\n\n11月10日（火）は24時半まで対応します（架空）。\n')
+  assert.match(halfPast24.errors.join('\n'), /時刻が不正/)
+  const ok = validateSnsDraftData(file, notice, '## 本文\n\n11月10日（火）は9時半から診療します（架空）。\n')
+  assert.deepEqual(ok.errors, [])
+})
+
 test('D 短文フォーマット: リンクが2件以上なら警告 (エラーにしない)', () => {
   const body = '## 本文\n\n予約は https://example.invalid/a 、地図は https://example.invalid/b （架空）\n\n#予防歯科\n'
   const result = validateSnsDraftData('2026-11-10-threads-a.md', baseData('threads'), body)

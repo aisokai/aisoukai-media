@@ -168,7 +168,8 @@ function validateMutualReviewData(data, errors) {
 
 // ---- 短文フォーマット (x / threads) ----
 
-const HASHTAG_RE = /(^|[\s　])#[^\s#　]+/u
+// 日本語に隣接するタグ (本文#予防歯科) も検出する。URL の fragment は URL を除去してから判定する
+const HASHTAG_RE = /#[^\s#　]+/u
 const URL_RE = /https?:\/\/[^\s)）」』>]+/g
 
 // 見出し行 (`## 本文` 等) を除いた本文行
@@ -189,7 +190,7 @@ export function checkShortFormFormat(content) {
   while (end > 0 && lines[end - 1].trim() === '') end -= 1
   let start = end
   while (start > 0 && isHashtagOnlyLine(lines[start - 1])) start -= 1
-  const misplaced = lines.slice(0, start).some((line) => HASHTAG_RE.test(line))
+  const misplaced = lines.slice(0, start).some((line) => HASHTAG_RE.test(line.replace(URL_RE, '')))
   if (misplaced) errors.push('ハッシュタグは本文の末尾にまとめてください (x / threads の短文フォーマット)')
   const urls = String(content ?? '').match(URL_RE) ?? []
   if (urls.length > 1) warnings.push(`リンクが ${urls.length} 件あります (短文フォーマットでは1件までを推奨)`)
@@ -206,7 +207,7 @@ const DATE_PATTERNS = [
   new RegExp(String.raw`(\d{4})-(\d{2})-(\d{2})` + WEEKDAY_SUFFIX, 'g'),
   new RegExp(String.raw`(?<![\d/])()(\d{1,2})\/(\d{1,2})(?![\d/])` + WEEKDAY_SUFFIX, 'g'),
 ]
-const TIME_RE = /(?<!\d)(\d{1,2})[:：](\d{2})(?!\d)|(?<!\d)(\d{1,2})時(?:(\d{1,2})分|半)?/g
+const TIME_RE = /(?<!\d)(\d{1,2})[:：](\d{2})(?!\d)|(?<!\d)(\d{1,2})時(?:(\d{1,2})分|(半))?/g
 
 function pad2(n) {
   return String(n).padStart(2, '0')
@@ -221,8 +222,15 @@ function isValidDate(y, m, d) {
 export function extractNoticeDates(content, defaultYear) {
   const found = []
   const text = String(content ?? '')
+  // 年付きのパターンを先に評価し、既に抽出した範囲と重なる一致は採用しない (年の補完による誤一致を防ぐ)
+  const taken = []
+  const overlaps = (start, end) => taken.some(([a, b]) => start < b && a < end)
   for (const re of DATE_PATTERNS) {
     for (const m of text.matchAll(re)) {
+      const start = m.index
+      const end = m.index + m[0].length
+      if (overlaps(start, end)) continue
+      taken.push([start, end])
       const y = m[1] ? Number(m[1]) : defaultYear
       const mo = Number(m[2])
       const d = Number(m[3])
@@ -258,7 +266,7 @@ export function checkNoticeConsistency(data, content) {
   }
   for (const m of String(content ?? '').matchAll(TIME_RE)) {
     const h = Number(m[1] ?? m[3])
-    const min = m[2] !== undefined ? Number(m[2]) : (m[4] !== undefined ? Number(m[4]) : 0)
+    const min = m[2] !== undefined ? Number(m[2]) : m[4] !== undefined ? Number(m[4]) : m[5] !== undefined ? 30 : 0
     if (h > 24 || min > 59 || (h === 24 && min > 0)) errors.push(`お知らせ投稿の時刻が不正です: "${m[0]}"`)
   }
   return { errors }
