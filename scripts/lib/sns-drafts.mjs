@@ -24,6 +24,26 @@ export const REQUIRED_FIELDS = [
   'publish_mode',
 ]
 
+// publish_mode: manual_only = Human 手動投稿承認 / ai_mutual_review = AI 相互監視 (policy aisoukai-media-tiered-blog-sns-2026-11-06)
+export const VALID_PUBLISH_MODES = ['manual_only', 'ai_mutual_review']
+export const MUTUAL_REVIEW_STATES = ['pending', 'passed', 'changes_requested', 'escalated']
+export const REVIEWED_MUTUAL_STATES = ['passed', 'changes_requested', 'escalated']
+export const EXCEPTION_CATEGORIES = [
+  'patient_identifiable',
+  'individual_consultation',
+  'complaint',
+  'reviewer_disagreement',
+  'other',
+]
+// mutual_review.state ごとに許可する status (§2-3)
+const STATE_ALLOWED_STATUSES = {
+  pending: ['draft', 'pending_review'],
+  changes_requested: ['draft', 'pending_review'],
+  passed: ['pending_review', 'approved', 'posted'],
+  escalated: ['draft', 'pending_review', 'rejected', 'archived'],
+}
+const CONTENT_HASH_RE = /^[0-9a-f]{64}$/
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const FILENAME_RE = /^\d{4}-\d{2}-\d{2}-(instagram|x|line|youtube|website)-.+\.md$/
 
@@ -38,6 +58,87 @@ export function normalizeDraftData(data) {
     if (value instanceof Date) out[key] = toDateStr(value)
   }
   return out
+}
+
+// identity は `<system>:<run-id>` 形式。system (`:` の前) を系統判定に使う
+export function parseIdentity(value) {
+  if (typeof value !== 'string') return null
+  const i = value.indexOf(':')
+  if (i <= 0) return null
+  const system = value.slice(0, i).trim()
+  const runId = value.slice(i + 1).trim()
+  if (!system || !runId || /\s/.test(value)) return null
+  return { system: system.toLowerCase(), runId }
+}
+
+// media_files は repo 相対パスのみ (絶対パス・.. を含むパスは拒否)
+export function isSafeRelativePath(value) {
+  if (typeof value !== 'string' || value.trim() === '') return false
+  if (value.startsWith('/') || value.includes('\\')) return false
+  return !value.split('/').some((seg) => seg === '..' || seg === '')
+}
+
+function validateMutualReviewData(data, errors) {
+  if (parseIdentity(data.created_by) === null) {
+    errors.push('created_by が <system>:<run-id> 形式ではありません (ai_mutual_review では必須)')
+  }
+
+  if (data.media_files !== undefined && data.media_files !== null) {
+    if (!Array.isArray(data.media_files)) {
+      errors.push('media_files は配列である必要があります')
+    } else {
+      for (const p of data.media_files) {
+        if (!isSafeRelativePath(p)) errors.push(`media_files に不正なパスがあります: "${p}" (repo 相対パスのみ)`)
+      }
+    }
+  }
+
+  if (data.approved_for_manual_post === true) {
+    errors.push('ai_mutual_review では approved_for_manual_post を true にできません (手動投稿承認との混在禁止)')
+  }
+
+  const review = data.mutual_review
+  if (review === undefined || review === null || typeof review !== 'object' || Array.isArray(review)) {
+    errors.push('mutual_review ブロックがありません (ai_mutual_review では必須)')
+    return
+  }
+
+  const state = review.state
+  if (!MUTUAL_REVIEW_STATES.includes(state)) {
+    errors.push(`mutual_review.state が無効です: "${state}" (許可値: ${MUTUAL_REVIEW_STATES.join(' / ')})`)
+    return
+  }
+
+  const allowedStatuses = STATE_ALLOWED_STATUSES[state]
+  if (data.status !== undefined && !allowedStatuses.includes(data.status)) {
+    errors.push(`mutual_review.state が ${state} のとき status "${data.status}" は許可されていません (許可: ${allowedStatuses.join(' / ')})`)
+  }
+
+  if (data.status === 'approved' && state !== 'passed') {
+    errors.push('status が approved ですが mutual_review.state が passed ではありません')
+  }
+
+  if (REVIEWED_MUTUAL_STATES.includes(state)) {
+    for (const key of ['reviewed_by', 'reviewed_at', 'content_hash', 'evidence_id']) {
+      if (review[key] === undefined || review[key] === null || review[key] === '') {
+        errors.push(`mutual_review.${key} がありません (state: ${state})`)
+      }
+    }
+    if (review.reviewed_by && parseIdentity(review.reviewed_by) === null) {
+      errors.push('mutual_review.reviewed_by が <system>:<run-id> 形式ではありません')
+    }
+    if (review.content_hash && !CONTENT_HASH_RE.test(String(review.content_hash))) {
+      errors.push('mutual_review.content_hash が SHA-256 hex (小文字64桁) ではありません')
+    }
+  }
+
+  if (state === 'escalated') {
+    if (!EXCEPTION_CATEGORIES.includes(review.exception_category)) {
+      errors.push(`state: escalated では mutual_review.exception_category が必須です (許可値: ${EXCEPTION_CATEGORIES.join(' / ')})`)
+    }
+  } else if (review.exception_category !== undefined && review.exception_category !== null) {
+    errors.push('mutual_review.exception_category は state: escalated のときのみ指定できます')
+  }
 }
 
 export function isDraftMarkdownFile(filename) {
@@ -90,8 +191,16 @@ export function validateSnsDraftData(filename, data, content) {
     errors.push(`medical_risk が無効です: "${data.medical_risk}"`)
   }
 
-  if (data.publish_mode !== undefined && data.publish_mode !== 'manual_only') {
-    errors.push(`publish_mode は manual_only のみ許可されています: "${data.publish_mode}"`)
+  if (data.publish_mode !== undefined && data.publish_mode !== null && !VALID_PUBLISH_MODES.includes(data.publish_mode)) {
+    errors.push(`publish_mode が無効です: "${data.publish_mode}" (許可値: ${VALID_PUBLISH_MODES.join(' / ')})`)
+  }
+
+  if (data.publish_mode === 'manual_only') {
+    // 共存ルール: 手動投稿承認の経路に相互監視の項目を混在させない
+    if (data.mutual_review !== undefined) errors.push('manual_only のドラフトに mutual_review を含めることはできません')
+    if (data.created_by !== undefined) errors.push('manual_only のドラフトに created_by を含めることはできません')
+  } else if (data.publish_mode === 'ai_mutual_review') {
+    validateMutualReviewData(data, errors)
   }
 
   if (data.date !== undefined) {
@@ -106,7 +215,7 @@ export function validateSnsDraftData(filename, data, content) {
     }
   }
 
-  if (data.status === 'approved' && data.approved_for_manual_post !== true) {
+  if (data.publish_mode === 'manual_only' && data.status === 'approved' && data.approved_for_manual_post !== true) {
     warnings.push('status が approved ですが approved_for_manual_post が true ではありません')
   }
 
