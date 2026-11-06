@@ -32,13 +32,15 @@ test('gmb_post_auto ON で定型GMB投稿のみ対象になる', () => {
   assert.deepEqual(selected.map((j) => j.type), ['gmb_emergency_notice'])
 })
 
-test('gmb_reply_auto_template ON ではテンプレ返信variantのみ対象', () => {
-  const config = withFlags({ gmb_reply_auto_template: true })
+test('review_reply はフラグONでも自動実行対象にならない（二重ロック）', () => {
   const replyJob = makeJob('review_reply')
-  const templateOnly = selectAutoExecutable([replyJob], config, { variantResolver: () => 'template_only' })
-  assert.equal(templateOnly.length, 1)
-  const normal = selectAutoExecutable([replyJob], config, { variantResolver: () => 'normal' })
-  assert.equal(normal.length, 0, '通常返信は gmb_reply_auto が必要')
+  for (const flags of [{ gmb_reply_auto_template: true }, { gmb_reply_auto_template: true, gmb_reply_auto: true }]) {
+    const config = withFlags(flags)
+    const templateOnly = selectAutoExecutable([replyJob], config, { variantResolver: () => 'template_only' })
+    assert.equal(templateOnly.length, 0, 'テンプレ返信variantも対象外')
+    const normal = selectAutoExecutable([replyJob], config, { variantResolver: () => 'normal' })
+    assert.equal(normal.length, 0, '通常返信variantも対象外')
+  }
 })
 
 test('high risk job はフラグONでも対象外', () => {

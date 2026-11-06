@@ -38,5 +38,7 @@ DMP = Dental Media Project。以下の短縮形でタスクを指示できる。
 - `dmp:sns <テーマ>` — SNS投稿ドラフトを依頼（Phase 2 で実装予定）
 - `dmp:youtube <テーマ>` — YouTubeスクリプトを依頼（Phase 4 で実装予定）
 
+SNS 運用では、作業前に `AGENTS.md` の `sns-mutual-review-20261106` 節（Policy version: `aisoukai-media-tiered-blog-sns-2026-11-06`）を必ず確認すること。治理文書の反映だけで未実装の `publish_mode`・チャンネル機能が利用可能になるわけではないため、対象機能の実装状況もあわせて確認する。
+
 詳細は `docs/dmp/` を参照。
 <!-- END:claude-code-supplement -->
