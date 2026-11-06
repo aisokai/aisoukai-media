@@ -397,8 +397,8 @@ test('レビュー指摘: media_files の symlink が repo 外を指す場合は
 
 test('レビュー指摘: repo 内のドットファイルへの symlink も拒否する', () => {
   const ctx = setup({ withMedia: false })
-  writeFileSync(join(ctx.root, '.env.local'), 'FICTIONAL=1')
-  symlinkSync(join(ctx.root, '.env.local'), join(ctx.root, 'public', 'images', 'sns', 'env.png'))
+  writeFileSync(join(ctx.root, '.env.fictional'), 'FICTIONAL=1')
+  symlinkSync(join(ctx.root, '.env.fictional'), join(ctx.root, 'public', 'images', 'sns', 'env.png'))
   assert.match(
     collectErrors(() => computeSnsContentHash({ data: { media_files: ['public/images/sns/env.png'] }, content: '', rootDir: ctx.root })),
     /許可されないパス/,
