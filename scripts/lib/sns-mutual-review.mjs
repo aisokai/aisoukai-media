@@ -7,7 +7,10 @@
 // - この関数群は投稿を実行しない。外部送信・publish API は持たない。
 // - media-gate のフラグ (sns_auto_suspend を含む) は読まない。「いま投稿してよいか」は実行主体が gate 判定で別途行う。
 import { createHash, randomUUID } from 'node:crypto'
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync, closeSync, constants as fsConstants, existsSync, fstatSync, mkdirSync, openSync, readFileSync,
+  realpathSync, statSync, writeFileSync,
+} from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
 import {
@@ -92,22 +95,62 @@ function isInside(root, full) {
   return full.startsWith(root + sep)
 }
 
-// 文字列上のパスだけでなく実体 (symlink 解決後) も repo 内の通常ファイルであることを確認する
-function resolveMediaFile(rootDir, relPath) {
+function checkMediaRealPath(root, real, relPath) {
+  if (!isInside(root, real)) return `media_files の実体が repo 外を指しています: "${relPath}"`
+  const relReal = real.slice(root.length + 1).split(sep).join('/')
+  if (!isAllowedMediaPath(relReal)) return `media_files の実体が許可されないパスです (${MEDIA_ALLOWED_PREFIX} 配下のみ): "${relPath}"`
+  return null
+}
+
+/**
+ * メディアファイルを検査済みの実体に結び付けて読み込む (検査と読み込みの間の差し替え対策)。
+ * 1. symlink 解決後の実体パスが許可領域 (public/images/) 内であることを確認
+ * 2. 実体パスを O_NOFOLLOW で open し、descriptor が通常ファイルであることを確認
+ * 3. open 後に実体パスを再解決し、パスが変わっていないこと・descriptor と同じファイル (dev/ino) であることを確認
+ *    (親ディレクトリの差し替えで領域外の実体を開いた場合はここで不一致になる)
+ * 4. 検証済み descriptor から読む
+ * hooks.beforeOpen はテスト専用 (差し替えの競合を再現するため)。
+ */
+export function readMediaFileBound(rootDir, relPath, hooks = {}) {
   const root = realpathSync(resolve(rootDir))
   const full = resolve(root, relPath)
   if (!isInside(root, full)) return { error: `media_files が repo 外を指しています: "${relPath}"` }
   if (!existsSync(full)) return { error: `media_files のファイルが存在しません: ${relPath}` }
   const real = realpathSync(full)
-  if (!isInside(root, real)) return { error: `media_files の実体が repo 外を指しています: "${relPath}"` }
-  const relReal = real.slice(root.length + 1).split(sep).join('/')
-  if (!isAllowedMediaPath(relReal)) return { error: `media_files の実体が許可されないパスです (${MEDIA_ALLOWED_PREFIX} 配下のみ): "${relPath}"` }
-  if (!lstatSync(real).isFile()) return { error: `media_files が通常ファイルではありません: ${relPath}` }
-  return { full: real }
+  const before = checkMediaRealPath(root, real, relPath)
+  if (before) return { error: before }
+  hooks.beforeOpen?.(real)
+
+  let fd
+  try {
+    fd = openSync(real, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+  } catch (e) {
+    return { error: `media_files を安全に開けません (${e.code ?? e.message}): ${relPath}` }
+  }
+  try {
+    const opened = fstatSync(fd)
+    if (!opened.isFile()) return { error: `media_files が通常ファイルではありません: ${relPath}` }
+    let realAfter
+    let current
+    try {
+      realAfter = realpathSync(real)
+      current = statSync(realAfter)
+    } catch {
+      return { error: `media_files が読み込み中に変更されました: ${relPath}` }
+    }
+    const after = checkMediaRealPath(root, realAfter, relPath)
+    if (after) return { error: after }
+    if (realAfter !== real || current.dev !== opened.dev || current.ino !== opened.ino) {
+      return { error: `media_files が検査後に差し替えられました: ${relPath}` }
+    }
+    return { bytes: readFileSync(fd) }
+  } finally {
+    closeSync(fd)
+  }
 }
 
-// media_files の検査。欠落・不正パスは errors に積み、hash は算出しない。
-export function collectMediaHashes(mediaFiles, rootDir = ROOT) {
+// media_files の検査と hash 算出。欠落・不正パスは errors に積み、hash は算出しない。
+export function collectMediaHashes(mediaFiles, rootDir = ROOT, hooks = {}) {
   const errors = []
   const list = mediaFiles === undefined || mediaFiles === null ? [] : mediaFiles
   if (!Array.isArray(list)) return { errors: ['media_files は配列である必要があります'], mediaHashes: null }
@@ -117,12 +160,12 @@ export function collectMediaHashes(mediaFiles, rootDir = ROOT) {
       errors.push(`media_files に不正なパスがあります (${MEDIA_ALLOWED_PREFIX} 配下の repo 相対パスのみ): "${p}"`)
       continue
     }
-    const { full, error } = resolveMediaFile(rootDir, p)
+    const { bytes, error } = readMediaFileBound(rootDir, p, hooks)
     if (error) {
       errors.push(error)
       continue
     }
-    hashes.push({ path: p, sha256: sha256Hex(readFileSync(full)) })
+    hashes.push({ path: p, sha256: sha256Hex(bytes) })
   }
   return { errors, mediaHashes: errors.length > 0 ? null : hashes }
 }

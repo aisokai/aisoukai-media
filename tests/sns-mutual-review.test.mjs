@@ -17,6 +17,7 @@ import {
   REVIEW_CHECK_KEYS,
   appendEvidenceRecord,
   appendPostingAuditRecord,
+  collectMediaHashes,
   computeSnsContentHash,
   loadLog,
   readCurrentPolicyVersion,
@@ -500,6 +501,38 @@ test('先生決定: media_files は public/images/ 配下のみ (指定パスと
     computeSnsContentHash({ data: { media_files: ['public/images/sns/example-01.png'] }, content: '', rootDir: ctx.root }).mediaHashes.length,
     1,
   )
+})
+
+test('レビュー指摘 (TOCTOU): 検査後・open 前にファイルを領域外への symlink に差し替えると読み込まない', () => {
+  const ctx = setup({ withMedia: false })
+  const outside = mkdtempSync(join(tmpdir(), 'sns-toctou-'))
+  roots.push(outside)
+  writeFileSync(join(outside, 'secret.png'), 'fictional-outside')
+  const target = join(ctx.root, 'public', 'images', 'sns', 'example-01.png')
+  const { errors, mediaHashes } = collectMediaHashes(['public/images/sns/example-01.png'], ctx.root, {
+    beforeOpen: () => {
+      renameSync(target, join(ctx.root, 'moved-01.png'))
+      symlinkSync(join(outside, 'secret.png'), target)
+    },
+  })
+  assert.equal(mediaHashes, null)
+  assert.match(errors.join('\n'), /安全に開けません|差し替え/)
+})
+
+test('レビュー指摘 (TOCTOU): 検査後・open 前に親ディレクトリを領域外への symlink に差し替えると読み込まない', () => {
+  const ctx = setup({ withMedia: false })
+  const outside = mkdtempSync(join(tmpdir(), 'sns-toctou-dir-'))
+  roots.push(outside)
+  writeFileSync(join(outside, 'example-01.png'), 'fictional-outside')
+  const dir = join(ctx.root, 'public', 'images', 'sns')
+  const { errors, mediaHashes } = collectMediaHashes(['public/images/sns/example-01.png'], ctx.root, {
+    beforeOpen: () => {
+      renameSync(dir, join(ctx.root, 'moved-sns'))
+      symlinkSync(outside, dir)
+    },
+  })
+  assert.equal(mediaHashes, null)
+  assert.match(errors.join('\n'), /差し替え|許可されない|repo 外/)
 })
 
 function collectErrors(fn) {
