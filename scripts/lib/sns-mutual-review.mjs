@@ -13,7 +13,8 @@ import matter from 'gray-matter'
 import {
   EXCEPTION_CATEGORIES,
   ROOT,
-  isSafeRelativePath,
+  MEDIA_ALLOWED_PREFIX,
+  isAllowedMediaPath,
   normalizeDraftData,
   parseIdentity,
   readSnsDraftFile,
@@ -100,7 +101,7 @@ function resolveMediaFile(rootDir, relPath) {
   const real = realpathSync(full)
   if (!isInside(root, real)) return { error: `media_files の実体が repo 外を指しています: "${relPath}"` }
   const relReal = real.slice(root.length + 1).split(sep).join('/')
-  if (!isSafeRelativePath(relReal)) return { error: `media_files の実体が許可されないパスです: "${relPath}"` }
+  if (!isAllowedMediaPath(relReal)) return { error: `media_files の実体が許可されないパスです (${MEDIA_ALLOWED_PREFIX} 配下のみ): "${relPath}"` }
   if (!lstatSync(real).isFile()) return { error: `media_files が通常ファイルではありません: ${relPath}` }
   return { full: real }
 }
@@ -112,8 +113,8 @@ export function collectMediaHashes(mediaFiles, rootDir = ROOT) {
   if (!Array.isArray(list)) return { errors: ['media_files は配列である必要があります'], mediaHashes: null }
   const hashes = []
   for (const p of [...list].sort()) {
-    if (!isSafeRelativePath(p)) {
-      errors.push(`media_files に不正なパスがあります: "${p}"`)
+    if (!isAllowedMediaPath(p)) {
+      errors.push(`media_files に不正なパスがあります (${MEDIA_ALLOWED_PREFIX} 配下の repo 相対パスのみ): "${p}"`)
       continue
     }
     const { full, error } = resolveMediaFile(rootDir, p)

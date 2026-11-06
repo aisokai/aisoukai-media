@@ -72,10 +72,18 @@ export function parseIdentity(value) {
 }
 
 // media_files は repo 相対パスのみ。絶対パス・..・空セグメント・ドットで始まるセグメント (.env* 等) は拒否
+// SNS メディアとして読み込みを許可する領域 (先生の決定 2026-11-06: public/images/ 配下のみ)
+export const MEDIA_ALLOWED_PREFIX = 'public/images/'
+
 export function isSafeRelativePath(value) {
   if (typeof value !== 'string' || value.trim() === '') return false
   if (value.startsWith('/') || value.includes('\\')) return false
   return !value.split('/').some((seg) => seg === '' || seg.startsWith('.'))
+}
+
+// 許可領域 (public/images/ 配下) 内の安全な相対パスであること
+export function isAllowedMediaPath(value) {
+  return isSafeRelativePath(value) && value.startsWith(MEDIA_ALLOWED_PREFIX) && value.length > MEDIA_ALLOWED_PREFIX.length
 }
 
 function validateMutualReviewData(data, errors) {
@@ -88,7 +96,7 @@ function validateMutualReviewData(data, errors) {
       errors.push('media_files は配列である必要があります')
     } else {
       for (const p of data.media_files) {
-        if (!isSafeRelativePath(p)) errors.push(`media_files に不正なパスがあります: "${p}" (repo 相対パスのみ)`)
+        if (!isAllowedMediaPath(p)) errors.push(`media_files に不正なパスがあります: "${p}" (${MEDIA_ALLOWED_PREFIX} 配下の repo 相対パスのみ)`)
       }
     }
   }

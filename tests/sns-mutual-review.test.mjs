@@ -480,6 +480,28 @@ test('CLI: 不正な YAML のドラフトもファイル単位のエラーとし
   assert.doesNotMatch(val.stderr, /2026-11-10-instagram-sns-202611-001\.md/)
 })
 
+test('先生決定: media_files は public/images/ 配下のみ (指定パスと symlink 実体の両方)', () => {
+  const ctx = setup({ withMedia: false })
+  mkdirSync(join(ctx.root, 'config'), { recursive: true })
+  writeFileSync(join(ctx.root, 'config', 'fictional.json'), '{"fictional":true}')
+  // 指定パスが領域外
+  assert.match(
+    collectErrors(() => computeSnsContentHash({ data: { media_files: ['config/fictional.json'] }, content: '', rootDir: ctx.root })),
+    /public\/images\/ 配下/,
+  )
+  // 指定パスは領域内だが、実体が repo 内の領域外
+  symlinkSync(join(ctx.root, 'config', 'fictional.json'), join(ctx.root, 'public', 'images', 'sns', 'cfg.png'))
+  assert.match(
+    collectErrors(() => computeSnsContentHash({ data: { media_files: ['public/images/sns/cfg.png'] }, content: '', rootDir: ctx.root })),
+    /実体が許可されないパス/,
+  )
+  // 領域内の実ファイルは読み込める
+  assert.equal(
+    computeSnsContentHash({ data: { media_files: ['public/images/sns/example-01.png'] }, content: '', rootDir: ctx.root }).mediaHashes.length,
+    1,
+  )
+})
+
 function collectErrors(fn) {
   try {
     fn()

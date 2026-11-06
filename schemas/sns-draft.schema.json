@@ -24,7 +24,7 @@
     "media_job_id": { "type": "string", "description": "対応する media queue job の id" },
     "publish_mode": { "enum": ["manual_only", "ai_mutual_review"] },
     "created_by": { "type": "string", "pattern": "^[^:\\s]+:\\S+$", "description": "作成AIの identity (<system>:<run-id>)。ai_mutual_review では必須、manual_only では指定不可" },
-    "media_files": { "type": "array", "items": { "type": "string" }, "description": "投稿に使うメディア実ファイルの repo 相対パス一覧。sns-content-hash/v1 の算出対象" },
+    "media_files": { "type": "array", "items": { "type": "string" }, "description": "投稿に使うメディア実ファイルの repo 相対パス一覧 (public/images/ 配下のみ)。sns-content-hash/v1 の算出対象" },
     "mutual_review": {
       "type": "object",
       "description": "相互監視の状態ブロック (正本)。ai_mutual_review では必須、manual_only では指定不可",

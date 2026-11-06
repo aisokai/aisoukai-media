@@ -153,7 +153,8 @@ test('C 互換用 top-level (reviewed / reviewed_by / reviewed_at) が mutual_re
 })
 
 test('C media_files は repo 相対パスのみ許可する', () => {
-  for (const bad of ['/etc/passwd', '../outside.png', 'public//x.png', '.env.local', 'public/.hidden/x.png', './x.png']) {
+  for (const bad of ['/etc/passwd', '../outside.png', 'public//x.png', '.env.local', 'public/.hidden/x.png', './x.png',
+    'content/posts/x.md', 'config/media-gate.json', 'public/robots.txt', 'public/images/', 'public/images/.hidden/x.png']) {
     const result = validateSnsDraftData(FILE, { ...mutualDraft, media_files: [bad] }, BODY)
     assert.match(result.errors.join('\n'), /media_files/, bad)
   }
