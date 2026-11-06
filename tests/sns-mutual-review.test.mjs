@@ -2,7 +2,7 @@
 // 本物の data/sns-review/ には書き込まない。
 import test, { after } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { linkSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -533,6 +533,36 @@ test('レビュー指摘 (TOCTOU): 検査後・open 前に親ディレクトリ�
   })
   assert.equal(mediaHashes, null)
   assert.match(errors.join('\n'), /差し替え|許可されない|repo 外/)
+})
+
+test('補強: 経路上に symlink がある (repo 内・許可領域内を指していても) メディアは読み込まない', () => {
+  const ctx = setup({ withMedia: false })
+  symlinkSync(join(ctx.root, 'public', 'images', 'sns', 'example-01.png'), join(ctx.root, 'public', 'images', 'sns', 'alias.png'))
+  const viaLink = collectMediaHashes(['public/images/sns/alias.png'], ctx.root)
+  assert.equal(viaLink.mediaHashes, null)
+  assert.match(viaLink.errors.join('\n'), /symlink は使えません/)
+  mkdirSync(join(ctx.root, 'public', 'images', 'real-dir'), { recursive: true })
+  writeFileSync(join(ctx.root, 'public', 'images', 'real-dir', 'a.png'), 'fictional')
+  symlinkSync(join(ctx.root, 'public', 'images', 'real-dir'), join(ctx.root, 'public', 'images', 'dir-link'))
+  const viaDirLink = collectMediaHashes(['public/images/dir-link/a.png'], ctx.root)
+  assert.match(viaDirLink.errors.join('\n'), /symlink は使えません/)
+})
+
+test('補強: ハードリンクされたメディアは読み込まない', () => {
+  const ctx = setup({ withMedia: false })
+  const outside = mkdtempSync(join(tmpdir(), 'sns-hardlink-'))
+  roots.push(outside)
+  writeFileSync(join(outside, 'secret.png'), 'fictional-outside')
+  let linked = true
+  try {
+    linkSync(join(outside, 'secret.png'), join(ctx.root, 'public', 'images', 'sns', 'hard.png'))
+  } catch {
+    linked = false // 別ボリュームでハードリンクを作れない環境では、同一ボリューム内で作る
+    linkSync(join(ctx.root, 'public', 'images', 'sns', 'example-01.png'), join(ctx.root, 'public', 'images', 'sns', 'hard.png'))
+  }
+  const result = collectMediaHashes(['public/images/sns/hard.png'], ctx.root)
+  assert.equal(result.mediaHashes, null, linked ? 'repo 外とのハードリンク' : 'repo 内のハードリンク')
+  assert.match(result.errors.join('\n'), /ハードリンク/)
 })
 
 function collectErrors(fn) {

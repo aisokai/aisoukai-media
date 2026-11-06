@@ -8,7 +8,7 @@
 // - media-gate のフラグ (sns_auto_suspend を含む) は読まない。「いま投稿してよいか」は実行主体が gate 判定で別途行う。
 import { createHash, randomUUID } from 'node:crypto'
 import {
-  appendFileSync, closeSync, constants as fsConstants, existsSync, fstatSync, mkdirSync, openSync, readFileSync,
+  appendFileSync, closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync,
   realpathSync, statSync, writeFileSync,
 } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
@@ -102,13 +102,35 @@ function checkMediaRealPath(root, real, relPath) {
   return null
 }
 
+// repo ルートからファイルまでの各要素が symlink でないこと (経路上の symlink を一切認めない)
+function findSymlinkComponent(root, relPath) {
+  let current = root
+  for (const segment of relPath.split('/')) {
+    current = join(current, segment)
+    let st
+    try {
+      st = lstatSync(current)
+    } catch {
+      return current
+    }
+    if (st.isSymbolicLink()) return current
+  }
+  return null
+}
+
 /**
+ * 脅威モデル (先生決定 2026-11-06): repo への書き込み権限を持つ主体は信頼する。
+ * そうした主体はドラフト・証拠ログ自体も書き換えられるため、読み込み処理はそれに対する完全な防御を目的としない。
+ * 誤操作・誤設定・単純な差し替えで許可領域外を読まないよう、以下で補強する。
+ *
  * メディアファイルを検査済みの実体に結び付けて読み込む (検査と読み込みの間の差し替え対策)。
  * 1. symlink 解決後の実体パスが許可領域 (public/images/) 内であることを確認
  * 2. 実体パスを O_NOFOLLOW で open し、descriptor が通常ファイルであることを確認
  * 3. open 後に実体パスを再解決し、パスが変わっていないこと・descriptor と同じファイル (dev/ino) であることを確認
  *    (親ディレクトリの差し替えで領域外の実体を開いた場合はここで不一致になる)
- * 4. 検証済み descriptor から読む
+ * 4. 経路上の各要素が symlink でないこと (open 前後)、ハードリンクでない (nlink === 1) ことを確認
+ * 5. 検証済み descriptor から読む
+ * 残余リスク: 経路上の要素を高速に差し替え続ける競合は Node の API では完全には排除できない (上記の脅威モデルで許容)。
  * hooks.beforeOpen はテスト専用 (差し替えの競合を再現するため)。
  */
 export function readMediaFileBound(rootDir, relPath, hooks = {}) {
@@ -119,6 +141,7 @@ export function readMediaFileBound(rootDir, relPath, hooks = {}) {
   const real = realpathSync(full)
   const before = checkMediaRealPath(root, real, relPath)
   if (before) return { error: before }
+  if (findSymlinkComponent(root, relPath)) return { error: `media_files の経路に symlink は使えません: ${relPath}` }
   hooks.beforeOpen?.(real)
 
   let fd
@@ -130,6 +153,7 @@ export function readMediaFileBound(rootDir, relPath, hooks = {}) {
   try {
     const opened = fstatSync(fd)
     if (!opened.isFile()) return { error: `media_files が通常ファイルではありません: ${relPath}` }
+    if (opened.nlink !== 1) return { error: `media_files がハードリンクされています (nlink=${opened.nlink}): ${relPath}` }
     let realAfter
     let current
     try {
@@ -143,6 +167,7 @@ export function readMediaFileBound(rootDir, relPath, hooks = {}) {
     if (realAfter !== real || current.dev !== opened.dev || current.ino !== opened.ino) {
       return { error: `media_files が検査後に差し替えられました: ${relPath}` }
     }
+    if (findSymlinkComponent(root, relPath)) return { error: `media_files が検査後に差し替えられました: ${relPath}` }
     return { bytes: readFileSync(fd) }
   } finally {
     closeSync(fd)
