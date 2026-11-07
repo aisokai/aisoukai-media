@@ -838,3 +838,10 @@ slug: 2026-11-06-mwf-4c3655e0bc46aea9f9e20a701f3623d363baa5094c0aa0c3b801be81ad4
 reviewed_by: 三谷
 date: 2026-11-06
 
+## 2026-11-07T18:06:04.343+09:00
+datetime: 2026-11-07T18:06:04.343+09:00
+action: approve
+slug: 2026-11-07-monthly-notice
+reviewed_by: 三谷
+date: 2026-11-07
+
