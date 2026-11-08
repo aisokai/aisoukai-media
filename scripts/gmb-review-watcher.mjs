@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import { GMB_REVIEWS_DIR, fetchReviews } from './lib/gmb-adapter.mjs'
 import { GMB_LOCATION_CONFIG_PATH } from './lib/gmb-api.mjs'
 import { classifyReview, REPLY_TEMPLATES, selectReplyTemplate } from './lib/review-rules.mjs'
@@ -150,4 +151,7 @@ function main() {
   })
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  assertActiveHost()
+  main()
+}

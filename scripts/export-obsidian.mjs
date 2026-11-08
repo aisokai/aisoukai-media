@@ -12,6 +12,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import { MEDIA_LOG_PATH, getTodayJst, listJobs } from './lib/media-queue.mjs'
 
 export function getVaultDir() {
@@ -107,4 +108,7 @@ function main() {
   console.log(`   ${outPath} (イベント ${eventCount} 件)`)
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  assertActiveHost()
+  main()
+}

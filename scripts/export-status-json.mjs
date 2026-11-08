@@ -7,6 +7,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import { ROOT, getJstTimestamp, getTodayJst, listJobs, loadGateConfig } from './lib/media-queue.mjs'
 import { buildStatusSummary } from './media-status.mjs'
 import { readLogEvents } from './export-obsidian.mjs'
@@ -48,4 +49,7 @@ function main() {
   console.log(`   queue ${data.counts.queue_total} 件 / 承認待ち ${data.pending.length} 件 / 本日イベント ${data.recent_events.length} 件`)
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  assertActiveHost()
+  main()
+}

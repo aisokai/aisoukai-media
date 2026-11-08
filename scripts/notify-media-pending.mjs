@@ -14,6 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import { ROOT, listJobs, loadGateConfig } from './lib/media-queue.mjs'
 
 function loadEnv() {
@@ -110,4 +111,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  assertActiveHost()
+  main()
+}
