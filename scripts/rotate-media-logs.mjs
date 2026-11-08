@@ -7,6 +7,7 @@
 import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import { ROOT, getJstTimestamp } from './lib/media-queue.mjs'
 
 const LOGS_DIR = join(ROOT, 'logs')
@@ -53,4 +54,7 @@ function main() {
   if (rotated === 0) console.log(`✅ ローテーション対象なし (${maxMb}MB 未満)`)
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  assertActiveHost()
+  main()
+}

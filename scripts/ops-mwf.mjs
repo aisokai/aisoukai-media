@@ -6,6 +6,7 @@ import {validateBackfillManifest} from './lib/mwf-backfill.mjs'
 // Deployment remains disabled until authenticated runtime capabilities are bound.
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import { createProductionRuntime } from './lib/mwf-production.mjs'
 import { openDeliveryStore, deliveryStatus, runDelivery } from './lib/mwf-delivery.mjs'
 
@@ -60,6 +61,7 @@ export async function runMwfCli(args, { adapters, productionOptions, wait, monot
   return result.ok ? 0 : 1
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  assertActiveHost()
   try { process.exitCode = await runMwfCli(process.argv.slice(2)) }
   catch { console.error(JSON.stringify({ status: 'attention', reason: 'delivery_failed_check_local_status' })); process.exitCode = 1 }
 }

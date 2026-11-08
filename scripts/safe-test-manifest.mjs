@@ -12,4 +12,5 @@ export const NORMAL_TEST_FILES = [
   'tests/theme-blog-draft-generation-request.test.mjs',
   'tests/theme-blog-flow.integration.test.mjs',
   'tests/theme-blog-publish-request.test.mjs',
+  'tests/active-host-guard.test.mjs',
 ]

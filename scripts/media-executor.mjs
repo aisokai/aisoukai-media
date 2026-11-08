@@ -15,6 +15,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { assertActiveHost } from './lib/active-host-guard.mjs'
 import {
   ROOT, appendMediaLog, effectiveGatePolicy, getJstTimestamp, listJobs, loadGateConfig,
   saveJob, transitionJob,
@@ -109,6 +110,7 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  assertActiveHost()
   main().catch((err) => {
     console.error(`❌ ${err.message}`)
     process.exit(1)
