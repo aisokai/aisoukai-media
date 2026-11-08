@@ -1,12 +1,13 @@
 # Active host
 
-- current: mac-mini
+- current: macbook-pro
 - since: 2026-11-08
 - declared_by: mitani
-- note: 2026-11-08 電気工事の停電で mac-mini は一時オフラインだったが同日昼に復旧。切り替え宣言は行っていない（current は mac-mini のまま）。MacBook 側はフェイルオーバー用 clone を常備するのみで、常駐ジョブは移していない。
+- note: 2026-11-08 切替ドリル（訓練）: 三谷の承認で所有者を macbook-pro へ一時的に切り替え中。実停止ではない。ドリル完了後に切戻し宣言を行う。
 
 ## 切り替え履歴
 - 2026-11-08: 初版作成（所有者は mac-mini）
+- 2026-11-08: 切替ドリル開始（mac-mini → macbook-pro）
 
 ## ルール
 - 切り替え・切り戻しは、このファイルを変更する専用コミット（PR経由）でのみ宣言する
