@@ -214,3 +214,31 @@ export async function readGitHubApprovedBaselineBytes(path: string, rawVersion: 
   }
   throw new Error('approved_baseline_not_found')
 }
+
+// Corroborating attribution for the unknown-published evidence path: find the
+// newest commit (same bounded history as above) at which this exact article
+// path held the given git blob, and report its git author/committer identity.
+// Git identities are self-asserted, so callers must treat this as supporting
+// evidence only, never as authentication. Returns null when no commit in the
+// bounded history held the blob.
+export async function readGitHubPathCommitAttribution(path: string, gitBlob: string, ref: string) {
+  if (!/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/.test(path) || !/^[a-f0-9]{40}$/.test(gitBlob) || !/^[a-f0-9]{40}$/.test(ref)) throw new Error('invalid_unknown_published_request')
+  const { token, repo } = getGitHubConfig()
+  const history = await readJson<{ sha: string; commit: { author: { name: string; email: string }; committer: { name: string; email: string } }; author: { login: string } | null }[]>(
+    `https://api.github.com/repos/${repo}/commits?path=${encodeURIComponent(path)}&sha=${ref}&per_page=20`,
+    { headers: githubHeaders(token) }, 'GitHub read bounded article history')
+  if (!Array.isArray(history) || history.length > 20 || history.some(item => !/^[a-f0-9]{40}$/.test(item.sha))) throw new Error('invalid_unknown_published_history')
+  for (const item of history) {
+    const { sha } = await readGitHubBytes(path, { ref: item.sha })
+    if (sha === gitBlob) {
+      return {
+        authorName: item.commit.author.name,
+        authorEmail: item.commit.author.email,
+        committerName: item.commit.committer.name,
+        committerEmail: item.commit.committer.email,
+        authorLogin: item.author?.login ?? null,
+      }
+    }
+  }
+  return null
+}

@@ -3,20 +3,21 @@ import {approvedComparisonUpdates} from '../../scripts/lib/mwf-human-comparisons
 import {serializeMwfArticle} from './mwfArticleSerialization.mjs'
 import {readDeployedPostFileIfPresent} from './deployedPostFile.mjs'
 import matter from 'gray-matter'
-import {readGitHubFile,readGitHubBytes,readGitHubBlobBytes,readGitHubApprovedBaselineBytes,readGitHubDirectory,readGitHubBranchHead,commitGitHubFiles} from './githubContents'
+import {readGitHubFile,readGitHubBytes,readGitHubBlobBytes,readGitHubApprovedBaselineBytes,readGitHubPathCommitAttribution,readGitHubDirectory,readGitHubBranchHead,commitGitHubFiles} from './githubContents'
+import {validateUnknownPublishedEvidence} from '../../scripts/lib/mwf-unknown-published.mjs'
 import {createServerAuthority,MWF_INVENTORY_ANCHOR,serverHash,decodeBoundArticle} from './mwfServerAuthority.mjs'
 import {verifyBlogEvidence,signBlogEvidence,topicContentVersion,isProtectedEditorialInput} from './tieredPublication.mjs'
 import {getDmpArticleState} from './dmpArticleState.mjs'
 import {buildPendingReviewPost} from './posts'
 import {parseCsv} from '../../scripts/csv-parser.mjs'
-import {comparisonSet,metadataEntry,reviewCandidate} from '../../scripts/lib/mwf-inventory.mjs'
+import {comparisonSet,metadataEntry,reviewCandidate,artifactGitBlob} from '../../scripts/lib/mwf-inventory.mjs'
 import {validateMinorArtifacts,humanApprovalPath} from './mwfMinorAuthority.mjs'
 import {createTieredReviewer} from '../../scripts/lib/mwf-tiered-review.mjs'
 
 type ServerRequest={schema?:number;publicationMode?:string;slot?:string;operation:string;topicId:string;topicVersion:string;artifactPath:string|null;artifactBlob:string|null;inventoryHash:string;baselineBlob?:string;proposalPath?:string}
 const cache=new Map<string, Promise<ReturnType<typeof comparisonSet>>>()
 // Expose only fixed diagnostic codes, never exception text, paths or response bodies.
-const comparisonFailureCodes=new Set(['inventory_anchor_mismatch','inventory_evidence_incomplete','inventory_metadata_unverified','comparison_history_limit','history_path_invalid','history_signature_invalid','canonical_listing_incomplete','unsupported_canonical_entry','comparison_metadata_unavailable','approval_listing_invalid','approval_path_invalid','approval_evidence_invalid','approval_current_unproven','approval_metadata_ambiguous','comparison_git_blob_invalid','comparison_current_changed','comparison_approved_baseline_unavailable','comparison_approved_baseline_changed','comparison_baseline_unavailable','comparison_baseline_changed','comparison_unreviewed_change','approved_baseline_not_found','invalid_approved_baseline_history','invalid_git_blob_response'])
+const comparisonFailureCodes=new Set(['inventory_anchor_mismatch','inventory_evidence_incomplete','inventory_metadata_unverified','comparison_history_limit','history_path_invalid','history_signature_invalid','canonical_listing_incomplete','unsupported_canonical_entry','comparison_metadata_unavailable','approval_listing_invalid','approval_path_invalid','approval_evidence_invalid','approval_current_unproven','approval_metadata_ambiguous','comparison_git_blob_invalid','comparison_current_changed','comparison_approved_baseline_unavailable','comparison_approved_baseline_changed','comparison_baseline_unavailable','comparison_baseline_changed','comparison_unreviewed_change','approved_baseline_not_found','invalid_approved_baseline_history','invalid_git_blob_response','unknown_published_unproven','invalid_unknown_published_request','invalid_unknown_published_history'])
 export function safeComparisonFailure(error:unknown){
  const message=error instanceof Error?error.message:''
  return comparisonFailureCodes.has(message)?message:'canonical_evidence_unavailable'
@@ -54,6 +55,22 @@ export function createMwfServerRuntime(){
    listReceipts:async()=>{try{return await readGitHubDirectory('data/mwf/human-approvals',{ref})}catch(error){if((error as {code?:string}).code==='NOT_FOUND')return[];throw error}},
    readReceipt:(path:string)=>json(path,ref),verifyReceipt:(value:unknown)=>verifyBlogEvidence(value,'human-approved-baseline',secret),
    readBytes:async(path:string)=>(await readGitHubBytes(path,{ref})).bytes,
+   // Unknown published path (no inventory/claim entry): accept a
+   // comparisonOnly projection only when the adopted three-point evidence
+   // validates against the exact current bytes. This is not an approval
+   // record and confers no publication eligibility.
+   verifyUnknownPublished:async(file:{path:string;sha:string})=>{
+    const raw=(await readGitHubBytes(file.path,{ref})).bytes
+    if(artifactGitBlob(raw)!==file.sha)throw Error('comparison_current_changed')
+    const parsed=matter(Buffer.from(raw).toString('utf8'))
+    const reviewHistoryText=await text('logs/review-history.md',ref)
+    const commit=await readGitHubPathCommitAttribution(file.path,file.sha,ref)
+    validateUnknownPublishedEvidence({data:parsed.data,content:parsed.content,reviewHistoryText,path:file.path,commit})
+    const entry=metadataEntry({path:file.path,raw,source:'canonical',head:undefined})
+    if(!entry.metadata)throw Error('comparison_metadata_unavailable')
+    return entry.metadata
+   },
+   readUnknownMetadata:undefined,
    comparisonOnly:true,readKnownBytes:readGitHubBlobBytes,
    readApprovedBytes:(proof:{path:string;rawVersion:string})=>readGitHubApprovedBaselineBytes(proof.path,proof.rawVersion,ref)}))
   return comparisonSet(entries.filter(e=>e.path!==exclude).sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))

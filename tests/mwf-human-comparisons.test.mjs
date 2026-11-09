@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {approvedComparisonUpdates} from '../scripts/lib/mwf-human-comparisons.mjs'
 import {metadataEntry,inventoryHash,comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
 import {signBlogEvidence,verifyBlogEvidence} from '../src/lib/tieredPublication.mjs'
+import {validateUnknownPublishedEvidence} from '../scripts/lib/mwf-unknown-published.mjs'
+import {getReviewedContentFingerprint} from '../src/lib/reviewContentFingerprint.mjs'
 const secret='synthetic-only',path='content/posts/2026-09-18-synthetic.md'
 function fixture(){
  const old=Buffer.from('---\ntitle: Synthetic\nexcerpt: Synthetic excerpt\ncategory: その他\nreviewed: false\n---\nBODY_SENTINEL'),raw=Buffer.from(old.toString().replace('reviewed: false','reviewed: true')),entry=metadataEntry({path,raw:old,source:'canonical'}),current=metadataEntry({path,raw,source:'canonical'}),receiptPath=`data/mwf/human-approvals/${inventoryHash(raw)}.json`
@@ -87,6 +89,116 @@ test('approved baseline lookup stays pinned to one exact path, bounds history, a
  await assert.rejects(readGitHubApprovedBaselineBytes('../private',hash,ref));assert.equal(calls,3);
  oversized=true;await assert.rejects(readGitHubApprovedBaselineBytes(path,hash,ref),/invalid_approved_baseline_history/);assert.equal(calls,4);
  oversized=false;await assert.rejects(readGitHubApprovedBaselineBytes(path,'f'.repeat(64),ref),/approved_baseline_not_found/);assert.equal(calls,7);
+ `
+ const result=spawnSync(process.execPath,['--input-type=module','-e',script],{cwd:new URL('../',import.meta.url),env:{GITHUB_REVIEW_TOKEN:'synthetic-test-only',GITHUB_REVIEW_REPO:'aisokai/aisoukai-media',GITHUB_REVIEW_BRANCH:'main'},encoding:'utf8'})
+ assert.equal(result.status,0,result.stderr)
+})
+
+const unknownPath='content/posts/2026-11-07-synthetic-notice.md'
+function unknownFixture(){
+ const raw=Buffer.from('---\ntitle: Synthetic notice\nexcerpt: Synthetic notice excerpt\ncategory: その他\ndraft: false\nreviewed: true\nreviewed_by: Synthetic teacher\nreviewed_at: 2026-11-07\n---\nNOTICE_BODY')
+ const entry=metadataEntry({path:unknownPath,raw,source:'canonical'})
+ return {raw,file:{path:unknownPath,sha:entry.gitBlob,type:'file'},metadata:entry.metadata}
+}
+test('unknown published path: Mac proposal and server acceptance give identical comparison entry',async()=>{
+ const f=unknownFixture()
+ const mac=await approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,comparisonOnly:true,readUnknownMetadata:async()=>f.metadata})
+ const server=await approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,readBytes:async()=>f.raw,verifyReceipt:()=>({}),comparisonOnly:true,verifyUnknownPublished:async()=>f.metadata})
+ assert.deepEqual(server,mac);assert.equal(server[0].comparisonOnly,true);assert.equal(server[0].unknownPath,true);assert.notEqual(server[0].blob,inventoryHash(f.raw))
+ assert.equal(comparisonSet(server).hash,comparisonSet(mac).hash)
+})
+test('unknown path fails closed without a server verifier or Mac metadata',async()=>{
+ const f=unknownFixture()
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,readBytes:async()=>f.raw,verifyReceipt:()=>({}),comparisonOnly:true}),/comparison_metadata_unavailable/)
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,readBytes:async()=>f.raw,comparisonOnly:true,verifyUnknownPublished:async()=>f.metadata}),/approval_verifier_required/)
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,comparisonOnly:true}),/comparison_metadata_unavailable/)
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,comparisonOnly:true,readUnknownMetadata:async()=>null}),/comparison_metadata_unavailable/)
+ // Non-comparisonOnly callers keep the historical unknown-path gate.
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,readUnknownMetadata:async()=>f.metadata}),/comparison_metadata_unavailable/)
+})
+test('unknown path is rejected when server evidence verification fails',async()=>{
+ const f=unknownFixture()
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,readBytes:async()=>f.raw,verifyReceipt:()=>({}),comparisonOnly:true,verifyUnknownPublished:async()=>{throw Error('unknown_published_unproven')}}),/unknown_published_unproven/)
+})
+test('forged receipt still rejects before unknown-path verification runs',async()=>{
+ const f=unknownFixture(),g=fixture();g.receipt.signature='f'.repeat(64)
+ let verified=0
+ await assert.rejects(approvedComparisonUpdates({entries:[],files:[f.file],listReceipts:g.options.listReceipts,readReceipt:g.options.readReceipt,verifyReceipt:g.options.verifyReceipt,readBytes:async()=>f.raw,comparisonOnly:true,verifyUnknownPublished:async()=>{verified++;return f.metadata}}),/approval_evidence_invalid/)
+ assert.equal(verified,0)
+})
+
+function evidenceFixture(){
+ const content='NOTICE_BODY',data={title:'Synthetic notice',excerpt:'Synthetic notice excerpt',category:'その他',draft:false,reviewed:true,reviewed_by:'Synthetic teacher',reviewed_at:'2026-11-07'}
+ data.reviewed_content_hash=getReviewedContentFingerprint(data,content)
+ const reviewHistoryText='## 2026-11-07T09:00:00.000+09:00\ndatetime: 2026-11-07T09:00:00.000+09:00\naction: approve\nslug: 2026-11-07-synthetic-notice\nreviewed_by: Synthetic teacher\ndate: 2026-11-07\n'
+ const commit={authorName:'Synthetic Human',authorEmail:'human@example.com',committerName:'Synthetic Human',committerEmail:'human@example.com',authorLogin:'synthetic-human'}
+ return {data,content,reviewHistoryText,path:unknownPath,commit}
+}
+test('unknown published evidence: all three points together accept',()=>{
+ assert.equal(validateUnknownPublishedEvidence(evidenceFixture()),true)
+})
+test('unknown published evidence: missing review-history record rejects',()=>{
+ const f=evidenceFixture();f.reviewHistoryText='## 2026-11-07T09:00:00.000+09:00\naction: approve\nslug: 2026-11-06-other\nreviewed_by: Synthetic teacher\n'
+ assert.throws(()=>validateUnknownPublishedEvidence(f),/unknown_published_unproven/)
+ const g=evidenceFixture();g.reviewHistoryText=g.reviewHistoryText.replace('reviewed_by: Synthetic teacher','reviewed_by: Someone else')
+ assert.throws(()=>validateUnknownPublishedEvidence(g),/unknown_published_unproven/)
+})
+test('unknown published evidence: hash mismatch and post-review body change reject',()=>{
+ const f=evidenceFixture();f.data={...f.data,reviewed_content_hash:'e'.repeat(64)}
+ assert.throws(()=>validateUnknownPublishedEvidence(f),/unknown_published_unproven/)
+ const g=evidenceFixture();g.content='NOTICE_BODY_EDITED_AFTER_REVIEW'
+ assert.throws(()=>validateUnknownPublishedEvidence(g),/unknown_published_unproven/)
+})
+test('unknown published evidence: unknown drafts and unreviewed articles reject',()=>{
+ const f=evidenceFixture();f.data={...f.data,draft:true};f.data.reviewed_content_hash=getReviewedContentFingerprint(f.data,f.content)
+ assert.throws(()=>validateUnknownPublishedEvidence(f),/unknown_published_unproven/)
+ const g=evidenceFixture();g.data={...g.data,reviewed:false};g.data.reviewed_content_hash=getReviewedContentFingerprint(g.data,g.content)
+ assert.throws(()=>validateUnknownPublishedEvidence(g),/unknown_published_unproven/)
+})
+test('unknown published evidence: automation or missing commit attribution rejects',()=>{
+ const f=evidenceFixture();f.commit={...f.commit,authorName:'MWF Draft Runner',authorEmail:'mwf@users.noreply.github.com'}
+ assert.throws(()=>validateUnknownPublishedEvidence(f),/unknown_published_unproven/)
+ const g=evidenceFixture();g.commit=null
+ assert.throws(()=>validateUnknownPublishedEvidence(g),/unknown_published_unproven/)
+})
+
+test('quarantined or local-only paths keep the historical gate and never enter the unknown flow',async()=>{
+ const f=unknownFixture(),changedRaw=Buffer.from(f.raw.toString().replace('NOTICE_BODY','NOTICE_BODY_V2')),changedFile={path:unknownPath,sha:metadataEntry({path:unknownPath,raw:changedRaw,source:'canonical'}).gitBlob,type:'file'}
+ for(const entry of [{...metadataEntry({path:unknownPath,raw:f.raw,source:'canonical'}),quarantine:true},{...metadataEntry({path:unknownPath,raw:f.raw,source:'local'})}]){
+  f.file=changedFile
+  let verified=0
+  await assert.rejects(approvedComparisonUpdates({entries:[entry],files:[f.file],listReceipts:async()=>[],readReceipt:async()=>null,readBytes:async()=>f.raw,verifyReceipt:()=>({}),comparisonOnly:true,verifyUnknownPublished:async()=>{verified++;return f.metadata}}),/comparison_metadata_unavailable/)
+  assert.equal(verified,0)
+ }
+})
+test('unknown published evidence: history fields spliced across blocks reject',()=>{
+ const f=evidenceFixture();f.reviewHistoryText='## 2026-11-07T09:00:00.000+09:00\nslug: 2026-11-07-synthetic-notice\nreviewed_by: Synthetic teacher\n\n## 2026-11-07T10:00:00.000+09:00\naction: approve\nslug: 2026-11-06-other\nreviewed_by: Synthetic teacher\n'
+ assert.throws(()=>validateUnknownPublishedEvidence(f),/unknown_published_unproven/)
+})
+test('unknown published evidence: committer-only automation rejects',()=>{
+ const f=evidenceFixture();f.commit={...f.commit,committerName:'MWF Draft Runner',committerEmail:'mwf@users.noreply.github.com'}
+ assert.throws(()=>validateUnknownPublishedEvidence(f),/unknown_published_unproven/)
+ const g=evidenceFixture();g.data={...g.data,archived:true};g.data.reviewed_content_hash=getReviewedContentFingerprint(g.data,g.content)
+ assert.throws(()=>validateUnknownPublishedEvidence(g),/unknown_published_unproven/)
+})
+test('unknown-path commit attribution stays bounded to one exact path and returns null when the blob is absent',async()=>{
+ const {spawnSync}=await import('node:child_process')
+ const script=`
+ import assert from 'node:assert/strict';
+ import {readGitHubPathCommitAttribution} from './src/lib/githubContents.ts';
+ const path='content/posts/2026-11-07-synthetic-notice.md',ref='a'.repeat(40),blob='b'.repeat(40);
+ let calls=0,oversized=false;
+ const commit=(sha,name)=>({sha,commit:{author:{name,email:name+'@example.com'},committer:{name,email:name+'@example.com'}},author:{login:'synthetic-human'}});
+ globalThis.fetch=async(url,options)=>{
+   calls++;assert.equal(options.headers.Authorization,'Bearer synthetic-test-only');
+   if(url.includes('/commits?')){assert.ok(url.includes('path='+encodeURIComponent(path)));assert.ok(url.includes('per_page=20'));return{ok:true,json:async()=>oversized?Array.from({length:21},(_,i)=>commit(String(i+1).repeat(40),'Human')):[commit('1'.repeat(40),'First'),commit('2'.repeat(40),'Second')]}}
+   assert.ok(url.includes('/contents/'+path+'?ref='));
+   return{ok:true,json:async()=>({encoding:'base64',content:Buffer.from('x').toString('base64'),sha:url.endsWith('2'.repeat(40))?blob:'c'.repeat(40)})}
+ };
+ const found=await readGitHubPathCommitAttribution(path,blob,ref);assert.equal(found.authorName,'Second');assert.equal(found.authorLogin,'synthetic-human');assert.equal(calls,3);
+ assert.equal(await readGitHubPathCommitAttribution(path,'d'.repeat(40),ref),null);assert.equal(calls,6);
+ oversized=true;await assert.rejects(readGitHubPathCommitAttribution(path,blob,ref),/invalid_unknown_published_history/);assert.equal(calls,7);
+ await assert.rejects(readGitHubPathCommitAttribution('../private',blob,ref));assert.equal(calls,7);
  `
  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{cwd:new URL('../',import.meta.url),env:{GITHUB_REVIEW_TOKEN:'synthetic-test-only',GITHUB_REVIEW_REPO:'aisokai/aisoukai-media',GITHUB_REVIEW_BRANCH:'main'},encoding:'utf8'})
  assert.equal(result.status,0,result.stderr)
