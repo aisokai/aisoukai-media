@@ -21,7 +21,7 @@ import {buildArticlePrompt} from '../prompts/dental-article-prompt.mjs'
 import {createIsolatedSync} from './mwf-isolated-sync.mjs'
 import {validatePostArtifact} from './post-artifact-validation.mjs'
 import {readOpaqueRegular} from '../mwf-inventory-metadata.mjs'
-import {inventoryHash,comparisonSet} from './mwf-inventory.mjs'
+import {inventoryHash,comparisonSet,metadataEntry} from './mwf-inventory.mjs'
 import {topicContentVersion,isProtectedEditorialInput} from '../../src/lib/tieredPublication.mjs'
 import {MWF_INVENTORY_ANCHOR} from '../../src/lib/mwfServerAuthority.mjs'
 import {createServerClient} from './mwf-server-client.mjs'
@@ -78,7 +78,11 @@ export function createProductionRuntime({recoveryTopic,backfill,candidateSupplyE
   if(listing.some(file=>file.type!=='file'))throw Error('comparison_listing_invalid')
   entries.push(...await approvedComparisonUpdates({entries,files:listing,
    listReceipts:async()=>{try{return github('GET',`contents/data/mwf/human-approvals?ref=${revision}`)}catch(error){if(error.code==='NOT_FOUND')return[];throw error}},
-   readReceipt:async path=>{const file=github('GET',`contents/${path}?ref=${revision}`);if(file.encoding!=='base64')throw Error('approval_encoding_invalid');return JSON.parse(Buffer.from(file.content,'base64').toString('utf8'))},verifyReceipt:undefined,readBytes:undefined,comparisonOnly:true}))
+   readReceipt:async path=>{const file=github('GET',`contents/${path}?ref=${revision}`);if(file.encoding!=='base64')throw Error('approval_encoding_invalid');return JSON.parse(Buffer.from(file.content,'base64').toString('utf8'))},verifyReceipt:undefined,readBytes:undefined,comparisonOnly:true,
+   // Unknown published paths only: extract the four public editorial keys
+   // from frontmatter bytes (the body is never decoded) so the Mac can
+   // propose the same comparisonOnly projection the server will validate.
+   readUnknownMetadata:async path=>{const file=github('GET',`contents/${path}?ref=${revision}`);if(file.encoding!=='base64')throw Error('approval_encoding_invalid');const entry=metadataEntry({path,raw:Buffer.from(file.content,'base64'),source:'canonical'});const listed=listing.find(f=>f.path===path);if(!listed||entry.gitBlob!==listed.sha)throw Error('comparison_current_changed');return entry.metadata},verifyUnknownPublished:undefined}))
   return comparisonSet(entries.sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))
  }
  function cached(key){try{return readOpaqueRegular(join(root,'mac-draft-prechecks.jsonl')).toString('utf8').split('\n').filter(Boolean).map(v=>JSON.parse(v)).filter(v=>v.key===key).at(-1)}catch(error){if(error.code==='ENOENT')return null;throw Error('draft_precheck_cache_invalid')}}

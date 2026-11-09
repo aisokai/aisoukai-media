@@ -4,10 +4,19 @@ const canonical=value=>JSON.stringify(value,(_key,item)=>item&&typeof item==='ob
 const PATH=/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/
 // The Mac creates metadata candidates only. Only the server authenticates receipts
 // and reads exact approved bytes; the prepared comparison hash binds both sides.
-export async function approvedComparisonUpdates({entries,files,listReceipts,readReceipt,verifyReceipt,readBytes,readKnownBytes,readApprovedBytes,comparisonOnly=false}){
+export async function approvedComparisonUpdates({entries,files,listReceipts,readReceipt,verifyReceipt,readBytes,readKnownBytes,readApprovedBytes,comparisonOnly=false,readUnknownMetadata,verifyUnknownPublished}){
  const changed=files.filter(file=>!entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))
  if(!changed.length)return[]
- for(const file of changed)if(file.type!=='file'||!PATH.test(file.path)||!entries.some(e=>e.path===file.path&&e.source==='canonical'&&!e.quarantine&&e.metadata))throw Error('comparison_metadata_unavailable')
+ const knownPath=file=>entries.some(e=>e.path===file.path&&e.source==='canonical'&&!e.quarantine&&e.metadata)
+ const hasAnyEntry=file=>entries.some(e=>e.path===file.path)
+ for(const file of changed)if(file.type!=='file'||!PATH.test(file.path))throw Error('comparison_metadata_unavailable')
+ // Unknown path means NO entry of any kind for that path. A path that has an
+ // entry but fails knownPath (quarantined, metadata-less, local-only) keeps
+ // the historical gate exactly; it must never leak into the unknown flow.
+ for(const file of changed)if(!knownPath(file)&&hasAnyEntry(file))throw Error('comparison_metadata_unavailable')
+ // Entry-less paths are only ever handled by the comparisonOnly flow below;
+ // every other caller keeps the historical gate.
+ for(const file of changed)if(!knownPath(file)&&!comparisonOnly)throw Error('comparison_metadata_unavailable')
  const listing=await listReceipts()
  if(!Array.isArray(listing)||listing.length>500)throw Error('approval_listing_invalid')
  const proofs=[]
@@ -19,6 +28,29 @@ export async function approvedComparisonUpdates({entries,files,listReceipts,read
  }
  const updates=[]
  for(const file of changed){
+  if(!knownPath(file)){
+   // Unknown path: receipts above have already been authenticated before any
+   // article fetch, so a forged receipt still rejects first. Acceptance is a
+   // comparisonOnly projection only; it is not an approval record.
+   if(readBytes){
+    // Server: full unknown-published evidence verification is mandatory, and
+    // the receipt verifier must be present just like the known-path flow.
+    // Without either this fails closed, exactly like the old gate.
+    if(!verifyReceipt)throw Error('approval_verifier_required')
+    if(!verifyUnknownPublished)throw Error('comparison_metadata_unavailable')
+    const metadata=await verifyUnknownPublished(file)
+    if(!metadata)throw Error('unknown_published_unproven')
+    updates.push({...comparisonProjection(file,metadata),unknownPath:true});continue
+   }
+   // Mac: propose the identical projection from public frontmatter metadata
+   // only. The proposal confers no authority; the server re-derives the
+   // metadata from exact bytes and validates the evidence before its
+   // prepared comparison hash can match this one.
+   if(!readUnknownMetadata)throw Error('comparison_metadata_unavailable')
+   const metadata=await readUnknownMetadata(file.path)
+   if(!metadata)throw Error('comparison_metadata_unavailable')
+   updates.push({...comparisonProjection(file,metadata),unknownPath:true});continue
+  }
   const matches=proofs.filter(p=>p.path===file.path).sort((a,b)=>Date.parse(b.reviewedAt)-Date.parse(a.reviewedAt))
   const proof=matches[0]
   if(matches.some(p=>p.rawVersion!==proof?.rawVersion&&Date.parse(p.reviewedAt)===Date.parse(proof?.reviewedAt)))throw Error('approval_current_unproven')
