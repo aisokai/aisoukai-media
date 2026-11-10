@@ -845,3 +845,10 @@ slug: 2026-11-07-monthly-notice
 reviewed_by: 三谷
 date: 2026-11-07
 
+## 2026-11-11T08:46:34.005+09:00
+datetime: 2026-11-11T08:46:34.005+09:00
+action: approve
+slug: 2026-11-11-mwf-852bdea6882421206e96315dac17247d89b090e5fe3a51f76da0e245c06a5b77
+reviewed_by: 三谷
+date: 2026-11-11
+
