@@ -3958,6 +3958,42 @@
         "request_id": "req_ddccb0f7c9cb41c99c92af11387211fd",
         "visual_review_id": "chatcmpl-EiuqtMq5a7FAFQLOa4kVuZ0inOgzp"
       }
+    },
+    {
+      "id": "generated-f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83",
+      "category": "root-canal",
+      "title": "根管治療中の仮詰めが取れたときの注意点",
+      "format": "png",
+      "sha256": "f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83",
+      "source_filename": "f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83.png",
+      "usage_status": "active",
+      "created_at": "2026-11-11T05:12:23.080Z",
+      "updated_at": "2026-11-11T05:12:23.080Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83.png",
+      "alt": "根管治療中の仮詰めが取れたときの注意点を説明するイラスト",
+      "content_sha256": "f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83",
+      "git_blob": "a0347256e26ee9668ac0882d6910696af581349d",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC021",
+        "title": "根管治療中の仮詰めが取れたときの注意点",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-Eiuv9zlBwFoFTz6eaDbmzjvHNcm7m:f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83"
+      },
+      "generation_provenance": {
+        "topic_version": "d555c9feb1ef701f7e34184b377e60cafa2bcd46190aca81f6611bf8afd75086",
+        "content_sha256": "f83689c5a609963b39e5e1029cc38163df946b94a6b6cb5ba029dcd05923fa83",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-11T05:12:23.080Z",
+        "request_id": "req_db69218563cc480c8657d0937c7b06d2",
+        "visual_review_id": "chatcmpl-Eiuv9zlBwFoFTz6eaDbmzjvHNcm7m"
+      }
     }
   ]
 }
