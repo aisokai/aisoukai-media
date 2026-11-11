@@ -3922,6 +3922,42 @@
         "request_id": "req_80063383ecb642708620b86ac9a78df3",
         "visual_review_id": "chatcmpl-Eipel32WESuekhixsjfE7N806Kh32"
       }
+    },
+    {
+      "id": "generated-9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83",
+      "category": "wisdom-tooth",
+      "title": "親知らずのセルフチェックと受診の目安",
+      "format": "png",
+      "sha256": "9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83",
+      "source_filename": "9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83.png",
+      "usage_status": "active",
+      "created_at": "2026-11-11T05:07:58.353Z",
+      "updated_at": "2026-11-11T05:07:58.353Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83.png",
+      "alt": "親知らずのセルフチェックと受診の目安を説明するイラスト",
+      "content_sha256": "9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83",
+      "git_blob": "52a679c111b57c04e28fe7b4a737f3deeab219d6",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "MONTHLY-202610TOPIC029",
+        "title": "親知らずのセルフチェックと受診の目安",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EiuqtMq5a7FAFQLOa4kVuZ0inOgzp:9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83"
+      },
+      "generation_provenance": {
+        "topic_version": "ada76e4a0940ac49744602f6a9fc42a27d31c24687556f9ad8effdae64fdb357",
+        "content_sha256": "9beaa8da5fe393c298842e56882ceafff902f09c688aff08259e810a8c9b3a83",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-11T05:07:58.353Z",
+        "request_id": "req_ddccb0f7c9cb41c99c92af11387211fd",
+        "visual_review_id": "chatcmpl-EiuqtMq5a7FAFQLOa4kVuZ0inOgzp"
+      }
     }
   ]
 }
