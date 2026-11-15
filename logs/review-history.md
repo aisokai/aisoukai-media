@@ -866,3 +866,10 @@ slug: 2026-10-16-mwf-303f064d84b2faa98e98f55fe7f7164b56f285ce8015f92e95199132964
 reviewed_by: 三谷
 date: 2026-10-16
 
+## 2026-11-15T19:56:19.792+09:00
+datetime: 2026-11-15T19:56:19.792+09:00
+action: approve
+slug: 2026-11-14-notice-late-arrival
+reviewed_by: 三谷
+date: 2026-11-14
+
