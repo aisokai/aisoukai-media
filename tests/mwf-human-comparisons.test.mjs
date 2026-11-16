@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {approvedComparisonUpdates} from '../scripts/lib/mwf-human-comparisons.mjs'
+import {approvedComparisonUpdates,isHumanRejectChange,hasRejectRecord} from '../scripts/lib/mwf-human-comparisons.mjs'
 import {metadataEntry,inventoryHash,comparisonSet} from '../scripts/lib/mwf-inventory.mjs'
 import {signBlogEvidence,verifyBlogEvidence} from '../src/lib/tieredPublication.mjs'
 import {validateUnknownPublishedEvidence} from '../scripts/lib/mwf-unknown-published.mjs'
@@ -202,4 +202,108 @@ test('unknown-path commit attribution stays bounded to one exact path and return
  `
  const result=spawnSync(process.execPath,['--input-type=module','-e',script],{cwd:new URL('../',import.meta.url),env:{GITHUB_REVIEW_TOKEN:'synthetic-test-only',GITHUB_REVIEW_REPO:'aisokai/aisoukai-media',GITHUB_REVIEW_BRANCH:'main'},encoding:'utf8'})
  assert.equal(result.status,0,result.stderr)
+})
+
+// Human reject of an approved article (scripts/reject-post.mjs shape). Synthetic data only.
+const rejectStem='2026-09-18-synthetic',rejectReason='Synthetic reject reason'
+const rejectHistory=(fields={})=>{const f={action:'reject',slug:rejectStem,reviewed_by:'Synthetic teacher',reason:rejectReason,...fields};return `## 2026-09-20T09:00:00.000+09:00\ndatetime: 2026-09-20T09:00:00.000+09:00\naction: ${f.action}\nslug: ${f.slug}\nreviewed_by: ${f.reviewed_by}\nreason: ${f.reason}\nreject_reason: ${f.reason}\n`}
+function rejectFixture({approvedEdit=s=>s,currentEdit=s=>s,history=rejectHistory()}={}){
+ const approved=Buffer.from(approvedEdit('---\ntitle: Synthetic\nexcerpt: Synthetic excerpt\ncategory: その他\nsource_topic_id: synthetic\ndraft: false\nreviewed: true\nauto_approved: false\npublication_status: published\nimage: "/images/library/test.png"\nstock_status: adopted\nreviewed_by: Synthetic teacher\nreviewed_at: 2026-09-19\nreviewed_content_hash: '+'d'.repeat(64)+'\n---\nBODY_SENTINEL'))
+ const raw=Buffer.from(currentEdit(approved.toString().replace('reviewed: true\n','reviewed: false\n').replace('stock_status: adopted\n','stock_status: rejected\n').replace('---\nBODY',`rejection_reason: ${rejectReason}\n---\nBODY`)))
+ const proof={path,rawVersion:inventoryHash(approved),contentVersion:'d'.repeat(64),humanAction:'authenticated_admin_approve',reviewedBy:'Synthetic teacher',reviewedAt:'2026-09-19'}
+ const entry=metadataEntry({path,raw:approved,source:'canonical'}),file={path,sha:metadataEntry({path,raw,source:'canonical'}).gitBlob,type:'file'}
+ let historyReads=0
+ const options={entries:[entry],files:[file],listReceipts:async()=>[{type:'file',path:`data/mwf/human-approvals/${proof.rawVersion}.json`}],readReceipt:async()=>signBlogEvidence('human-approved-baseline',proof,secret),verifyReceipt:value=>verifyBlogEvidence(value,'human-approved-baseline',secret),readBytes:async()=>raw,readApprovedBytes:async()=>approved,readKnownBytes:async()=>approved,readReviewHistory:history===null?undefined:async()=>{historyReads++;return history},comparisonOnly:true}
+ return {approved,raw,options,historyReads:()=>historyReads}
+}
+const rejectsUnreviewed=async(spec,label)=>assert.rejects(approvedComparisonUpdates(rejectFixture(spec).options),/comparison_unreviewed_change/,label)
+test('Human reject of receipt-proven approved bytes is comparison-only; server/Mac agree and body is never decoded',async()=>{
+ const f=rejectFixture(),original=Buffer.prototype.toString;let decoded=0
+ Buffer.prototype.toString=function(encoding,...args){if((encoding===undefined||/^utf-?8$/i.test(encoding))&&this.includes(Buffer.from('BODY_SENTINEL')))decoded++;return original.call(this,encoding,...args)}
+ try{
+  const server=await approvedComparisonUpdates(f.options),mac=await approvedComparisonUpdates({...f.options,readBytes:undefined,verifyReceipt:undefined,readApprovedBytes:undefined,readKnownBytes:undefined,readReviewHistory:undefined})
+  assert.deepEqual(server,mac);assert.equal(server[0].comparisonOnly,true);assert.notEqual(server[0].blob,inventoryHash(f.raw));assert.equal(decoded,0);assert.equal(f.historyReads(),1)
+  assert.equal(comparisonSet([...f.options.entries,...server]).hash,comparisonSet([...f.options.entries,...mac]).hash)
+ }finally{Buffer.prototype.toString=original}
+ assert.deepEqual(isHumanRejectChange(f.approved,f.raw),{reviewedBy:'Synthetic teacher',reason:rejectReason})
+ // Quoted scalars decode to the same evidence value.
+ const quoted=rejectFixture({currentEdit:s=>s.replace(`rejection_reason: ${rejectReason}`,`rejection_reason: "${rejectReason}"`)});assert.equal((await approvedComparisonUpdates(quoted.options))[0].comparisonOnly,true)
+ const single=rejectFixture({currentEdit:s=>s.replace(`rejection_reason: ${rejectReason}`,`rejection_reason: '${rejectReason}'`)});assert.equal((await approvedComparisonUpdates(single.options))[0].comparisonOnly,true)
+})
+test('reject shape is not accepted when the body or any unrelated field changes',async()=>{
+ await rejectsUnreviewed({currentEdit:s=>s.replace('BODY_SENTINEL','BODY_SENTINEL changed')},'body')
+ for(const [label,currentEdit] of [
+  ['reviewed_by',s=>s.replace('reviewed_by: Synthetic teacher','reviewed_by: Someone else')],
+  ['reviewed_at',s=>s.replace('reviewed_at: 2026-09-19','reviewed_at: 2026-09-20')],
+  ['reviewed_content_hash',s=>s.replace('d'.repeat(64),'e'.repeat(64))],
+  ['draft',s=>s.replace('draft: false','draft: true')],
+  ['auto_approved',s=>s.replace('auto_approved: false','auto_approved: true')],
+  ['publication_status',s=>s.replace('publication_status: published','publication_status: draft')],
+  ['image',s=>s.replace('/images/library/test.png','/images/library/other.png')],
+  ['new key',s=>s.replace('---\nBODY','archived: true\n---\nBODY')],
+  ['removed key',s=>s.replace('reviewed_at: 2026-09-19\n','')],
+  ['comment appended to a kept key',s=>s.replace('draft: false\n','draft: false\n# note\n')],
+ ]){
+  const f=rejectFixture({currentEdit});await assert.rejects(approvedComparisonUpdates(f.options),/comparison_unreviewed_change/,label);assert.equal(f.historyReads(),0,label)
+ }
+ // The history must name the article's own reviewer even when the shape is otherwise exact.
+ await rejectsUnreviewed({currentEdit:s=>s.replace('reviewed_by: Synthetic teacher','reviewed_by: Someone else'),history:rejectHistory({reviewed_by:'Someone else'})},'reviewed_by with matching history')
+})
+test('reject is not accepted without a matching single-block review-history record',async()=>{
+ await rejectsUnreviewed({history:''},'empty history')
+ await rejectsUnreviewed({history:null},'no history reader')
+ await rejectsUnreviewed({history:rejectHistory({slug:'2026-09-17-other'})},'other slug')
+ await rejectsUnreviewed({history:rejectHistory({slug:`${rejectStem}-extra`})},'slug prefix')
+ await rejectsUnreviewed({history:rejectHistory({action:'approve'})},'approve only')
+ await rejectsUnreviewed({history:rejectHistory({reason:'Another reason'})},'reason mismatch')
+ await rejectsUnreviewed({history:rejectHistory({reason:`${rejectReason} and more`})},'reason prefix')
+ await rejectsUnreviewed({history:rejectHistory({reviewed_by:'Someone else'})},'reviewer mismatch')
+ await rejectsUnreviewed({history:`## 2026-09-20T09:00:00.000+09:00\naction: reject\nslug: ${rejectStem}\n\n## 2026-09-20T10:00:00.000+09:00\naction: approve\nslug: 2026-09-17-other\nreviewed_by: Synthetic teacher\nreason: ${rejectReason}\n`},'spliced across blocks')
+ await rejectsUnreviewed({history:`## 2026-09-20T09:00:00.000+09:00\naction: reject\nslug: 2026-09-17-other\nreviewed_by: Synthetic teacher\nreason: ${rejectReason}\n\n## 2026-09-20T10:00:00.000+09:00\naction: approve\nslug: ${rejectStem}\nreviewed_by: Synthetic teacher\n`},'reject of another slug plus approve of this one')
+ assert.equal(hasRejectRecord(rejectHistory(),path,{reviewedBy:'Synthetic teacher',reason:rejectReason}),true)
+ assert.equal(hasRejectRecord(undefined,path,{reviewedBy:'Synthetic teacher',reason:rejectReason}),false)
+ assert.equal(hasRejectRecord(rejectHistory(),path,{reviewedBy:'Synthetic teacher',reason:''}),false)
+ assert.equal(hasRejectRecord(rejectHistory(),path,undefined),false)
+})
+test('reject requires the exact reviewed/stock_status transition and a one-line non-empty reason',async()=>{
+ await rejectsUnreviewed({currentEdit:s=>s.replace('stock_status: rejected','stock_status: archived')},'stock_status archived')
+ await rejectsUnreviewed({currentEdit:s=>s.replace('stock_status: rejected','stock_status: adopted')},'stock_status unchanged')
+ await rejectsUnreviewed({currentEdit:s=>s.replace('stock_status: rejected','stock_status: "rejected"')},'stock_status quoted')
+ await rejectsUnreviewed({currentEdit:s=>s.replace('reviewed: false','reviewed: true')},'reviewed unchanged')
+ await rejectsUnreviewed({approvedEdit:s=>s.replace('stock_status: adopted','stock_status: candidate')},'baseline not adopted')
+ await rejectsUnreviewed({approvedEdit:s=>s.replace('stock_status: adopted\n','')},'baseline without stock_status')
+ await rejectsUnreviewed({approvedEdit:s=>s.replace('reviewed: true','reviewed: false')},'baseline reviewed false')
+ await rejectsUnreviewed({approvedEdit:s=>s.replace('---\nBODY','rejection_reason: Earlier reason\n---\nBODY'),currentEdit:s=>s.replace('rejection_reason: Earlier reason\n','')},'baseline already rejected')
+ await rejectsUnreviewed({approvedEdit:s=>s.replace('reviewed_by: Synthetic teacher\n','')},'no reviewed_by')
+ for(const [label,value,reason] of [
+  ['empty',`rejection_reason: \n`,''],
+  ['empty quoted',`rejection_reason: ""\n`,''],
+  ['folded block',`rejection_reason: >\n  ${rejectReason}\n`,rejectReason],
+  ['literal block',`rejection_reason: |-\n  ${rejectReason}\n`,rejectReason],
+  ['continuation line',`rejection_reason: ${rejectReason}\n  continued\n`,`${rejectReason} continued`],
+  ['flow',`rejection_reason: [${rejectReason}]\n`,rejectReason],
+  ['comment',`rejection_reason: ${rejectReason} # note\n`,rejectReason],
+  ['trailing comment line',`rejection_reason: ${rejectReason}\n# note\n`,rejectReason],
+  ['escaped newline',`rejection_reason: "${rejectReason}\\nreason: x"\n`,rejectReason],
+ ]){
+  const f=rejectFixture({currentEdit:s=>s.replace(`rejection_reason: ${rejectReason}\n`,value),history:rejectHistory({reason})})
+  await assert.rejects(approvedComparisonUpdates(f.options),/comparison_unreviewed_change/,label);assert.equal(f.historyReads(),0,label)
+ }
+ // Anchors/tags/unterminated quotes already stop at the earlier metadata gate; the pure check refuses them too.
+ for(const value of [`&a ${rejectReason}`,`!!str ${rejectReason}`,`*a`,`"${rejectReason}`,`'${rejectReason}`]){
+  const f=rejectFixture(),current=Buffer.from(f.raw.toString().replace(`rejection_reason: ${rejectReason}`,`rejection_reason: ${value}`))
+  assert.equal(isHumanRejectChange(f.approved,current),null,value)
+ }
+ assert.equal(isHumanRejectChange(Buffer.from('no frontmatter'),Buffer.from('no frontmatter')),null)
+})
+test('reject without a receipt-proven baseline is never accepted, and a forged baseline fails closed',async()=>{
+ const f=rejectFixture();f.options.listReceipts=async()=>[]
+ await assert.rejects(approvedComparisonUpdates(f.options),/comparison_unreviewed_change/);assert.equal(f.historyReads(),0)
+ const g=rejectFixture();g.options.readApprovedBytes=async()=>g.raw
+ await assert.rejects(approvedComparisonUpdates(g.options),/comparison_approved_baseline_changed/);assert.equal(g.historyReads(),0)
+ const h=rejectFixture();h.options.readApprovedBytes=undefined
+ await assert.rejects(approvedComparisonUpdates(h.options),/comparison_approved_baseline_unavailable/)
+ // The approval-record flow (comparisonOnly=false) still demands the exact approved bytes.
+ const i=rejectFixture();i.options.comparisonOnly=false
+ await assert.rejects(approvedComparisonUpdates(i.options),/approved_bytes_changed/);assert.equal(i.historyReads(),0)
 })

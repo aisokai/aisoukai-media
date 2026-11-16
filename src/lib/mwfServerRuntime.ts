@@ -72,7 +72,9 @@ export function createMwfServerRuntime(){
    },
    readUnknownMetadata:undefined,
    comparisonOnly:true,readKnownBytes:readGitHubBlobBytes,
-   readApprovedBytes:(proof:{path:string;rawVersion:string})=>readGitHubApprovedBaselineBytes(proof.path,proof.rawVersion,ref)}))
+   readApprovedBytes:(proof:{path:string;rawVersion:string})=>readGitHubApprovedBaselineBytes(proof.path,proof.rawVersion,ref),
+   // Human reject evidence, pinned to the same ref; read only for a reject-shaped change.
+   readReviewHistory:()=>text('logs/review-history.md',ref)}))
   return comparisonSet(entries.filter(e=>e.path!==exclude).sort((a,b)=>`${a.path}:${a.blob}`.localeCompare(`${b.path}:${b.blob}`)))
  }
  async function validate(request:ServerRequest,ref:string){
