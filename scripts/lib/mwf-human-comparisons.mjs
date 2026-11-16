@@ -4,7 +4,7 @@ const canonical=value=>JSON.stringify(value,(_key,item)=>item&&typeof item==='ob
 const PATH=/^content\/posts\/\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.md$/
 // The Mac creates metadata candidates only. Only the server authenticates receipts
 // and reads exact approved bytes; the prepared comparison hash binds both sides.
-export async function approvedComparisonUpdates({entries,files,listReceipts,readReceipt,verifyReceipt,readBytes,readKnownBytes,readApprovedBytes,comparisonOnly=false,readUnknownMetadata,verifyUnknownPublished}){
+export async function approvedComparisonUpdates({entries,files,listReceipts,readReceipt,verifyReceipt,readBytes,readKnownBytes,readApprovedBytes,comparisonOnly=false,readUnknownMetadata,verifyUnknownPublished,readReviewHistory}){
  const changed=files.filter(file=>!entries.some(e=>e.path===file.path&&e.gitBlob===file.sha))
  if(!changed.length)return[]
  const knownPath=file=>entries.some(e=>e.path===file.path&&e.source==='canonical'&&!e.quarantine&&e.metadata)
@@ -70,6 +70,15 @@ export async function approvedComparisonUpdates({entries,files,listReceipts,read
       const baseline=Buffer.from(await readApprovedBytes(proof))
       if(inventoryHash(baseline)!==proof.rawVersion)throw Error('comparison_approved_baseline_changed')
       matched=isDraftImageOnlyChange(baseline,raw)
+      // Human reject of the receipt-proven approved bytes: accepted only when
+      // the frontmatter diff has the exact reject shape AND review history
+      // holds the matching reject record. The history is read only for that
+      // shape; no reader or no record keeps the gate closed. The receipt-less
+      // branch below never accepts a reject.
+      if(!matched){
+       const reject=isHumanRejectChange(baseline,raw)
+       if(reject&&readReviewHistory)matched=hasRejectRecord(await readReviewHistory(),file.path,reject)
+      }
      }else{
       if(!readKnownBytes)throw Error('comparison_baseline_unavailable')
       for(const old of [...new Map(known.filter(e=>!e.comparisonOnly).map(e=>[e.blob,e])).values()].sort((a,b)=>a.blob.localeCompare(b.blob))){
@@ -138,4 +147,57 @@ export function isDraftImageOnlyChange(baseline,current){
  const left=unchanged(before.values),right=unchanged(after.values)
  if(left.length!==right.length||left.some(([key,value],i)=>key!==right[i][0]||!value.equals(right[i][1])))return false
  return [...IMAGE_FIELDS].some(key=>!Buffer.from(before.values.get(key)??'').equals(Buffer.from(after.values.get(key)??'')))
+}
+const REJECT_FIELDS=new Set(['reviewed','stock_status','rejection_reason'])
+// Decode ONE single-line frontmatter scalar (same rules as mwf-inventory:
+// plain, "json" or 'yaml-single'). Block scalars, flows, anchors, tags,
+// comments, continuation lines and undecodable bytes all return null.
+function lineScalar(key,bytes){
+ const prefix=Buffer.from(`${key}: `)
+ if(!bytes||bytes.length<=prefix.length||bytes.length>4200||!bytes.subarray(0,prefix.length).equals(prefix)||bytes.indexOf(10)!==bytes.length-1||bytes.includes(13))return null
+ const text=bytes.subarray(prefix.length,-1).toString('utf8')
+ if(!Buffer.from(text).equals(bytes.subarray(prefix.length,-1)))return null
+ const value=text.trim();let decoded
+ try{
+  if(value.startsWith('"')){decoded=JSON.parse(value);if(typeof decoded!=='string')return null}
+  else if(value.startsWith("'")){if(!/^'(?:[^']|'')*'$/.test(value))return null;decoded=value.slice(1,-1).replace(/''/g,"'")}
+  else{if(!value||/^[>|[\]{}&*!?%@`]/.test(value)||/\s#/.test(value))return null;decoded=value}
+ }catch{return null}
+ // History lines are matched after trim, so only a trimmed, single-line,
+ // control-free value can ever be evidence.
+ if(!decoded||decoded!==decoded.trim()||/[\u0000-\u001f\u007f\u0085\u2028\u2029]/.test(decoded))return null
+ return decoded
+}
+// The exact frontmatter shape scripts/reject-post.mjs leaves on an approved
+// article: identical body bytes, reviewed true->false, stock_status
+// adopted->rejected, a new one-line rejection_reason, and every other key
+// (draft, publication/review audit fields, images, ...) byte-identical.
+// Only rejection_reason and reviewed_by are decoded; the body never is.
+// The shape alone proves nothing: the caller must also find the Human record.
+export function isHumanRejectChange(baseline,current){
+ const before=sections(baseline),after=sections(current)
+ if(!before||!after||!before.body.equals(after.body))return null
+ for(const [key,from,to] of [['reviewed','true','false'],['stock_status','adopted','rejected']]){
+  const old=before.values.get(key),next=after.values.get(key)
+  if(!old||!next||!old.equals(Buffer.from(`${key}: ${from}\n`))||!next.equals(Buffer.from(`${key}: ${to}\n`)))return null
+ }
+ if(before.values.has('rejection_reason'))return null
+ const rest=map=>[...map].filter(([key])=>!REJECT_FIELDS.has(key)).sort(([a],[b])=>a.localeCompare(b))
+ const left=rest(before.values),right=rest(after.values)
+ if(left.length!==right.length||left.some(([key,value],i)=>key!==right[i][0]||!value.equals(right[i][1])))return null
+ const reason=lineScalar('rejection_reason',after.values.get('rejection_reason')),reviewedBy=lineScalar('reviewed_by',after.values.get('reviewed_by'))
+ if(!reason||!reviewedBy)return null
+ return {reviewedBy,reason}
+}
+// Human evidence for a reject: ONE review-history block must carry the reject
+// action, this slug, the article's reviewer and the exact reason. Fields are
+// never spliced across blocks (same matching as validateUnknownPublishedEvidence).
+export function hasRejectRecord(historyText,path,{reviewedBy,reason}={}){
+ if(typeof historyText!=='string'||typeof reviewedBy!=='string'||typeof reason!=='string'||!reviewedBy||!reason)return false
+ const stem=String(path??'').split('/').at(-1).replace(/\.md$/,'')
+ if(!stem)return false
+ return historyText.split(/^## /m).some(block=>{
+  const lines=block.split('\n').map(line=>line.trim())
+  return lines.includes('action: reject')&&lines.includes(`slug: ${stem}`)&&lines.includes(`reviewed_by: ${reviewedBy}`)&&lines.includes(`reason: ${reason}`)
+ })
 }
