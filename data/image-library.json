@@ -3994,6 +3994,42 @@
         "request_id": "req_db69218563cc480c8657d0937c7b06d2",
         "visual_review_id": "chatcmpl-Eiuv9zlBwFoFTz6eaDbmzjvHNcm7m"
       }
+    },
+    {
+      "id": "generated-d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483",
+      "category": "preventive",
+      "title": "口の乾きが気になるときに考えたい原因と対策の目安",
+      "format": "png",
+      "sha256": "d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483",
+      "source_filename": "d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483.png",
+      "usage_status": "active",
+      "created_at": "2026-11-16T11:23:11.021Z",
+      "updated_at": "2026-11-16T11:23:11.021Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483.png",
+      "alt": "口の乾きが気になるときに考えたい原因と対策の目安を説明するイラスト",
+      "content_sha256": "d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483",
+      "git_blob": "b416d7846615ad7ffd00cef95a636a00894fde01",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "TOPIC-20261113-001",
+        "title": "口の乾きが気になるときに考えたい原因と対策の目安",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-Ekp5ktJsLAeMP2pMRgsEpZpLa15Ly:d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483"
+      },
+      "generation_provenance": {
+        "topic_version": "953c19dfe88d71ea0de7a5b2a61523e3a0ab48dc61e39cfc68008ce566701357",
+        "content_sha256": "d12ab8072a4f3968a012e109e4f2a8675ac05ad05ac35b12e065366f7b412483",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-16T11:23:11.021Z",
+        "request_id": "req_274780b0230649a6904a3aa967185f0c",
+        "visual_review_id": "chatcmpl-Ekp5ktJsLAeMP2pMRgsEpZpLa15Ly"
+      }
     }
   ]
 }
