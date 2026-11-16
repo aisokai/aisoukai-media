@@ -5,6 +5,7 @@ export const artifactGitBlob=raw=>createHash('sha1').update(Buffer.from(`blob ${
 const HASH=/^[a-f0-9]{64}$/
 export const inventoryPath=path=>/^content\/posts\/\d{4}-\d{2}-\d{2}-[A-Za-z0-9_-]+\.md$/.test(path)
 const fields=new Set(['title','excerpt','category','source_topic_id'])
+const FOLDED=Buffer.from(': >-'),UNFOLDABLE=/[\u0000-\u001f\u007f-\u009f\u2028\u2029\ufeff\ufffe\uffff]/
 // Hash opaque bytes; decode values ONLY for these four top-level public editorial keys.
 // Unknown/private fields and article body are never decoded or passed to a YAML parser.
 export function extractEditorialMetadata(raw) {
@@ -56,6 +57,32 @@ export function extractEditorialMetadata(raw) {
   if(['sensitive_data','contains_patient_data','contains_private_message','data_sensitivity'].includes(key))return null
   if(fields.has(key)){
    if(Object.hasOwn(data,key))return null
+   if((key==='title'||key==='excerpt')&&line.subarray(colon).equals(FOLDED)){
+    // Accept ONLY the plain folded form js-yaml emits for long strings: the key line
+    // is exactly `<key>: >-`, followed by one or more lines that all share one space
+    // indentation. The value is those lines joined by single spaces (fold + strip).
+    // Rejected (null): any other indicator (`>`, `>+`, `|`, `>2-`, trailing text),
+    // no continuation, blank/whitespace-only lines, deeper or shallower (non-zero)
+    // indentation, tabs or other control bytes, trailing spaces, invalid UTF-8.
+    // A zero-indent line ends the scalar and is left for the ordinary parser, so
+    // indented key-like text stays part of the value and never becomes a root key.
+    const parts=[];let width=0
+    while(offset<raw.length&&offset<128*1024){
+     const next=raw.indexOf(10,offset),until=next<0?raw.length:next
+     if(until>128*1024)return null
+     let more=raw.subarray(offset,until);if(more.at(-1)===13)more=more.subarray(0,-1)
+     let depth=0;while(more[depth]===32)depth++
+     if(depth===more.length)return null
+     if(!depth)break
+     if(parts.length&&depth!==width||more.at(-1)===32)return null
+     const bytes=more.subarray(depth),text=bytes.toString('utf8')
+     if(UNFOLDABLE.test(text)||!Buffer.from(text,'utf8').equals(bytes))return null
+     width=depth;parts.push(text);offset=until+1
+    }
+    const folded=parts.join(' ');if(!parts.length||!folded||folded.length>4000)return null
+    data[key]=folded
+    continue
+   }
    const value=line.subarray(colon+1).toString('utf8').trim();if(value.length>4000)return null
    try{if(value.startsWith('"')){data[key]=JSON.parse(value);if(typeof data[key]!=='string')return null}else if(value.startsWith("'")){if(!/^'(?:[^']|'')*'$/.test(value))return null;data[key]=value.slice(1,-1).replace(/''/g,"'")}else{if(!value||/^[>|[\]{}&*!?%@`]/.test(value)||/\s#/.test(value))return null;data[key]=value}}
    catch{return null}

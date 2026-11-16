@@ -56,3 +56,64 @@ test('successful opaque multiline metadata extraction does not UTF8-decode warni
  Buffer.prototype.toString=function(encoding,...args){if((encoding===undefined||/^utf-?8$/i.test(encoding))&&(this.includes(sentinel)||this.includes(body)))violations++;return original.call(this,encoding,...args)}
  try{for(const warning of fixtures)assert.equal(extractEditorialMetadata(Buffer.from(`---\n${warning}\ntitle: Public\nexcerpt: Public\ncategory: その他\n---\nBODY_DECODE_SENTINEL`)).title,'Public');assert.equal(violations,0)}finally{Buffer.prototype.toString=original}
 })
+
+// Folded `>-` title/excerpt (the form gray-matter/js-yaml writes for long strings). Synthetic data only.
+const foldedDoc=(middle,tail='category: その他\n')=>Buffer.from(`---\n${middle}${tail}---\nBODY_DECODE_SENTINEL`)
+test('simple folded >- title and excerpt are decoded as single-space joined lines',()=>{
+ assert.deepEqual(extractEditorialMetadata(foldedDoc('title: Public\nexcerpt: >-\n  Synthetic one line\n')),{title:'Public',excerpt:'Synthetic one line',category:'その他'})
+ assert.deepEqual(extractEditorialMetadata(foldedDoc('title: >-\n    架空の長い題名の前半\n    架空の題名の後半\nexcerpt: >-\n  Synthetic first\n  second: with "quote [ {\n  # third\nimage: /images/synthetic.webp\n')),{title:'架空の長い題名の前半 架空の題名の後半',excerpt:'Synthetic first second: with "quote [ { # third',category:'その他'})
+ assert.equal(extractEditorialMetadata(Buffer.from('---\r\ntitle: Public\r\nexcerpt: >-\r\n  Synthetic\r\n  crlf\r\ncategory: Other\r\n---\r\n')).excerpt,'Synthetic crlf')
+ const entry=metadataEntry({path:'content/posts/2026-09-14-folded.md',raw:foldedDoc('title: Public\nexcerpt: >-\n  Synthetic folded\n  summary\nsource_topic_id: synthetic-1\n'),source:'canonical'})
+ assert.deepEqual(entry.metadata,{title:'Public',excerpt:'Synthetic folded summary',source_topic_id:'synthetic-1',category:'その他'})
+})
+test('folded continuation text never becomes a root key and real protected keys still reject',()=>{
+ assert.deepEqual(extractEditorialMetadata(foldedDoc('excerpt: >-\n  Synthetic start\n  title: 偽\n  sensitive_data: true\n  category: 偽\ntitle: Public\n')),{excerpt:'Synthetic start title: 偽 sensitive_data: true category: 偽',title:'Public',category:'その他'})
+ assert.equal(extractEditorialMetadata(foldedDoc('title: Public\nexcerpt: >-\n  Synthetic\nsensitive_data: true\n')),null)
+ assert.equal(extractEditorialMetadata(foldedDoc('title: Public\nexcerpt: >-\n  Synthetic\n','')),null)
+})
+test('every non-simple block scalar form of a public key fails closed',()=>{
+ const reject=(middle,label=middle)=>assert.equal(extractEditorialMetadata(foldedDoc(`title: Public\n${middle}`)),null,JSON.stringify(label))
+ for(const indicator of ['>','>+','|','|-','|+','>2-','>-2','>- ','>- # note','>-x',' >-','>--'])reject(`excerpt: ${indicator}\n  Synthetic text\n`)
+ reject('excerpt:  >-\n  Synthetic text\n');reject('excerpt:>-\n  Synthetic text\n')
+ reject('excerpt: >-\n','no continuation');reject('excerpt: >-\n\n  Synthetic\n','leading blank');reject('excerpt: >-\n  Synthetic\n\n  more\n','inner blank');reject('excerpt: >-\n  Synthetic\n\n','trailing blank');reject('excerpt: >-\n  Synthetic\n  \n  more\n','whitespace-only line');reject('excerpt: >-\n  Synthetic\n   \n','deeper whitespace-only line')
+ reject('excerpt: >-\n  Synthetic\n    deeper\n','deeper');reject('excerpt: >-\n    Synthetic\n  shallower\n','shallower');reject('excerpt: >-\n\tSynthetic\n','tab indent');reject('excerpt: >-\n  Synthetic\n\tmore\n','later tab indent');reject('excerpt: >-\n  \tSynthetic\n','tab after indent');reject('excerpt: >-\n  Synthetic\tmore\n','inner tab')
+ reject('excerpt: >-\n  Synthetic \n  more\n','trailing space');reject('excerpt: >-\n  Synthetic\n  more \n','final trailing space');reject('excerpt: >-\n  Synthetic\rmore\n','bare carriage return');reject('excerpt: >-\n  Synthetic more\n','line separator')
+ reject('excerpt: >-\n  Synthetic\nexcerpt: >-\n  Again\n','duplicate folded');reject('excerpt: >-\n  Synthetic\nexcerpt: Again\n','duplicate plain after folded');reject('excerpt: Again\nexcerpt: >-\n  Synthetic\n','duplicate folded after plain')
+ reject(`excerpt: >-\n${`  ${'あ'.repeat(100)}\n`.repeat(40)}`,'over 4000 characters')
+ assert.equal(extractEditorialMetadata(foldedDoc(`title: Public\nexcerpt: >-\n${`  ${'あ'.repeat(99)}\n`.repeat(40)}`)).excerpt.length,3999)
+ for(const key of ['category','source_topic_id'])assert.equal(extractEditorialMetadata(Buffer.from(`---\ntitle: Public\nexcerpt: Public\n${key==='category'?'':'category: その他\n'}${key}: >-\n  synthetic\n---`)),null,key)
+ assert.equal(extractEditorialMetadata(Buffer.concat([Buffer.from('---\ntitle: Public\nexcerpt: >-\n  Synthetic '),Buffer.from([0xe3,0x81]),Buffer.from('\ncategory: Other\n---')])),null)
+ assert.equal(extractEditorialMetadata(Buffer.from('---\ntitle: Public\ncategory: Other\nexcerpt: >-\n  Synthetic unterminated')),null)
+ assert.equal(extractEditorialMetadata(Buffer.from(`---\ntitle: Public\ncategory: Other\nexcerpt: >-\n  ${'a'.repeat(128*1024)}\n---`)),null)
+})
+test('folded decoding never disagrees with gray-matter for gray-matter-written front matter',async()=>{
+ const {default:matter}=await import('gray-matter')
+ const long='架空の説明文です。',values=[
+  `${long.repeat(6)} ${long.repeat(6)} ${long.repeat(6)}`,
+  'Synthetic English summary sentence that keeps going well past the eighty column folding width of the dumper and then some more words.',
+  long.repeat(20),
+  `Synthetic: colon and # hash inside ${'a long sentence with many words '.repeat(5)}end`,
+  `${'word '.repeat(30)}tail`,`${'word  double  '.repeat(12)}tail`,` leading space ${'word '.repeat(30)}tail`,`${'word '.repeat(30)}trailing `,
+  `${'word '.repeat(30)}\nsecond paragraph ${'word '.repeat(30)}`,`${'word '.repeat(30)}tail\n`,`"quoted" ${'word '.repeat(30)}'single'`,
+  `- dash start ${'word '.repeat(30)}tail`,`> indicator start ${'word '.repeat(30)}tail`,`${'word '.repeat(30)}key: value`,`${'語 '.repeat(60)}終`,
+  `${'x'.repeat(100)} ${'y'.repeat(100)}`,`${'word '.repeat(20)}  ${'word '.repeat(20)}tail`,`${'word '.repeat(30)}tab\there`,'Short plain summary','短い要約 #1: 架空',
+ ]
+ let seed=20261116;const rnd=n=>{seed=(seed*1103515245+12345)&0x7fffffff;return seed%n},atoms=['word','架空','の説明',' ','  ',': ','#',' #','-','"',"'",'、','。','long'.repeat(9),'あ'.repeat(30)]
+ for(let i=0;i<400;i++){let s='';for(let n=10+rnd(60);n>0;n--)s+=atoms[rnd(atoms.length)];values.push(s)}
+ let folded=0,decoded=0
+ for(const value of values)for(const key of ['excerpt','title']){
+  const fm={title:'Synthetic title',excerpt:'Synthetic excerpt',category:'その他',draft:false,tags:['synthetic']};fm[key]=value
+  const text=matter.stringify('Synthetic body\n',fm),got=extractEditorialMetadata(Buffer.from(text)),want=matter(text).data
+  assert.equal(want[key],value)
+  const simple=new RegExp(`^${key}: >-$`,'m').test(text);if(simple)folded++
+  if(got===null)continue
+  decoded++;assert.equal(got.title,want.title,JSON.stringify(text));assert.equal(got.excerpt,want.excerpt,JSON.stringify(text))
+ }
+ assert.ok(folded>50&&decoded>folded/2,`folded=${folded} decoded=${decoded}`)
+ for(const value of values.slice(0,5)){const text=matter.stringify('Synthetic body\n',{title:'Synthetic title',excerpt:value,category:'その他'});assert.match(text,/^excerpt: >-$/m);assert.equal(extractEditorialMetadata(Buffer.from(text))?.excerpt,value)}
+})
+test('folded public values are decoded without UTF8-decoding private or body bytes',()=>{
+ const sentinel=Buffer.from('PRIVATE_DECODE_SENTINEL'),body=Buffer.from('BODY_DECODE_SENTINEL'),original=Buffer.prototype.toString;let violations=0
+ Buffer.prototype.toString=function(encoding,...args){if((encoding===undefined||/^utf-?8$/i.test(encoding))&&(this.includes(sentinel)||this.includes(body)))violations++;return original.call(this,encoding,...args)}
+ try{assert.equal(extractEditorialMetadata(foldedDoc('title: Public\nprivate_request: >-\n  PRIVATE_DECODE_SENTINEL\nexcerpt: >-\n  Synthetic folded\n  summary\ngeneration_warnings:\n  - >-\n    PRIVATE_DECODE_SENTINEL\n')).excerpt,'Synthetic folded summary');assert.equal(violations,0)}finally{Buffer.prototype.toString=original}
+})
