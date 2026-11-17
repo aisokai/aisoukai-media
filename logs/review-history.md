@@ -889,3 +889,11 @@ slug: 2026-11-16-mwf-891ee772e31ac72bdc2505225a261a7c458f71eda40a71d87e35b4d9389
 reviewed_by: 三谷
 date: 2026-11-16
 
+## 2026-11-18T08:47:44.534+09:00
+datetime: 2026-11-18T08:47:44.534+09:00
+action: approve
+slug: 2026-11-18-blog-20261118
+reviewed_by: 三谷
+date: 2026-11-18
+publish_at: 2026-11-18
+
