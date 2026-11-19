@@ -55,12 +55,12 @@
       "status": "selected"
     },
     {
-      "title": "歯周病予防と糖尿病の関係を正しく理解する",
-      "category": "歯周病治療",
-      "targetKeyword": "歯周病 糖尿病 理解",
-      "searchIntent": "informational",
-      "recommendedReason": "疾患連関の基本をわかりやすく解説し、予防の重要性を強調",
-      "medicalRisk": "low",
+      "title": "口内炎ができたときに確認したいことと受診の目安",
+      "category": "その他",
+      "targetKeyword": "口内炎 治らない 受診 目安",
+      "searchIntent": "口内炎ができたとき、様子を見てよい場合と受診した方がよい場合の目安を知りたい",
+      "recommendedReason": "元の歯周病・糖尿病テーマが既存記事と重なるため、2026-11-19に差し替え",
+      "medicalRisk": "medium",
       "id": "2026-12-topic-004",
       "targetReader": "歯科の一般的な健康情報を知りたい方",
       "patientConcern": "informational",
