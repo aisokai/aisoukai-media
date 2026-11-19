@@ -4030,6 +4030,42 @@
         "request_id": "req_274780b0230649a6904a3aa967185f0c",
         "visual_review_id": "chatcmpl-Ekp5ktJsLAeMP2pMRgsEpZpLa15Ly"
       }
+    },
+    {
+      "id": "generated-94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd",
+      "category": "pediatric",
+      "title": "子どもが歯をぶつけたときに確認したいことと受診の目安",
+      "format": "png",
+      "sha256": "94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd",
+      "source_filename": "94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd.png",
+      "usage_status": "active",
+      "created_at": "2026-11-19T23:34:34.620Z",
+      "updated_at": "2026-11-19T23:34:34.620Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd.png",
+      "alt": "子どもが歯をぶつけたときに確認したいことと受診の目安を説明するイラスト",
+      "content_sha256": "94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd",
+      "git_blob": "8dbd6077553d052e4dfe8878ab7efe0007ec62d6",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "TOPIC-20261113-002",
+        "title": "子どもが歯をぶつけたときに確認したいことと受診の目安",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-Em5wC3HMIrsVAhiZKUx1nBfUKUNzZ:94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd"
+      },
+      "generation_provenance": {
+        "topic_version": "fc8a381963fe12be3f447265f67dda17bdc0e3dbfe8d9129b627508e00fc01bb",
+        "content_sha256": "94abcfe5cc942361375b70d635dacbe643eb2246d859e7d14e9b7218f09fd0dd",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-19T23:34:34.620Z",
+        "request_id": "req_80bb860635454b2fb1d83c93ea153195",
+        "visual_review_id": "chatcmpl-Em5wC3HMIrsVAhiZKUx1nBfUKUNzZ"
+      }
     }
   ]
 }
