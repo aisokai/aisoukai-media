@@ -897,3 +897,11 @@ reviewed_by: 三谷
 date: 2026-11-18
 publish_at: 2026-11-18
 
+## 2026-11-20T00:04:15.148+09:00
+datetime: 2026-11-20T00:04:15.148+09:00
+action: approve
+slug: 2026-11-19-blog-20261119
+reviewed_by: 三谷
+date: 2026-11-19
+publish_at: 2026-11-19
+
