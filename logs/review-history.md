@@ -905,3 +905,10 @@ reviewed_by: 三谷
 date: 2026-11-19
 publish_at: 2026-11-19
 
+## 2026-11-20T08:37:58.925+09:00
+datetime: 2026-11-20T08:37:58.925+09:00
+action: approve
+slug: 2026-11-20-mwf-6c069c0f13d52ebcf819c11866e5533c5d77cfabd1fa22acd95f59460ac20205
+reviewed_by: 三谷
+date: 2026-11-20
+
