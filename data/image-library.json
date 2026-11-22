@@ -4066,6 +4066,42 @@
         "request_id": "req_80bb860635454b2fb1d83c93ea153195",
         "visual_review_id": "chatcmpl-Em5wC3HMIrsVAhiZKUx1nBfUKUNzZ"
       }
+    },
+    {
+      "id": "generated-9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44",
+      "category": "preventive",
+      "title": "歯の着色や黄ばみが気になるときの原因とケアの目安",
+      "format": "png",
+      "sha256": "9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44",
+      "source_filename": "9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44.png",
+      "usage_status": "active",
+      "created_at": "2026-11-22T23:34:21.019Z",
+      "updated_at": "2026-11-22T23:34:21.019Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44.png",
+      "alt": "歯の着色や黄ばみが気になるときの原因とケアの目安を説明するイラスト",
+      "content_sha256": "9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44",
+      "git_blob": "4d7b416a9f1c234d6ef55cd5054c04d680978783",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "TOPIC-20261113-003",
+        "title": "歯の着色や黄ばみが気になるときの原因とケアの目安",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EnBMbHlkol4w4rkC4vfbGjxYjtxbp:9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44"
+      },
+      "generation_provenance": {
+        "topic_version": "33a3368be058e9fbb68aec91c4677a9f6dd3a1771b51b002cfa06afb5463f9bb",
+        "content_sha256": "9e9d7af80c515ed59f2e8dd7007a731ab5713315ab6fef4c903827e2a207ae44",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-22T23:34:21.019Z",
+        "request_id": "req_2d5b1f2703e34a07968efbb85afaf6e0",
+        "visual_review_id": "chatcmpl-EnBMbHlkol4w4rkC4vfbGjxYjtxbp"
+      }
     }
   ]
 }
