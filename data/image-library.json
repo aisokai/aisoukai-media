@@ -4102,6 +4102,42 @@
         "request_id": "req_2d5b1f2703e34a07968efbb85afaf6e0",
         "visual_review_id": "chatcmpl-EnBMbHlkol4w4rkC4vfbGjxYjtxbp"
       }
+    },
+    {
+      "id": "generated-184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae",
+      "category": "general",
+      "title": "朝、顎が疲れていると感じたら：歯ぎしり・食いしばりのサインと相談の目安",
+      "format": "png",
+      "sha256": "184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae",
+      "source_filename": "184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae.png",
+      "usage_status": "active",
+      "created_at": "2026-11-24T23:34:45.693Z",
+      "updated_at": "2026-11-24T23:34:45.693Z",
+      "width": 1536,
+      "height": 1024,
+      "path": "/images/library/generated/184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae.png",
+      "alt": "朝、顎が疲れていると感じたら：歯ぎしり・食いしばりのサインと相談の目安を説明するイラスト",
+      "content_sha256": "184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae",
+      "git_blob": "21fd46e189293744005d1ddc404fbe9ad6d1e513",
+      "license_status": "approved",
+      "license_source": "https://openai.com/policies/services-agreement/",
+      "license_note": "既存アカウントでこのブログ用に生成。先生による生成・利用の許諾に基づく利用。出力の独占性・著作権成立・法的審査を保証するものではない。",
+      "topic_assignment": {
+        "topic_id": "TOPIC-20261113-004",
+        "title": "朝、顎が疲れていると感じたら：歯ぎしり・食いしばりのサインと相談の目安",
+        "status": "visually_matched",
+        "evidence": "openai:chatcmpl-EnuK7uiuANPvf5OiKIzirTe1iMhFT:184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae"
+      },
+      "generation_provenance": {
+        "topic_version": "09f14f0c84c2f07f8d2449682ff07d14445975ecda35cc759cacdcd98eaaf63c",
+        "content_sha256": "184350c19a33d2002281c880b79a7a2a5feb8578de7fe27e9e22ee456871d4ae",
+        "model": "gpt-image-2.5-sunburst",
+        "operation": "teacher-approved-blog-images-2026-10-07",
+        "usage_evidence": "teacher_20261007_automatic_generation_with_teacher_theme_adoption",
+        "created_at": "2026-11-24T23:34:45.693Z",
+        "request_id": "req_e2f6492b7fee49608ffc4b0d4d8496ed",
+        "visual_review_id": "chatcmpl-EnuK7uiuANPvf5OiKIzirTe1iMhFT"
+      }
     }
   ]
 }
