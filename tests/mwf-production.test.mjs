@@ -26,7 +26,7 @@ function fixture(){
    return{status:0,stdout:JSON.stringify(value)}
   }
   git.push({args,options});const op=args[0];if(op==='status')return{status:0,stdout:''};if(op==='show')return{status:1,stdout:''};if(op==='hash-object'){raw=options.input;return{status:0,stdout:'b'.repeat(40)}};const path=openDeliveryStore(root).read()[0]?.path;return{status:0,stdout:op==='rev-parse'?'a'.repeat(40):op==='write-tree'?'c'.repeat(40):op==='commit-tree'?'d'.repeat(40):op==='diff-tree'?path:op==='ls-remote'?`${'d'.repeat(40)} refs/heads/main\n`:''}
- },fetchImpl:async(url,options)=>{calls.push({url,options});if(url.includes('openai.com')){const input=JSON.parse(options.body);return{ok:true,status:200,json:async()=>({id:'actual-generator',choices:[{finish_reason:'stop',message:{content:input.messages[0].role==='system'?'{"decision":"clear"}':'## Synthetic\nPublic editorial.'}}]})}}return{ok:true,json:async()=>({ok:true,result:{message_id:1}})}}}
+ },fetchImpl:async(url,options)=>{calls.push({url,options});if(url.includes('openai.com')){const input=JSON.parse(options.body);assert.equal(input.model,'gpt-6-luna');assert.equal(input.reasoning_effort,'low');return{ok:true,status:200,json:async()=>({id:'actual-generator',choices:[{finish_reason:'stop',message:{content:input.messages[0].role==='system'?'{"decision":"clear"}':'## Synthetic\nPublic editorial.'}}]})}}return{ok:true,json:async()=>({ok:true,result:{message_id:1}})}}}
  return{root,options,calls,git,getRaw:()=>raw,setAdopted:v=>adopted=v,setReady:v=>serverReady=v,setPublished:v=>published=v,topic}
 }
 test('Mac without admin/GitHub secret generates only unreviewed draft, syncs using native helper and notifies exact server pending reflection',async()=>{const f=fixture();let result;assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0);assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.doesNotMatch(f.getRaw(),/tiered_review_proof/);assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2);assert.equal(f.git.find(c=>c.args[0]==='push').options.env.GIT_CONFIG_VALUE_0,'!/opt/homebrew/bin/gh auth git-credential');assert.equal(result.items[0].state,'notified');await runMwfCli(['--production'],{productionOptions:f.options,output:()=>{}});assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,2)})
@@ -122,13 +122,15 @@ test('proven invalid legacy request is repaired once under new key without chang
 
 test('cached ambiguous creates one unreviewed draft and review request after exact server reflection without rechecking provider',async()=>{
  const {writeFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs'),{PRECHECK_REQUEST_VERSION}=await import('../scripts/lib/mwf-precheck.mjs')
- const f=fixture(),legacyKey=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),key=inventoryHash(`${PRECHECK_REQUEST_VERSION}:${legacyKey}`)
+ for(const requestVersion of [PRECHECK_REQUEST_VERSION,'json-context-v2']){
+ const f=fixture(),legacyKey=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),key=inventoryHash(`${requestVersion}:${legacyKey}`)
  writeFileSync(join(f.root,'mac-draft-prechecks.jsonl'),JSON.stringify({key,status:'hold',reason:'precheck_ambiguous',httpStatus:200,errorCode:'unknown'})+'\n')
  let result
  for(let i=0;i<2;i++)assert.equal(await runMwfCli(['--production'],{productionOptions:f.options,output:v=>result=v}),0)
  assert.equal(result.items.length,1);assert.equal(result.items[0].state,'notified');assert.match(f.getRaw(),/draft: true/);assert.match(f.getRaw(),/reviewed: false/);assert.match(f.getRaw(),/auto_approved: false/);assert.doesNotMatch(f.getRaw(),/tiered_review_proof/)
  const item=openDeliveryStore(f.root).read()[0];assert.equal(item.topic.metadataReviewReason,'metadata_review_required');assert.equal(item.serverPublished,false);assert.equal(item.deliveredBlob,item.blob)
  assert.equal(f.calls.filter(c=>c.url.includes('openai')).length,1);assert.equal(f.calls.filter(c=>c.url.includes('telegram')).length,1);assert.match(f.calls.at(-1).options.body,/先生の内容確認・承認/)
+ }
 })
 test('related, rejected and unknown prechecks never generate',async()=>{
  for(const kind of ['related','http','unknown']){
@@ -139,7 +141,7 @@ test('related, rejected and unknown prechecks never generate',async()=>{
  }
 })
 
-test('ambiguous reason in legacy key does not acquire current request provenance or draft eligibility',async()=>{
+test('ambiguous evidence under legacy key is preserved and cannot gain versioned provenance',async()=>{
  const {writeFileSync,readFileSync}=await import('node:fs'),{topicContentVersion}=await import('../src/lib/tieredPublication.mjs')
  const f=fixture(),path=join(f.root,'mac-draft-prechecks.jsonl'),key=inventoryHash(`${topicContentVersion(f.topic)}:${comparisonSet([]).hash}`),raw=JSON.stringify({key,status:'hold',reason:'precheck_ambiguous',httpStatus:200,requestVersion:'json-context-v2'})+'\n'
  writeFileSync(path,raw);let result

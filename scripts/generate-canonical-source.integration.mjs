@@ -43,7 +43,7 @@ test('canonical provider path accepts an injected client without external calls'
         completions: {
           create: async (options) => {
             calls.push(options)
-            return { choices: [{ message: { content: JSON.stringify(article) } }] }
+            return { choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(article) } }] }
           },
         },
       },
@@ -52,9 +52,9 @@ test('canonical provider path accepts an injected client without external calls'
 
   assert.deepEqual(generated, article)
   assert.equal(calls.length, 1)
-  assert.equal(calls[0].model, 'gpt-5-nano')
+  assert.equal(calls[0].model, 'gpt-6-luna')
   assert.equal(calls[0].max_completion_tokens, 4000)
-  assert.equal(calls[0].reasoning_effort, 'minimal')
+  assert.equal(calls[0].reasoning_effort, 'low')
 })
 
 test('canonical request rejects extra fields and path-like input', async () => {

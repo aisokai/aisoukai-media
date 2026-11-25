@@ -35,7 +35,7 @@ test('generateBlogArticleText uses the shared low-cost OpenAI model', async () =
         create: async (request) => {
           calls.push(request)
           return {
-            choices: [{ message: { content: '  本文  ' } }],
+            choices: [{ finish_reason: 'stop', message: { content: '  本文  ' } }],
             usage: { prompt_tokens: 3, completion_tokens: 2 },
           }
         },
@@ -47,7 +47,7 @@ test('generateBlogArticleText uses the shared low-cost OpenAI model', async () =
   assert.equal(result.body, '本文')
   assert.equal(calls[0].model, OPENAI_MODEL)
   assert.equal(calls[0].max_completion_tokens, 4000)
-  assert.equal(calls[0].reasoning_effort, 'minimal')
+  assert.equal(calls[0].reasoning_effort, 'low')
 })
 
 test('generateBlogArticleText rejects an empty provider response', async () => {
@@ -58,4 +58,19 @@ test('generateBlogArticleText rejects an empty provider response', async () => {
     }),
     { code: 'response_invalid' },
   )
+})
+
+test('generateBlogArticleText rejects truncation and refusal even when content is nonempty', async () => {
+  for (const choice of [
+    { finish_reason: 'length', message: { content: 'synthetic partial article' } },
+    { finish_reason: 'stop', message: { content: 'synthetic text', refusal: 'mock refusal' } },
+  ]) {
+    await assert.rejects(
+      () => generateBlogArticleText({
+        prompt: 'テスト',
+        client: { chat: { completions: { create: async () => ({ choices: [choice] }) } } },
+      }),
+      { code: 'response_invalid' },
+    )
+  }
 })

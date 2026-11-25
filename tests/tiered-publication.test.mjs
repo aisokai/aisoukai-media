@@ -59,7 +59,9 @@ test('actual independent-review adapter inspects image and comparisons, signs ac
  assert.equal(result.status,'certified')
  const parsed=matter(result.raw);assert.equal(assessTieredPublication(parsed.data,parsed.content,secret,context),true)
  assert.equal(parsed.data.tiered_review_proof.payload.reviewerId,'openai:independent-response')
- assert.equal(JSON.parse(calls[1].options.body).messages[1].content[1].type,'image_url')
+ const request=JSON.parse(calls[1].options.body)
+ assert.deepEqual([request.model,request.reasoning_effort,request.response_format.type],['gpt-6-luna','low','json_object'])
+ assert.equal(request.messages[1].content[1].type,'image_url')
  assert.equal(parsed.data.tiered_review_proof.policyVersion,BLOG_POLICY_VERSION)
 })
 
