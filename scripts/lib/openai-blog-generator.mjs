@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import OpenAI from 'openai'
 
-export const OPENAI_MODEL = 'gpt-5-nano'
+export const OPENAI_MODEL = 'gpt-6-luna'
 export const BLOG_GENERATION_MAX_TOKENS = 4000
 
 export class BlogGenerationError extends Error {
@@ -33,10 +33,11 @@ export async function generateBlogArticleText({ prompt, client, maxTokens = BLOG
   const response = await activeClient.chat.completions.create({
     model: OPENAI_MODEL,
     max_completion_tokens: maxTokens,
-    reasoning_effort: 'minimal',
+    reasoning_effort: 'low',
     messages: [{ role: 'user', content: prompt }],
   })
-  const body = response.choices?.[0]?.message?.content?.trim() ?? ''
-  if (!body) throw new BlogGenerationError('response_invalid')
+  const choice = response.choices?.[0]
+  const body = typeof choice?.message?.content === 'string' ? choice.message.content.trim() : ''
+  if (choice?.finish_reason !== 'stop' || choice?.message?.refusal || !body) throw new BlogGenerationError('response_invalid')
   return { body, response }
 }

@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {classifyPrecheckResponse,projectPrecheckCache} from '../scripts/lib/mwf-precheck.mjs'
+import {classifyPrecheckResponse,projectPrecheckCache,PRECHECK_REQUEST_VERSION,LEGACY_V2_PRECHECK_REQUEST_VERSION} from '../scripts/lib/mwf-precheck.mjs'
 const response=decision=>({choices:[{finish_reason:'stop',message:{content:JSON.stringify({decision})}}]})
 test('clear, related and ambiguous require completed strict decision envelope',()=>{
  for(const decision of ['clear','related','ambiguous']){const result=classifyPrecheckResponse(200,response(decision));assert.equal(result.reason,`precheck_${decision}`);assert.equal(result.status,decision==='clear'?'clear':'hold')}
- for(const value of [{choices:[{finish_reason:'length',message:{content:'{"decision":"clear"}'}}]},{choices:[{finish_reason:'stop',message:{content:'{"decision":"clear","extra":true}'}}]},response('other'),null])assert.equal(classifyPrecheckResponse(200,value).reason,'precheck_unknown')
+ for(const value of [{choices:[{finish_reason:'length',message:{content:'{"decision":"clear"}'}}]},{choices:[{finish_reason:'stop',message:{content:'{"decision":"clear","extra":true}'}}]},{choices:[{finish_reason:'stop',message:{content:'{"decision":"clear"}',refusal:'mock refusal'}}]},response('other'),null])assert.equal(classifyPrecheckResponse(200,value).reason,'precheck_unknown')
 })
 test('definite HTTP rejection is distinct from uncertain server response and never emits raw errors',()=>{
  for(const status of [400,401,403,404,422,429]){const result=classifyPrecheckResponse(status,{error:{code:'unsupported_value',message:'PRIVATE'}});assert.equal(result.reason,'precheck_request_rejected');assert.equal(result.httpStatus,status);assert.equal(result.errorCode,'unsupported_value');assert.doesNotMatch(JSON.stringify(result),/PRIVATE/)}
@@ -17,12 +17,15 @@ test('legacy hold projection is honest and nonmutating; old clear and unknown re
  for(const record of [{status:'clear',reason:'metadata_precheck'},{status:'hold',reason:'precheck_unknown'}])assert.equal(projectPrecheckCache(record),record)
 })
 
-test('JSON mode structural validator fails old request and accepts explicit JSON v2 request',async()=>{
+test('frozen legacy payload and Luna live JSON contract remain distinct',async()=>{
  const {legacyPrecheckRequest,buildPrecheckRequest}=await import('../scripts/lib/mwf-precheck.mjs')
  const topic={id:'synthetic',title:'Synthetic'},entries=[]
  const providerValidator=request=>request.response_format.type==='json_object'&&request.messages.some(m=>/json/i.test(m.content))?200:400
  assert.equal(providerValidator(legacyPrecheckRequest(topic,entries)),400)
- assert.equal(providerValidator(buildPrecheckRequest(topic,entries)),200)
+ const historical=legacyPrecheckRequest(topic,entries), live=buildPrecheckRequest(topic,entries)
+ assert.deepEqual([historical.model,historical.reasoning_effort],['gpt-5-nano','minimal'])
+ assert.deepEqual([live.model,live.reasoning_effort,live.max_completion_tokens],['gpt-6-luna','low',2000])
+ assert.equal(providerValidator(live),200)
  assert.equal(legacyPrecheckRequest(topic,entries).messages[1].content,buildPrecheckRequest(topic,entries).messages[1].content)
 })
 test('legacy repair requires exact key, unclassified hold and no JSON in any reconstructed message',async()=>{
@@ -39,7 +42,7 @@ test('legacy repair requires exact key, unclassified hold and no JSON in any rec
 
 test('only completed classified HTTP200 ambiguous admits draft-only; no other hold is weakened',async()=>{
  const {precheckDraftDisposition}=await import('../scripts/lib/mwf-precheck.mjs')
- assert.equal(precheckDraftDisposition({...classifyPrecheckResponse(200,response('ambiguous')),requestVersion:'json-context-v2'}),'draft_only')
+ for(const requestVersion of [PRECHECK_REQUEST_VERSION,LEGACY_V2_PRECHECK_REQUEST_VERSION])assert.equal(precheckDraftDisposition({...classifyPrecheckResponse(200,response('ambiguous')),requestVersion}),'draft_only')
  assert.equal(precheckDraftDisposition(classifyPrecheckResponse(200,response('clear'))),'clear')
  for(const result of [classifyPrecheckResponse(200,response('related')),classifyPrecheckResponse(400,response('ambiguous')),classifyPrecheckResponse(500,{}),{status:'hold',reason:'legacy_precheck_unclassified'},{status:'hold',reason:'precheck_ambiguous'},{status:'hold',reason:'precheck_ambiguous',httpStatus:200}, {status:'hold',reason:'duplicate_metadata'}])assert.equal(precheckDraftDisposition(result),'hold')
 })

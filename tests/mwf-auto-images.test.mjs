@@ -23,9 +23,9 @@ function fixture({unknown=false,reviewPass=true,patchUnknown=false,distinct=fals
  const request=async(url,options)=>{
   const input=JSON.parse(options.body)
   if(url==='https://api.openai.com/v1/images/generations'){generated++;assert.equal(input.n,1);assert.equal(input.size,'1536x1024');assert.equal(input.quality,'medium');if(unknown)throw Error('uncertain');if(distinct)bytes[30]=generated;return{ok:true,headers:new Headers({'x-request-id':'req_synthetic'}),json:async()=>({data:[{b64_json:bytes.toString('base64')}]})}}
-  assert.equal(url,'https://api.openai.com/v1/chat/completions');reviewed++;assert.match(input.messages[1].content[1].image_url.url,/^data:image\/png;base64,/)
+  assert.equal(url,'https://api.openai.com/v1/chat/completions');reviewed++;assert.equal(input.model,'gpt-6-luna');assert.equal(input.reasoning_effort,'low');assert.equal(input.response_format.type,'json_object');assert.match(input.messages[1].content[1].image_url.url,/^data:image\/png;base64,/)
   if(reviewMode==='http')return{ok:false,status:500,json:async()=>({error:{message:'DO_NOT_RECORD'}})}
-  return{ok:true,status:200,json:async()=>({id:'chatcmpl-synthetic',choices:[{finish_reason:reviewMode==='length'?'length':'stop',message:{content:reviewMode==='malformed'?'DO_NOT_RECORD':JSON.stringify({suitable:reviewPass,medicalAccuracy:true,notMisleading:true,noIdentifiablePeople:true})}}]})}
+  return{ok:true,status:200,json:async()=>({id:'chatcmpl-synthetic',choices:[{finish_reason:reviewMode==='length'?'length':'stop',message:{refusal:reviewMode==='refusal'?'mock refusal':null,content:reviewMode==='malformed'?'DO_NOT_RECORD':JSON.stringify({suitable:reviewPass,medicalAccuracy:true,notMisleading:true,noIdentifiablePeople:true})}}]})}
  }
  const ensure=createAutoImages({root,github,request,enabled:true,publicRequest:async url=>{assert.match(url,/^https:\/\/aisoukai-media.vercel.app\/images\/library\/generated\/[a-f0-9]{64}.png$/);return{ok:deployed,headers:new Headers({'content-type':'image/png'}),arrayBuffer:async()=>Buffer.from(bytes)}}})
  const journalPath=join(root,'generated-images',`image-${topicContentVersion(topic)}.json`)
@@ -62,7 +62,7 @@ const adopted={adoptionVerified:true}
 test('rejection journal records the cause without model text',async()=>{
  const criteria=fixture({reviewPass:false});assert.equal((await criteria.ensure(topic,adopted)).reason,'visual_review_failed')
  assert.equal(criteria.journal().status,'rejected');assert.deepEqual(criteria.journal().rejection,{kind:'criteria_failed',failed:['suitable'],reviewId:'chatcmpl-synthetic'})
- for(const [reviewMode,rejection] of [['http',{kind:'review_request_failed',httpStatus:500}],['length',{kind:'review_incomplete'}],['malformed',{kind:'review_malformed'}]]){
+ for(const [reviewMode,rejection] of [['http',{kind:'review_request_failed',httpStatus:500}],['length',{kind:'review_incomplete'}],['refusal',{kind:'review_incomplete'}],['malformed',{kind:'review_malformed'}]]){
   const f=fixture({reviewMode});assert.deepEqual(await f.ensure(topic,adopted),{status:'pending',reason:'visual_review_failed'});assert.deepEqual(f.journal().rejection,rejection);assert.doesNotMatch(readFileSync(f.journalPath,'utf8'),/DO_NOT_RECORD/)
   assert.equal((await f.ensure(topic,adopted)).reason,'rejected');assert.equal(f.generated(),1);assert.equal(f.reviewed(),1)
  }
