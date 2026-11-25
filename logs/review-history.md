@@ -926,3 +926,11 @@ slug: 2026-11-25-mwf-b6a6174bbf8e8be4fbb7c6bafeab6c796583f09e6cd01db3d3720a60645
 reviewed_by: 三谷
 date: 2026-11-25
 
+## 2026-11-25T16:56:17.919+09:00
+datetime: 2026-11-25T16:56:17.919+09:00
+action: approve
+slug: 2026-11-25-case-0013
+reviewed_by: 三谷
+date: 2026-11-25
+publish_at: 2026-11-25
+
