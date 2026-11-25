@@ -185,3 +185,17 @@ Policy version: `aisoukai-media-tiered-blog-sns-2026-11-06`。
 - 本変更は `config/media-gate.json` の該当 flags が先生の操作で ON にされた範囲でのみ効力を持つ。flags の変更権限は従来どおり先生のみとし、AI は変更しない。先生はいつでも flags を OFF に戻すことで自動運用を停止できる。
 - 患者情報そのものの読み書き、secrets / credentials / tokens の取得・表示・保存の禁止は維持する。レビュー証拠・監査ログに対象コンテンツの hash と判定結果は記録してよいが、患者を特定し得る本文の引用は最小限とする。
 <!-- END:sns-mutual-review-20261106 -->
+
+<!-- BEGIN:case-blog-intake-20261125 -->
+## 先生による症例ブログ取り込みの明示変更（2026-11-25）
+
+Policy version: `aisoukai-media-tiered-blog-sns-2026-11-06`（変更なし。本節は同 version の下での対象限定の追加改定）。
+根拠: `teacher_20261125_explicit_case_blog_intake_anonymized_photos`。
+この節は、上記の禁止規則のうち、以下の症例ブログ取り込みに限って先生が明示変更した範囲だけを置き換える。対象外の禁止は維持する。
+
+- 対象は、症例アカウント（@mfdc.cases）で公開済みの症例を藍想会メディアのブログ記事として展開する手動取り込みに限る。対象操作は、未承認ドラフト（draft:true / reviewed:false / auto_approved:false）の記事ファイルと写真の配置、配置前の目視確認、validation、対象ファイルだけの commit、origin/main への non-force push のみとする。approve / reject / 公開は引き続き先生本人の操作に限る。
+- 写真は、患者本人の同意が得られ、匿名化済みの作業版（EXIF除去済み、氏名・顔など個人を特定できる情報を含まないもの）に限る。raw データと氏名入りファイル名の使用は禁止する。症例ごとの同意と匿名化の確認は取り込み前に必須とし、確認できない症例は取り込まない。
+- データ宣言の更新: 本節の対象操作に限り、Teacher data handling declaration のスコープに「同意取得済み・匿名化済みの症例写真と症例記事（未承認ドラフト）」を追加する。それ以外の実データ・患者データの読み書き禁止は維持する。
+- push は、本節に基づく v3 task contract が `reviewed_non_force_push` を明示し、独立レビューと7つの完了ゲートをすべて満たす場合に限る。force push、履歴の書き換え、対象外ファイルの変更は禁止する。
+- 取り込み後の記事は通常のレビュー運用に従い、先生が管理画面または CLI で承認するまで公開されない。
+<!-- END:case-blog-intake-20261125 -->
