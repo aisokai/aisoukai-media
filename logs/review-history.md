@@ -934,3 +934,11 @@ reviewed_by: 三谷
 date: 2026-11-25
 publish_at: 2026-11-25
 
+## 2026-11-25T16:56:21.151+09:00
+datetime: 2026-11-25T16:56:21.151+09:00
+action: approve
+slug: 2026-11-25-case-0014
+reviewed_by: 三谷
+date: 2026-11-25
+publish_at: 2026-11-25
+
